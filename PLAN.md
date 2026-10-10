@@ -119,7 +119,11 @@ Conventions:
 
 - **Tables are created on startup with `create_all`, and all models are defined in slice 1 [decision].** `create_all` adds new tables but never alters existing ones. Defining the whole schema up front keeps the persistent Neon database in sync across slices. If a column change is needed later, adopt Alembic at that point.
 - **The owner session is a stdlib-HMAC-signed, HttpOnly, SameSite=Lax cookie signed with SECRET_KEY, valid for 12 hours [decision].** This avoids an extra dependency; Starlette's SessionMiddleware would need `itsdangerous`, which isn't on the allowed list. Logout clears the cookie.
-- **Login is limited in memory: 5 failures within 5 minutes per email or IP → 429.** One Render instance makes in-memory limiting acceptable.
+- **Login is limited in memory, in a 5-minute sliding window (one Render instance, so memory is enough):**
+  - 5 failures for one email from one IP block that pair (429).
+  - 20 failures from one IP across any emails block that IP.
+  - Failures are never counted per email alone; otherwise anyone who knows the owner's email could keep the owner locked out (security review, 2026-10-10).
+  - The client IP is the **rightmost** `X-Forwarded-For` entry, the one Render's proxy appends. The entries to its left are written by the visitor. uvicorn runs with `--no-proxy-headers`, because `--forwarded-allow-ips='*'` would trust the leftmost, visitor-controlled entry.
 - **Email links never act on GET.** "Confirm I'm coming" opens `manage.html?token=…&action=confirm`, and the page then makes the POST. This stops email link scanners from confirming or cancelling bookings.
 - **Time is controlled through `clock.now()`.** Tests fix it so the 2-hour, 24-hour, 60-day and 30-minute rules can be tested deterministically.
 - **Render builds from the Dockerfile [decision].** Check in slice 1 that `ZoneInfo("Europe/Berlin")` works in the slim image. If it doesn't, add the `tzdata` package.
@@ -154,13 +158,14 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - Uses `concurrency: { group: deploy-production, cancel-in-progress: true }` **[decision]**. Otherwise two quick pushes would make the older run wait for a commit that was replaced, and time out.
 - **Manual setup (you):**
   - Create a Neon database and a Render web service with auto-deploy off and the env vars set, including `SEED_DEMO_DATA=true`.
+  - After the first deploy, make one failed login and check the Render log line "Failed owner login from …". It must show your public IP, not an internal `10.x` address. If it shows an internal address, Render adds more than one proxy hop, and `client_ip()` must be adjusted before the per-IP limits mean anything.
   - After the first deploy, check that `/health` shows a commit SHA and not `"dev"`. That confirms Render passes `RENDER_GIT_COMMIT` to the Docker runtime. If it doesn't, the deploy check can never pass.
   - Add GitHub secrets `RENDER_DEPLOY_HOOK_URL` and `JOBS_SECRET`.
   - Add the GitHub variable `APP_URL`.
 - **Tests:**
   - health returns `RENDER_GIT_COMMIT` when it is set and `"dev"` otherwise
   - the menu hides inactive items
-  - login success, 401 and 429
+  - login success, 401 and 429; an attacker can't lock the owner out from another IP; spoofed `X-Forwarded-For` entries don't reset the count; spraying many emails from one IP is blocked
   - an owner route without a session returns 401
   - seed:
     - `SEED_DEMO_DATA` unset or false → only the studio and owner

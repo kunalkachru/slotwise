@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import secrets
 import time
-from collections import defaultdict, deque
+from collections import deque
 
 import bcrypt
 
@@ -71,33 +71,68 @@ def read_session_value(value: str | None, secret_key: str, now: float | None = N
         return None
 
 
+def client_ip(peer: str | None, forwarded_for: str | None) -> str:
+    """The visitor's IP as seen by our own proxy.
+
+    Render's proxy appends the address it received the request from to X-Forwarded-For,
+    so only the rightmost entry is trustworthy; everything to its left is whatever the
+    visitor sent. Without the header (local runs, tests) the socket peer is used.
+    """
+    if forwarded_for:
+        entries = [e.strip() for e in forwarded_for.split(",") if e.strip()]
+        if entries:
+            return entries[-1]
+    return peer or "unknown"
+
+
 class LoginLimiter:
     """In-memory failed-login counter (one Render instance, so memory is enough).
 
-    A key is blocked once it has `max_failures` failures inside `window_seconds`.
-    The app checks both the email and the client IP.
+    Failures are counted per (email, IP) pair and per IP, never per email alone, so a
+    stranger who knows the owner's email can only lock out themselves:
+    - 5 failures for one email from one IP block that pair
+    - 20 failures from one IP (any emails) block that IP
+    Both inside a sliding 5-minute window.
     """
 
-    def __init__(self, max_failures: int = 5, window_seconds: int = 300, clock=time.monotonic):
-        self.max_failures = max_failures
+    def __init__(
+        self,
+        per_account_and_ip: int = 5,
+        per_ip: int = 20,
+        window_seconds: int = 300,
+        clock=time.monotonic,
+    ):
+        self.per_account_and_ip = per_account_and_ip
+        self.per_ip = per_ip
         self.window_seconds = window_seconds
         self.clock = clock
-        self._failures: dict[str, deque[float]] = defaultdict(deque)
+        self._failures: dict[str, deque[float]] = {}
 
-    def _recent(self, key: str) -> deque[float]:
+    def _count(self, key: str) -> int:
+        attempts = self._failures.get(key)
+        if attempts is None:
+            return 0
         cutoff = self.clock() - self.window_seconds
-        attempts = self._failures[key]
         while attempts and attempts[0] < cutoff:
             attempts.popleft()
-        return attempts
+        if not attempts:
+            del self._failures[key]  # keep memory bounded to recent failures
+            return 0
+        return len(attempts)
 
-    def is_blocked(self, *keys: str) -> bool:
-        return any(len(self._recent(k)) >= self.max_failures for k in keys)
+    @staticmethod
+    def _keys(email: str, ip: str) -> tuple[str, str]:
+        return f"pair:{email}|{ip}", f"ip:{ip}"
 
-    def record_failure(self, *keys: str) -> None:
+    def is_blocked(self, email: str, ip: str) -> bool:
+        pair, ip_key = self._keys(email, ip)
+        return self._count(pair) >= self.per_account_and_ip or self._count(ip_key) >= self.per_ip
+
+    def record_failure(self, email: str, ip: str) -> None:
         now = self.clock()
-        for key in keys:
-            self._failures[key].append(now)
+        for key in self._keys(email, ip):
+            self._failures.setdefault(key, deque()).append(now)
 
-    def reset(self, key: str) -> None:
-        self._failures.pop(key, None)
+    def reset(self, email: str, ip: str) -> None:
+        """After a successful login, forget that pair's failures (the IP count stays)."""
+        self._failures.pop(self._keys(email, ip)[0], None)

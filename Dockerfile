@@ -17,6 +17,7 @@ USER slotwise
 
 EXPOSE 8000
 
-# Render sets $PORT. Proxy headers make request.client and https detection correct behind
-# Render's load balancer (login throttling per IP, Secure session cookie).
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
+# Render sets $PORT. Proxy headers are off on purpose: uvicorn would otherwise trust the
+# visitor-controlled left end of X-Forwarded-For. The app reads the proxy-appended
+# rightmost entry itself (app/security.py: client_ip).
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --no-proxy-headers"]

@@ -55,7 +55,7 @@ The jobs must be idempotent, because a call can come late or twice.
 
 **Two kinds of access:**
 - `/public/*`: customers, with no accounts. A customer reaches their own booking only through a secret `manage_token`, and a waitlist offer through an `offer_token`. Generate both with `secrets`. A token must never expose another customer's data.
-- `/owner/*`: one owner, logged in with email and password (bcrypt hash) and a session. Without a session these routes return 401, and the front end redirects to Owner login. `GET /auth/me` checks the session when a page loads.
+- `/owner/*`: one owner, logged in with email and password (bcrypt hash) and a session. Failed logins are throttled per (email, IP) pair and per IP, never per email alone, so nobody can lock the owner out. The IP is the rightmost `X-Forwarded-For` entry (`app/security.py: client_ip`). Keep uvicorn on `--no-proxy-headers`. Without a session these routes return 401, and the front end redirects to Owner login. `GET /auth/me` checks the session when a page loads.
 - Other endpoints:
   - `GET /health` returns `status`, and `version` = `RENDER_GIT_COMMIT` (`"dev"` when it isn't set). The deploy workflow compares this version with the commit it deployed, so don't change its shape.
   - `GET /public/studio` returns the studio header data.
