@@ -1,0 +1,1930 @@
+{
+  "type": "app-idea-blueprint",
+  "version": 2,
+  "form_title": "App Idea Blueprint — Front End, Back End & Database",
+  "saved_at": "2026-10-10T11:17:39.563Z",
+  "app_name": "Slotwise",
+  "progress": {
+    "required_answered": 27,
+    "required_total": 27,
+    "complete": true,
+    "issues_to_review": 0
+  },
+  "derived": {
+    "api_endpoints": [
+      {
+        "method": "GET",
+        "path": "/public/services",
+        "used_by": [
+          "Home › Service menu",
+          "Book › Services"
+        ],
+        "sends": [
+          "nothing"
+        ],
+        "returns": [
+          "list of active categories with their services (id, name, description, duration_minutes, price) and each service's add-ons",
+          "services with id, name, duration_minutes, price and their add-ons"
+        ],
+        "errors": [
+          "500: show 'Could not load the menu. Please refresh.'",
+          "500: show 'Could not load services.'"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/public/therapists?service_ids=",
+        "used_by": [
+          "Book › Therapist"
+        ],
+        "sends": [
+          "chosen service ids"
+        ],
+        "returns": [
+          "list of therapists (id, display_name, short_bio)"
+        ],
+        "errors": [
+          "404: show 'No therapist offers this combination. Please remove a service.'"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/public/availability?date=&therapist_id=&service_ids=&add_on_ids=",
+        "used_by": [
+          "Book › Date"
+        ],
+        "sends": [
+          "date, therapist_id (or empty for no preference), service_ids, add_on_ids"
+        ],
+        "returns": [
+          "free start times for that day (time, therapist_id, therapist_name), based on total duration plus buffer"
+        ],
+        "errors": [
+          "422: show 'Please choose a date within the next 60 days.'"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/public/bookings",
+        "used_by": [
+          "Book › Confirm booking"
+        ],
+        "sends": [
+          "service_ids, add_on_ids, therapist_id, date, start_time, first_name, last_name, email, phone, note"
+        ],
+        "returns": [
+          "the booking with id, manage_token, itemized items, total_price, total_minutes, start and end time"
+        ],
+        "errors": [
+          "400: 'That time was just taken. Please pick another.' (refresh free times); 422: highlight the missing or invalid field, e.g., 'Please enter your phone number.'"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/public/waitlist",
+        "used_by": [
+          "Book › Join waitlist"
+        ],
+        "sends": [
+          "service_ids, add_on_ids, therapist_id (optional), preferred_date, earliest_time, latest_time, first_name, last_name, email, phone"
+        ],
+        "returns": [
+          "the waitlist entry and its position in the queue"
+        ],
+        "errors": [
+          "422: highlight missing fields; 409: 'You are already on the waitlist for this day.'"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/public/bookings/{token}",
+        "used_by": [
+          "Manage booking › My booking"
+        ],
+        "sends": [
+          "token from the link"
+        ],
+        "returns": [
+          "booking details with items, status, total_price and cancellation deadline"
+        ],
+        "errors": [
+          "404: show 'Booking not found. Please check the link in your email.'"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/public/bookings/{token}/confirm",
+        "used_by": [
+          "Manage booking › Confirm I'm coming"
+        ],
+        "sends": [
+          "token"
+        ],
+        "returns": [
+          "updated booking with status confirmed"
+        ],
+        "errors": [
+          "400: 'This booking can no longer be confirmed.'; 404: 'Booking not found.'"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/public/bookings/{token}/cancel",
+        "used_by": [
+          "Manage booking › Cancel booking"
+        ],
+        "sends": [
+          "token"
+        ],
+        "returns": [
+          "updated booking with status cancelled and whether it counted as a late cancellation"
+        ],
+        "errors": [
+          "400: 'This booking is already cancelled or finished.'; 404: 'Booking not found.'"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/public/waitlist/offers/{token}",
+        "used_by": [
+          "Claim waitlist slot › Offer details"
+        ],
+        "sends": [
+          "token from the link"
+        ],
+        "returns": [
+          "offer details, expires_at and status (open, claimed, expired)"
+        ],
+        "errors": [
+          "404: 'Offer not found.'; 410: 'Sorry, this offer has expired.'"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/public/waitlist/offers/{token}/claim",
+        "used_by": [
+          "Claim waitlist slot › Claim this slot"
+        ],
+        "sends": [
+          "token"
+        ],
+        "returns": [
+          "the new booking with manage_token and items"
+        ],
+        "errors": [
+          "400: 'Someone else was faster. You are still on the waitlist.'; 410: 'This offer has expired.'"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "used_by": [
+          "Owner login › Log in"
+        ],
+        "sends": [
+          "email, password"
+        ],
+        "returns": [
+          "session cookie and the owner's name"
+        ],
+        "errors": [
+          "401: 'Email or password is wrong.'; 429: 'Too many attempts. Try again in 5 minutes.'"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/owner/dashboard?date=",
+        "used_by": [
+          "Dashboard › Key numbers"
+        ],
+        "sends": [
+          "date (default today)"
+        ],
+        "returns": [
+          "the numbers above plus today's booking list"
+        ],
+        "errors": [
+          "401: go to Owner login"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/auth/logout",
+        "used_by": [
+          "Dashboard › Log out"
+        ],
+        "sends": [
+          "nothing"
+        ],
+        "returns": [
+          "ok"
+        ],
+        "errors": [
+          "none"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/owner/bookings?from=&to=&therapist_id=&status=&q=",
+        "used_by": [
+          "Bookings › Calendar / list"
+        ],
+        "sends": [
+          "date range and filters"
+        ],
+        "returns": [
+          "list of bookings with items and totals"
+        ],
+        "errors": [
+          "401: go to Owner login"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/owner/bookings",
+        "used_by": [
+          "Bookings › Add booking"
+        ],
+        "sends": [
+          "same fields as the public booking"
+        ],
+        "returns": [
+          "the saved booking"
+        ],
+        "errors": [
+          "400: 'That time is already booked.'; 422: highlight missing fields"
+        ]
+      },
+      {
+        "method": "PUT",
+        "path": "/owner/bookings/{id}/status",
+        "used_by": [
+          "Bookings › Change status"
+        ],
+        "sends": [
+          "status"
+        ],
+        "returns": [
+          "updated booking"
+        ],
+        "errors": [
+          "400: 'A visit can only be marked done or no-show after its start time.'"
+        ]
+      },
+      {
+        "method": "PUT",
+        "path": "/owner/bookings/{id}/items",
+        "used_by": [
+          "Bookings › Adjust final items"
+        ],
+        "sends": [
+          "list of items (item_type, name, quantity, unit_price)"
+        ],
+        "returns": [
+          "updated booking with new total"
+        ],
+        "errors": [
+          "422: 'Quantity and price must be positive.'"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/owner/bookings/{id}/receipt",
+        "used_by": [
+          "Bookings › Send receipt"
+        ],
+        "sends": [
+          "nothing"
+        ],
+        "returns": [
+          "receipt number and sent_at"
+        ],
+        "errors": [
+          "400: 'Only finished visits can get a receipt.'"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/owner/bookings/export.csv?from=&to=",
+        "used_by": [
+          "Bookings › Export CSV"
+        ],
+        "sends": [
+          "date range"
+        ],
+        "returns": [
+          "CSV file"
+        ],
+        "errors": [
+          "422: 'Please choose a date range.'"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/owner/services",
+        "used_by": [
+          "Services & add-ons › Service list"
+        ],
+        "sends": [
+          "nothing"
+        ],
+        "returns": [
+          "services with their add-ons"
+        ],
+        "errors": [
+          "401: go to Owner login"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/owner/services  (edit: PUT /owner/services/{id})",
+        "used_by": [
+          "Services & add-ons › Add / edit service"
+        ],
+        "sends": [
+          "service fields"
+        ],
+        "returns": [
+          "the saved service"
+        ],
+        "errors": [
+          "422: 'Price must be 0 or more and duration a multiple of 15 minutes.'; 409: 'A service with this name already exists.'"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/owner/add-ons  (edit: PUT /owner/add-ons/{id})",
+        "used_by": [
+          "Services & add-ons › Add / edit add-on"
+        ],
+        "sends": [
+          "add-on fields"
+        ],
+        "returns": [
+          "the saved add-on"
+        ],
+        "errors": [
+          "422: highlight invalid fields"
+        ]
+      },
+      {
+        "method": "PUT",
+        "path": "/owner/services/{id}",
+        "used_by": [
+          "Services & add-ons › Active"
+        ],
+        "sends": [
+          "active true/false"
+        ],
+        "returns": [
+          "updated service"
+        ],
+        "errors": [
+          "404: 'Service not found.'"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/owner/therapists",
+        "used_by": [
+          "Therapists & hours › Therapists"
+        ],
+        "sends": [
+          "nothing"
+        ],
+        "returns": [
+          "therapists with their service ids"
+        ],
+        "errors": [
+          "401: go to Owner login"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/owner/therapists  (edit: PUT /owner/therapists/{id})",
+        "used_by": [
+          "Therapists & hours › Add / edit therapist"
+        ],
+        "sends": [
+          "therapist fields"
+        ],
+        "returns": [
+          "saved therapist"
+        ],
+        "errors": [
+          "422: 'Please pick at least one service.'"
+        ]
+      },
+      {
+        "method": "PUT",
+        "path": "/owner/therapists/{id}/hours",
+        "used_by": [
+          "Therapists & hours › Weekly hours"
+        ],
+        "sends": [
+          "list of weekday, start_time, end_time"
+        ],
+        "returns": [
+          "saved hours"
+        ],
+        "errors": [
+          "422: 'End time must be after start time.'"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/owner/days-off  (remove: DELETE /owner/days-off/{id})",
+        "used_by": [
+          "Therapists & hours › Days off"
+        ],
+        "sends": [
+          "therapist_id (optional), date, reason"
+        ],
+        "returns": [
+          "saved day off plus any existing bookings on that day as a warning"
+        ],
+        "errors": [
+          "409: 'There are bookings on this day. Move or cancel them first.'"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/owner/waitlist?date=",
+        "used_by": [
+          "Waitlist › Waiting customers"
+        ],
+        "sends": [
+          "date filter (optional)"
+        ],
+        "returns": [
+          "waitlist entries with offer history"
+        ],
+        "errors": [
+          "401: go to Owner login"
+        ]
+      },
+      {
+        "method": "DELETE",
+        "path": "/owner/waitlist/{id}",
+        "used_by": [
+          "Waitlist › Remove from waitlist"
+        ],
+        "sends": [
+          "nothing"
+        ],
+        "returns": [
+          "ok"
+        ],
+        "errors": [
+          "404: 'Entry not found.'"
+        ]
+      }
+    ],
+    "issues_to_review": []
+  },
+  "answers": {
+    "your_name": {
+      "section": "The Big Idea",
+      "question": "Your name",
+      "answer": "Kunal Kachru"
+    },
+    "app_name": {
+      "section": "The Big Idea",
+      "question": "App name",
+      "answer": "Slotwise"
+    },
+    "one_sentence_pitch": {
+      "section": "The Big Idea",
+      "question": "One-sentence pitch",
+      "answer": "Slotwise helps small appointment-based studios (demo: Isar Wellness, a wellness studio offering massages, facials and reflexology) take online bookings from a clear itemized price menu so that no-shows drop and cancelled slots get refilled automatically from a waitlist."
+    },
+    "the_problem_being_solved": {
+      "section": "The Big Idea",
+      "question": "The problem being solved",
+      "answer": "Small service businesses such as massage and wellness studios, physiotherapists, tutors and repair shops take most bookings by phone, WhatsApp or a paper diary. The owner answers calls during treatments, prices are only explained verbally, and customers regularly forget appointments or cancel at the last minute. A cancelled 60-minute massage at EUR 70 usually stays empty because there is no quick way to tell the customers who wanted that time. Big platforms (Fresha, Treatwell) exist, but they take commission or feel too heavy for a one- to three-person studio. Today owners cope with phone reminders by hand, WhatsApp broadcasts and simply accepting the lost income."
+    },
+    "who_will_use_the_app": {
+      "section": "The Big Idea",
+      "question": "Who will use the app",
+      "answer": [
+        "Customers or the general public",
+        "Owner or administrator"
+      ]
+    },
+    "type_of_app": {
+      "section": "The Big Idea",
+      "question": "Type of app",
+      "answer": "Booking or scheduling (e.g., salon, clinic, class slots)"
+    },
+    "how_you_will_know_it_is_working": {
+      "section": "The Big Idea",
+      "question": "How you will know it is working",
+      "answer": "Within 3 months: no-show rate below 5% (from roughly 10-15% today), at least 50% of cancelled slots refilled through the waitlist, and at least 60% of bookings made online instead of by phone. The owner dashboard shows all three numbers."
+    },
+    "front_end_look_and_feel": {
+      "section": "Front End — Look and Feel",
+      "question": "Front end: Look and feel",
+      "answer": "Clean and minimal"
+    },
+    "front_end_color_theme": {
+      "section": "Front End — Look and Feel",
+      "question": "Front end: Color theme",
+      "answer": "Fresh green (primary #1F8756, accent #33C375)"
+    },
+    "front_end_custom_colors": {
+      "section": "Front End — Look and Feel",
+      "question": "Front end: Custom colors",
+      "answer": null
+    },
+    "front_end_light_or_dark_mode": {
+      "section": "Front End — Look and Feel",
+      "question": "Front end: Light or dark mode",
+      "answer": "Light background"
+    },
+    "front_end_font_style": {
+      "section": "Front End — Look and Feel",
+      "question": "Front end: Font style",
+      "answer": "Modern and clean (sans-serif)"
+    },
+    "front_end_shape_of_buttons_and_cards": {
+      "section": "Front End — Look and Feel",
+      "question": "Front end: Shape of buttons and cards",
+      "answer": "Softly rounded (a safe default)"
+    },
+    "front_end_logo_and_inspiration": {
+      "section": "Front End — Look and Feel",
+      "question": "Front end: Logo and inspiration",
+      "answer": "No logo yet: use the word 'Slotwise' in the primary green with a small leaf or clock icon. Booking flow inspired by Calendly (one clear step at a time, big tappable time buttons). The service menu should read like a clean restaurant menu: name, one-line description, duration and price aligned on the right."
+    },
+    "front_end_devices": {
+      "section": "Front End — Look and Feel",
+      "question": "Front end: Devices",
+      "answer": [
+        "Phone (mobile-friendly first)",
+        "Laptop or desktop"
+      ]
+    },
+    "front_end_sketch_or_mock_up_link": {
+      "section": "Front End — Look and Feel",
+      "question": "Front end: Sketch or mock-up link",
+      "answer": null
+    },
+    "front_end_login_and_accounts": {
+      "section": "Front End — Screens, Controls and Navigation",
+      "question": "Front end: Login and accounts",
+      "answer": "Yes: email and password"
+    },
+    "front_end_navigation_style": {
+      "section": "Front End — Screens, Controls and Navigation",
+      "question": "Front end: Navigation style",
+      "answer": "Customers: simple top bar with the studio name and 'Book now'. Owner area: side menu (Dashboard, Bookings, Services & add-ons, Therapists & hours, Waitlist, Log out)"
+    },
+    "front_end_most_important_user_journey_step_by_step": {
+      "section": "Front End — Screens, Controls and Navigation",
+      "question": "Front end: Most important user journey, step by step",
+      "answer": "Customer taps the studio's booking link on Instagram or Google Maps -> sees the itemized menu on Home -> taps Book next to 'Deep tissue massage 60 min, EUR 70' -> adds the add-on 'Hot stones, +15 min, EUR 12' -> picks therapist Lena -> picks Friday -> taps the free time 17:00 -> enters name, email and phone -> checks the summary (massage EUR 70 + hot stones EUR 12 = EUR 82, 75 minutes, pay at the studio) -> taps Confirm booking -> sees the confirmation screen and receives an email with the itemized summary and a manage link -> 24 hours before, gets a reminder email and taps 'Confirm I'm coming'. If she has to cancel instead, the slot is automatically offered to the first matching person on the waitlist."
+    },
+    "front_end_screens_and_controls": {
+      "section": "Front End — Screens, Controls and Navigation",
+      "question": "Front end: Screens and controls",
+      "answer": [
+        {
+          "name": "Home",
+          "purpose": "Customer sees the studio, the full itemized service menu with prices and durations, and starts a booking",
+          "who_can_see": "Everyone (no login)",
+          "controls": [
+            {
+              "type": "label_text",
+              "label": "Studio header",
+              "shows_or_collects": "Studio name, address, phone, opening hours and the cancellation policy (free up to 24 hours before)",
+              "action": "display_only"
+            },
+            {
+              "type": "table",
+              "label": "Service menu",
+              "shows_or_collects": "Grouped by category (Massages, Facials, Reflexology). Columns: service name, short description, duration, price in EUR",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/public/services",
+              "api_sends": "nothing",
+              "api_returns": "list of active categories with their services (id, name, description, duration_minutes, price) and each service's add-ons",
+              "api_errors": "500: show 'Could not load the menu. Please refresh.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "button",
+              "label": "Book now",
+              "shows_or_collects": "Starts a booking (a Book button also appears next to every service and preselects it)",
+              "action": "go_to_screen",
+              "goes_to_screen": "Book"
+            },
+            {
+              "type": "menu_link",
+              "label": "Manage my booking",
+              "shows_or_collects": "Short explanation that customers manage bookings from the link in their confirmation email",
+              "action": "go_to_screen",
+              "goes_to_screen": "Manage booking"
+            },
+            {
+              "type": "menu_link",
+              "label": "Studio login",
+              "shows_or_collects": "Small link in the footer for the owner",
+              "action": "go_to_screen",
+              "goes_to_screen": "Owner login"
+            }
+          ]
+        },
+        {
+          "name": "Book",
+          "purpose": "Customer picks services and add-ons, a therapist, a date and a free time, enters their details, checks the itemized summary and confirms",
+          "who_can_see": "Everyone (no login)",
+          "controls": [
+            {
+              "type": "checkboxes",
+              "label": "Services",
+              "shows_or_collects": "Active services from the menu (at least one required); preselected if the customer came from a Book button",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/public/services",
+              "api_sends": "nothing",
+              "api_returns": "services with id, name, duration_minutes, price and their add-ons",
+              "api_errors": "500: show 'Could not load services.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "checkboxes",
+              "label": "Add-ons",
+              "shows_or_collects": "Add-ons belonging to the chosen services, e.g., Hot stones +15 min +EUR 12, Aromatherapy oil +0 min +EUR 5. Updates the summary.",
+              "action": "update_this_screen"
+            },
+            {
+              "type": "option_buttons",
+              "label": "Therapist",
+              "shows_or_collects": "Therapists who offer every chosen service, plus 'No preference'",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/public/therapists?service_ids=",
+              "api_sends": "chosen service ids",
+              "api_returns": "list of therapists (id, display_name, short_bio)",
+              "api_errors": "404: show 'No therapist offers this combination. Please remove a service.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "date_picker",
+              "label": "Date",
+              "shows_or_collects": "A date from tomorrow up to 60 days ahead; days off and closed days are greyed out",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/public/availability?date=&therapist_id=&service_ids=&add_on_ids=",
+              "api_sends": "date, therapist_id (or empty for no preference), service_ids, add_on_ids",
+              "api_returns": "free start times for that day (time, therapist_id, therapist_name), based on total duration plus buffer",
+              "api_errors": "422: show 'Please choose a date within the next 60 days.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "table",
+              "label": "Free times",
+              "shows_or_collects": "Buttons for each free start time (every 15 minutes), with the therapist name. Selecting one updates the summary. If the list is empty, the Join waitlist box is shown.",
+              "action": "display_only"
+            },
+            {
+              "type": "form",
+              "label": "Your details",
+              "shows_or_collects": "first name (required), last name (required), email (required), phone (required), note for the therapist (optional, max 300 characters, with the hint 'Please don't enter medical details')",
+              "action": "display_only"
+            },
+            {
+              "type": "table",
+              "label": "Booking summary",
+              "shows_or_collects": "Itemized lines: each service and add-on with its price, then total duration, total price in EUR, and the note 'Pay at the studio'",
+              "action": "display_only"
+            },
+            {
+              "type": "button",
+              "label": "Confirm booking",
+              "shows_or_collects": "Saves the booking",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/public/bookings",
+              "api_sends": "service_ids, add_on_ids, therapist_id, date, start_time, first_name, last_name, email, phone, note",
+              "api_returns": "the booking with id, manage_token, itemized items, total_price, total_minutes, start and end time",
+              "api_errors": "400: 'That time was just taken. Please pick another.' (refresh free times); 422: highlight the missing or invalid field, e.g., 'Please enter your phone number.'",
+              "then_go_to_screen": "Booking confirmation"
+            },
+            {
+              "type": "form",
+              "label": "Join waitlist",
+              "shows_or_collects": "Shown when no times are free: preferred date, earliest and latest time, plus the customer details above",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/public/waitlist",
+              "api_sends": "service_ids, add_on_ids, therapist_id (optional), preferred_date, earliest_time, latest_time, first_name, last_name, email, phone",
+              "api_returns": "the waitlist entry and its position in the queue",
+              "api_errors": "422: highlight missing fields; 409: 'You are already on the waitlist for this day.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "menu_link",
+              "label": "Back",
+              "shows_or_collects": "Return to the menu",
+              "action": "go_to_screen",
+              "goes_to_screen": "Home"
+            }
+          ]
+        },
+        {
+          "name": "Booking confirmation",
+          "purpose": "Shows that the booking worked, with the full itemized summary",
+          "who_can_see": "The customer who just booked",
+          "controls": [
+            {
+              "type": "label_text",
+              "label": "Success message",
+              "shows_or_collects": "'You're booked!' plus date, time, therapist, studio address and 'A confirmation has been emailed to you.'",
+              "action": "display_only"
+            },
+            {
+              "type": "table",
+              "label": "Itemized summary",
+              "shows_or_collects": "Each service and add-on with its price, total duration, total price, 'Pay at the studio'",
+              "action": "display_only"
+            },
+            {
+              "type": "label_text",
+              "label": "Manage link note",
+              "shows_or_collects": "'Use the link in your email to confirm, cancel or view your receipt.'",
+              "action": "display_only"
+            },
+            {
+              "type": "button",
+              "label": "Back to home",
+              "shows_or_collects": "Returns to the studio page",
+              "action": "go_to_screen",
+              "goes_to_screen": "Home"
+            }
+          ]
+        },
+        {
+          "name": "Manage booking",
+          "purpose": "Customer opens their booking from the email link (no login) to see the itemized details, confirm, cancel, or view the final receipt",
+          "who_can_see": "Anyone with the secret link from the email",
+          "controls": [
+            {
+              "type": "table",
+              "label": "My booking",
+              "shows_or_collects": "Status, date, time, therapist, itemized lines with prices, total; after the visit the final receipt lines",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/public/bookings/{token}",
+              "api_sends": "token from the link",
+              "api_returns": "booking details with items, status, total_price and cancellation deadline",
+              "api_errors": "404: show 'Booking not found. Please check the link in your email.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "button",
+              "label": "Confirm I'm coming",
+              "shows_or_collects": "Marks the booking as confirmed (also available as a one-click link in the reminder email)",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/public/bookings/{token}/confirm",
+              "api_sends": "token",
+              "api_returns": "updated booking with status confirmed",
+              "api_errors": "400: 'This booking can no longer be confirmed.'; 404: 'Booking not found.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "button",
+              "label": "Cancel booking",
+              "shows_or_collects": "Cancels the booking after a 'Are you sure?' prompt; frees the slot and triggers the waitlist",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/public/bookings/{token}/cancel",
+              "api_sends": "token",
+              "api_returns": "updated booking with status cancelled and whether it counted as a late cancellation",
+              "api_errors": "400: 'This booking is already cancelled or finished.'; 404: 'Booking not found.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "button",
+              "label": "Book again",
+              "shows_or_collects": "Starts a new booking",
+              "action": "go_to_screen",
+              "goes_to_screen": "Book"
+            }
+          ]
+        },
+        {
+          "name": "Claim waitlist slot",
+          "purpose": "Customer from the waitlist opens the offer link and claims a freed slot before it expires",
+          "who_can_see": "Anyone with the offer link from the waitlist email",
+          "controls": [
+            {
+              "type": "label_text",
+              "label": "Offer details",
+              "shows_or_collects": "Freed date and time, therapist, itemized services and total price, and a countdown until the offer expires (30 minutes)",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/public/waitlist/offers/{token}",
+              "api_sends": "token from the link",
+              "api_returns": "offer details, expires_at and status (open, claimed, expired)",
+              "api_errors": "404: 'Offer not found.'; 410: 'Sorry, this offer has expired.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "button",
+              "label": "Claim this slot",
+              "shows_or_collects": "Turns the offer into a real booking",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/public/waitlist/offers/{token}/claim",
+              "api_sends": "token",
+              "api_returns": "the new booking with manage_token and items",
+              "api_errors": "400: 'Someone else was faster. You are still on the waitlist.'; 410: 'This offer has expired.'",
+              "then_go_to_screen": "Booking confirmation"
+            },
+            {
+              "type": "button",
+              "label": "No thanks",
+              "shows_or_collects": "Declines; the offer moves on to the next person on the waitlist",
+              "action": "go_to_screen",
+              "goes_to_screen": "Home"
+            }
+          ]
+        },
+        {
+          "name": "Owner login",
+          "purpose": "The studio owner signs in to manage the studio",
+          "who_can_see": "Everyone (only the owner has an account)",
+          "controls": [
+            {
+              "type": "form",
+              "label": "Login form",
+              "shows_or_collects": "email (required), password (required)",
+              "action": "display_only"
+            },
+            {
+              "type": "button",
+              "label": "Log in",
+              "shows_or_collects": "Checks the email and password",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/auth/login",
+              "api_sends": "email, password",
+              "api_returns": "session cookie and the owner's name",
+              "api_errors": "401: 'Email or password is wrong.'; 429: 'Too many attempts. Try again in 5 minutes.'",
+              "then_go_to_screen": "Dashboard"
+            },
+            {
+              "type": "menu_link",
+              "label": "Back to studio page",
+              "shows_or_collects": "Returns to the public page",
+              "action": "go_to_screen",
+              "goes_to_screen": "Home"
+            }
+          ]
+        },
+        {
+          "name": "Dashboard",
+          "purpose": "Owner sees today at a glance and the key numbers that show whether no-shows are going down",
+          "who_can_see": "Logged-in owner",
+          "controls": [
+            {
+              "type": "menu_link",
+              "label": "Owner menu",
+              "shows_or_collects": "Side menu: Dashboard, Bookings, Services & add-ons, Therapists & hours, Waitlist, Log out",
+              "action": "go_to_screen",
+              "goes_to_screen": "Bookings"
+            },
+            {
+              "type": "label_text",
+              "label": "Key numbers",
+              "shows_or_collects": "Today's bookings, expected revenue today, confirmation rate, no-show rate last 30 days, slots refilled from the waitlist last 30 days, revenue recovered through the waitlist",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/owner/dashboard?date=",
+              "api_sends": "date (default today)",
+              "api_returns": "the numbers above plus today's booking list",
+              "api_errors": "401: go to Owner login",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "table",
+              "label": "Today's appointments",
+              "shows_or_collects": "Columns: time, customer, therapist, services, total, status (booked / confirmed / done / no-show / cancelled). Clicking a row opens it on Bookings.",
+              "action": "display_only"
+            },
+            {
+              "type": "chart",
+              "label": "No-shows per week",
+              "shows_or_collects": "Bar chart of no-shows and late cancellations for the last 8 weeks",
+              "action": "display_only"
+            },
+            {
+              "type": "button",
+              "label": "Log out",
+              "shows_or_collects": "Ends the session",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/auth/logout",
+              "api_sends": "nothing",
+              "api_returns": "ok",
+              "api_errors": "none",
+              "then_go_to_screen": "Home"
+            }
+          ]
+        },
+        {
+          "name": "Bookings",
+          "purpose": "Owner views bookings in a calendar or list, adds phone bookings, marks visits done or no-show, adjusts the final items and sends the receipt",
+          "who_can_see": "Logged-in owner",
+          "controls": [
+            {
+              "type": "table",
+              "label": "Calendar / list",
+              "shows_or_collects": "Day or week view per therapist; list view with columns date, time, customer, services, total, status. Filter by therapist, status and date range; search by customer name or phone.",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/owner/bookings?from=&to=&therapist_id=&status=&q=",
+              "api_sends": "date range and filters",
+              "api_returns": "list of bookings with items and totals",
+              "api_errors": "401: go to Owner login",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "form",
+              "label": "Add booking",
+              "shows_or_collects": "For phone bookings: services, add-ons, therapist, date, time, customer name, email, phone",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/owner/bookings",
+              "api_sends": "same fields as the public booking",
+              "api_returns": "the saved booking",
+              "api_errors": "400: 'That time is already booked.'; 422: highlight missing fields",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "dropdown",
+              "label": "Change status",
+              "shows_or_collects": "booked, confirmed, done, no-show, cancelled",
+              "action": "call_api",
+              "api_method": "PUT",
+              "api_path": "/owner/bookings/{id}/status",
+              "api_sends": "status",
+              "api_returns": "updated booking",
+              "api_errors": "400: 'A visit can only be marked done or no-show after its start time.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "form",
+              "label": "Adjust final items",
+              "shows_or_collects": "Add, remove or change lines done on the day (e.g., extra 15 minutes, product sold). Prices are prefilled from the menu but can be edited.",
+              "action": "call_api",
+              "api_method": "PUT",
+              "api_path": "/owner/bookings/{id}/items",
+              "api_sends": "list of items (item_type, name, quantity, unit_price)",
+              "api_returns": "updated booking with new total",
+              "api_errors": "422: 'Quantity and price must be positive.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "button",
+              "label": "Send receipt",
+              "shows_or_collects": "Emails the final itemized receipt to the customer and makes it visible on Manage booking",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/owner/bookings/{id}/receipt",
+              "api_sends": "nothing",
+              "api_returns": "receipt number and sent_at",
+              "api_errors": "400: 'Only finished visits can get a receipt.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "button",
+              "label": "Export CSV",
+              "shows_or_collects": "Downloads the filtered bookings with items",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/owner/bookings/export.csv?from=&to=",
+              "api_sends": "date range",
+              "api_returns": "CSV file",
+              "api_errors": "422: 'Please choose a date range.'",
+              "then_go_to_screen": null
+            }
+          ]
+        },
+        {
+          "name": "Services & add-ons",
+          "purpose": "Owner manages the itemized menu customers see: categories, services, add-ons, prices and durations",
+          "who_can_see": "Logged-in owner",
+          "controls": [
+            {
+              "type": "table",
+              "label": "Service list",
+              "shows_or_collects": "Columns: category, name, duration, price, buffer after, active",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/owner/services",
+              "api_sends": "nothing",
+              "api_returns": "services with their add-ons",
+              "api_errors": "401: go to Owner login",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "form",
+              "label": "Add / edit service",
+              "shows_or_collects": "category, name, description, duration_minutes (15 to 240, steps of 15), price, buffer_minutes (0 to 30), active",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/owner/services  (edit: PUT /owner/services/{id})",
+              "api_sends": "service fields",
+              "api_returns": "the saved service",
+              "api_errors": "422: 'Price must be 0 or more and duration a multiple of 15 minutes.'; 409: 'A service with this name already exists.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "form",
+              "label": "Add / edit add-on",
+              "shows_or_collects": "parent service, name, extra_minutes (0 to 60), price, active",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/owner/add-ons  (edit: PUT /owner/add-ons/{id})",
+              "api_sends": "add-on fields",
+              "api_returns": "the saved add-on",
+              "api_errors": "422: highlight invalid fields",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "toggle",
+              "label": "Active",
+              "shows_or_collects": "Hides or shows a service on the public menu without deleting it (old bookings keep their prices)",
+              "action": "call_api",
+              "api_method": "PUT",
+              "api_path": "/owner/services/{id}",
+              "api_sends": "active true/false",
+              "api_returns": "updated service",
+              "api_errors": "404: 'Service not found.'",
+              "then_go_to_screen": null
+            }
+          ]
+        },
+        {
+          "name": "Therapists & hours",
+          "purpose": "Owner manages therapists, which services each offers, weekly opening hours and days off",
+          "who_can_see": "Logged-in owner",
+          "controls": [
+            {
+              "type": "table",
+              "label": "Therapists",
+              "shows_or_collects": "Columns: name, services offered, active",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/owner/therapists",
+              "api_sends": "nothing",
+              "api_returns": "therapists with their service ids",
+              "api_errors": "401: go to Owner login",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "form",
+              "label": "Add / edit therapist",
+              "shows_or_collects": "display_name, short_bio, services offered (checkboxes), active",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/owner/therapists  (edit: PUT /owner/therapists/{id})",
+              "api_sends": "therapist fields",
+              "api_returns": "saved therapist",
+              "api_errors": "422: 'Please pick at least one service.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "form",
+              "label": "Weekly hours",
+              "shows_or_collects": "For each therapist and weekday: start and end time, or closed",
+              "action": "call_api",
+              "api_method": "PUT",
+              "api_path": "/owner/therapists/{id}/hours",
+              "api_sends": "list of weekday, start_time, end_time",
+              "api_returns": "saved hours",
+              "api_errors": "422: 'End time must be after start time.'",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "form",
+              "label": "Days off",
+              "shows_or_collects": "Therapist (or whole studio), date, reason",
+              "action": "call_api",
+              "api_method": "POST",
+              "api_path": "/owner/days-off  (remove: DELETE /owner/days-off/{id})",
+              "api_sends": "therapist_id (optional), date, reason",
+              "api_returns": "saved day off plus any existing bookings on that day as a warning",
+              "api_errors": "409: 'There are bookings on this day. Move or cancel them first.'",
+              "then_go_to_screen": null
+            }
+          ]
+        },
+        {
+          "name": "Waitlist",
+          "purpose": "Owner sees who is waiting and the history of offers sent for freed slots",
+          "who_can_see": "Logged-in owner",
+          "controls": [
+            {
+              "type": "table",
+              "label": "Waiting customers",
+              "shows_or_collects": "Columns: customer, services, preferred date and time window, therapist, joined at, status (waiting / offered / booked / expired)",
+              "action": "call_api",
+              "api_method": "GET",
+              "api_path": "/owner/waitlist?date=",
+              "api_sends": "date filter (optional)",
+              "api_returns": "waitlist entries with offer history",
+              "api_errors": "401: go to Owner login",
+              "then_go_to_screen": null
+            },
+            {
+              "type": "button",
+              "label": "Remove from waitlist",
+              "shows_or_collects": "Removes an entry",
+              "action": "call_api",
+              "api_method": "DELETE",
+              "api_path": "/owner/waitlist/{id}",
+              "api_sends": "nothing",
+              "api_returns": "ok",
+              "api_errors": "404: 'Entry not found.'",
+              "then_go_to_screen": null
+            }
+          ]
+        }
+      ]
+    },
+    "front_end_start_screen": {
+      "section": "Front End — Screens, Controls and Navigation",
+      "question": "Front end: Start screen",
+      "answer": "Home"
+    },
+    "front_end_screen_after_login": {
+      "section": "Front End — Screens, Controls and Navigation",
+      "question": "Front end: Screen after login",
+      "answer": "Dashboard"
+    },
+    "front_end_navigation_map_in_words": {
+      "section": "Front End — Screens, Controls and Navigation",
+      "question": "Front end: Navigation map in words",
+      "answer": "Customer: Home -> Book -> Booking confirmation -> (email link) Manage booking. If no times are free on Book, the customer joins the waitlist and stays on Book with a success message. Waitlist email link -> Claim waitlist slot -> Booking confirmation (or 'No thanks' -> Home). Owner: Home footer 'Studio login' -> Owner login -> Dashboard; the side menu reaches Bookings, Services & add-ons, Therapists & hours and Waitlist. Log out returns to Home. Any owner screen opened without a valid session goes to Owner login. If saving fails, stay on the same screen and show the error next to the field or at the top."
+    },
+    "front_end_handy_features": {
+      "section": "Front End — Screens, Controls and Navigation",
+      "question": "Front end: Handy features",
+      "answer": [
+        "Search",
+        "Filters and sorting (e.g., by price or date)",
+        "Calendar view",
+        "Charts and graphs",
+        "Notifications or reminders",
+        "Printable receipts or invoices"
+      ]
+    },
+    "back_end_extra_endpoints_not_tied_to_a_control": {
+      "section": "Back End — Actions, Rules and API",
+      "question": "Back end: Extra endpoints not tied to a control",
+      "answer": "GET /public/studio (studio name, address, phone, hours and policy for the Home header). GET /auth/me (check the owner session on page load). POST /internal/run-jobs (protected by a secret header; sends due reminders, expires waitlist offers and passes them to the next person; called every 15 minutes by a scheduled GitHub Actions workflow, because the free host sleeps and cannot run its own scheduler). GET /health (returns status and app version; used by the CI/CD smoke test after every deploy)."
+    },
+    "back_end_actions_the_app_must_perform": {
+      "section": "Back End — Actions, Rules and API",
+      "question": "Back end: Actions the app must perform",
+      "answer": "Calculate free start times from working hours, days off, existing bookings, total duration and buffer. Check the chosen time is still free at the moment of saving (inside one database transaction). Save the booking together with its itemized lines, copying the current name, duration and price of every service and add-on. Create or reuse the customer by email. Email an itemized confirmation with the manage link. Send a reminder email 24 hours before with one-click confirm and cancel links. On cancellation, free the slot and offer it to the first matching waitlist entry by email with a 30-minute claim link; if it expires or is declined, offer it to the next one. Turn a claimed offer into a booking with source 'waitlist'. Let the owner mark bookings done or no-show, adjust the final items, and email a final itemized receipt with a receipt number. Count no-shows and late cancellations per customer. Calculate the dashboard numbers. Export bookings to CSV."
+    },
+    "back_end_business_rules_and_calculations": {
+      "section": "Back End — Actions, Rules and API",
+      "question": "Back end: Business rules and calculations",
+      "answer": "A therapist can never have two overlapping bookings; the buffer after each service counts as blocked time. Bookings need at least 2 hours' notice and can be made at most 60 days ahead. Start times are on 15-minute steps and must fit completely inside the therapist's working hours. Total duration = sum of service minutes + add-on minutes; blocked time = total duration + the largest buffer of the chosen services. Total price = sum of (unit_price_snapshot x quantity) of all booking items. Prices are copied into each booking item at booking time, so later menu price changes never change existing bookings or receipts. Inactive services and add-ons are hidden from customers but stay on old bookings. Cancellation is free up to 24 hours before; later cancellations are allowed but flagged as late_cancellation. A booking can only be marked done or no-show after its start time, and only done bookings can get a receipt. Waitlist offers go to entries in join order whose date, time window, therapist preference and total duration fit the freed slot; only one open offer per slot at a time; an offer expires after 30 minutes. Customers with 2 or more no-shows are highlighted for the owner (no automatic blocking in version 1). All money is in EUR with 2 decimals; all times are in Europe/Berlin."
+    },
+    "back_end_error_situations_and_messages": {
+      "section": "Back End — Actions, Rules and API",
+      "question": "Back end: Error situations and messages",
+      "answer": "Time already booked -> 400 'That time was just taken. Please pick another.' Booking less than 2 hours ahead or more than 60 days ahead -> 422 'Please choose a time between 2 hours and 60 days from now.' Missing or invalid email or phone -> 422 'Please enter a valid email address' / 'Please enter your phone number.' Unknown booking or offer link -> 404 'Booking not found. Please check the link in your email.' Expired waitlist offer -> 410 'Sorry, this offer has expired.' Cancelling an already cancelled or finished booking -> 400 'This booking is already cancelled or finished.' Already on the waitlist for that day -> 409 'You are already on the waitlist for this day.' Wrong login -> 401 'Email or password is wrong.' Owner page without session -> 401, the front end redirects to Owner login. Duplicate service name -> 409 'A service with this name already exists.' Unexpected error -> 500 'Something went wrong. Please try again.'"
+    },
+    "back_end_user_types_and_what_each_can_do": {
+      "section": "Back End — Actions, Rules and API",
+      "question": "Back end: User types and what each can do",
+      "answer": "Customer (no account): view the menu, book, join the waitlist, and through the secret email link view, confirm or cancel only that one booking and see its receipt. Customers can never see other customers' data. Owner (email and password): everything in the owner area, including services and prices, therapists, hours, days off, all bookings, statuses, final items, receipts, waitlist, dashboard and CSV export. Therapists don't log in in version 1; the owner manages their schedules."
+    },
+    "back_end_messages_and_notifications": {
+      "section": "Back End — Actions, Rules and API",
+      "question": "Back end: Messages and notifications",
+      "answer": [
+        "Email"
+      ]
+    },
+    "back_end_payments": {
+      "section": "Back End — Actions, Rules and API",
+      "question": "Back end: Payments",
+      "answer": "Only record payments made in person"
+    },
+    "back_end_other_services_to_connect": {
+      "section": "Back End — Actions, Rules and API",
+      "question": "Back end: Other services to connect",
+      "answer": [
+        "Email service",
+        "Spreadsheet import or export"
+      ]
+    },
+    "back_end_sensitive_information_handled": {
+      "section": "Back End — Actions, Rules and API",
+      "question": "Back end: Sensitive information handled",
+      "answer": [
+        "Names and contact details",
+        "Passwords (login accounts)"
+      ]
+    },
+    "back_end_expected_number_of_users": {
+      "section": "Back End — Actions, Rules and API",
+      "question": "Back end: Expected number of users",
+      "answer": "Small group (up to 50)"
+    },
+    "database_tables_and_fields": {
+      "section": "Database — What the App Stores",
+      "question": "Database: Tables and fields",
+      "answer": [
+        {
+          "name": "Owners",
+          "purpose": "One studio owner account that can log in",
+          "fields": [
+            {
+              "name": "full_name",
+              "type": "text",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "email",
+              "type": "email",
+              "required": true,
+              "unique": true,
+              "notes": "Login email"
+            },
+            {
+              "name": "password_hash",
+              "type": "text",
+              "required": true,
+              "unique": false,
+              "notes": "Never store the plain password"
+            }
+          ]
+        },
+        {
+          "name": "Studio",
+          "purpose": "The studio's public details and booking rules (one row in version 1)",
+          "fields": [
+            {
+              "name": "name",
+              "type": "text",
+              "required": true,
+              "unique": false,
+              "notes": "Isar Wellness"
+            },
+            {
+              "name": "address",
+              "type": "text",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "phone",
+              "type": "phone",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "email",
+              "type": "email",
+              "required": true,
+              "unique": false,
+              "notes": "Sender and reply-to for customer emails"
+            },
+            {
+              "name": "min_notice_hours",
+              "type": "whole_number",
+              "required": true,
+              "unique": false,
+              "notes": "Default 2"
+            },
+            {
+              "name": "free_cancellation_hours",
+              "type": "whole_number",
+              "required": true,
+              "unique": false,
+              "notes": "Default 24"
+            },
+            {
+              "name": "booking_window_days",
+              "type": "whole_number",
+              "required": true,
+              "unique": false,
+              "notes": "Default 60"
+            },
+            {
+              "name": "waitlist_offer_minutes",
+              "type": "whole_number",
+              "required": true,
+              "unique": false,
+              "notes": "Default 30"
+            }
+          ]
+        },
+        {
+          "name": "Therapists",
+          "purpose": "One person who gives treatments",
+          "fields": [
+            {
+              "name": "display_name",
+              "type": "text",
+              "required": true,
+              "unique": true,
+              "notes": "e.g., Lena"
+            },
+            {
+              "name": "short_bio",
+              "type": "long_text",
+              "required": false,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "active",
+              "type": "yes_no",
+              "required": true,
+              "unique": false,
+              "notes": "Default yes"
+            }
+          ]
+        },
+        {
+          "name": "Services",
+          "purpose": "One item on the public menu",
+          "fields": [
+            {
+              "name": "category",
+              "type": "choice_list",
+              "required": true,
+              "unique": false,
+              "notes": "Massages / Facials / Reflexology"
+            },
+            {
+              "name": "name",
+              "type": "text",
+              "required": true,
+              "unique": true,
+              "notes": "e.g., Deep tissue massage 60 min"
+            },
+            {
+              "name": "description",
+              "type": "long_text",
+              "required": false,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "duration_minutes",
+              "type": "whole_number",
+              "required": true,
+              "unique": false,
+              "notes": "15 to 240, multiple of 15"
+            },
+            {
+              "name": "price",
+              "type": "money",
+              "required": true,
+              "unique": false,
+              "notes": "EUR, 0 or more"
+            },
+            {
+              "name": "buffer_minutes",
+              "type": "whole_number",
+              "required": true,
+              "unique": false,
+              "notes": "Cleanup time after, 0 to 30, default 10"
+            },
+            {
+              "name": "active",
+              "type": "yes_no",
+              "required": true,
+              "unique": false,
+              "notes": "Default yes"
+            }
+          ]
+        },
+        {
+          "name": "TherapistServices",
+          "purpose": "Which therapist offers which service",
+          "fields": [
+            {
+              "name": "therapist",
+              "type": "link_to_table",
+              "required": true,
+              "unique": false,
+              "notes": null,
+              "links_to": "Therapists"
+            },
+            {
+              "name": "service",
+              "type": "link_to_table",
+              "required": true,
+              "unique": false,
+              "notes": "Therapist + service pair is unique",
+              "links_to": "Services"
+            }
+          ]
+        },
+        {
+          "name": "AddOns",
+          "purpose": "An optional extra that belongs to one service",
+          "fields": [
+            {
+              "name": "service",
+              "type": "link_to_table",
+              "required": true,
+              "unique": false,
+              "notes": null,
+              "links_to": "Services"
+            },
+            {
+              "name": "name",
+              "type": "text",
+              "required": true,
+              "unique": false,
+              "notes": "e.g., Hot stones"
+            },
+            {
+              "name": "extra_minutes",
+              "type": "whole_number",
+              "required": true,
+              "unique": false,
+              "notes": "0 to 60"
+            },
+            {
+              "name": "price",
+              "type": "money",
+              "required": true,
+              "unique": false,
+              "notes": "EUR"
+            },
+            {
+              "name": "active",
+              "type": "yes_no",
+              "required": true,
+              "unique": false,
+              "notes": "Default yes"
+            }
+          ]
+        },
+        {
+          "name": "WorkingHours",
+          "purpose": "One weekday time window when a therapist works",
+          "fields": [
+            {
+              "name": "therapist",
+              "type": "link_to_table",
+              "required": true,
+              "unique": false,
+              "notes": null,
+              "links_to": "Therapists"
+            },
+            {
+              "name": "weekday",
+              "type": "choice_list",
+              "required": true,
+              "unique": false,
+              "notes": "Mon / Tue / Wed / Thu / Fri / Sat / Sun"
+            },
+            {
+              "name": "start_time",
+              "type": "time",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "end_time",
+              "type": "time",
+              "required": true,
+              "unique": false,
+              "notes": "After start_time"
+            }
+          ]
+        },
+        {
+          "name": "DaysOff",
+          "purpose": "A date when a therapist, or the whole studio, is closed",
+          "fields": [
+            {
+              "name": "therapist",
+              "type": "link_to_table",
+              "required": false,
+              "unique": false,
+              "notes": "Empty = whole studio closed",
+              "links_to": "Therapists"
+            },
+            {
+              "name": "date",
+              "type": "date",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "reason",
+              "type": "text",
+              "required": false,
+              "unique": false,
+              "notes": "e.g., Holiday"
+            }
+          ]
+        },
+        {
+          "name": "Customers",
+          "purpose": "One person who has booked or joined the waitlist (no login)",
+          "fields": [
+            {
+              "name": "first_name",
+              "type": "text",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "last_name",
+              "type": "text",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "email",
+              "type": "email",
+              "required": true,
+              "unique": true,
+              "notes": "Used to match returning customers"
+            },
+            {
+              "name": "phone",
+              "type": "phone",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "no_show_count",
+              "type": "whole_number",
+              "required": true,
+              "unique": false,
+              "notes": "Default 0, updated automatically"
+            }
+          ]
+        },
+        {
+          "name": "Bookings",
+          "purpose": "One appointment",
+          "fields": [
+            {
+              "name": "customer",
+              "type": "link_to_table",
+              "required": true,
+              "unique": false,
+              "notes": null,
+              "links_to": "Customers"
+            },
+            {
+              "name": "therapist",
+              "type": "link_to_table",
+              "required": true,
+              "unique": false,
+              "notes": null,
+              "links_to": "Therapists"
+            },
+            {
+              "name": "start_at",
+              "type": "date_time",
+              "required": true,
+              "unique": false,
+              "notes": "Not in the past, on a 15-minute step"
+            },
+            {
+              "name": "end_at",
+              "type": "date_time",
+              "required": true,
+              "unique": false,
+              "notes": "start_at + total minutes (buffer is not shown to the customer)"
+            },
+            {
+              "name": "status",
+              "type": "choice_list",
+              "required": true,
+              "unique": false,
+              "notes": "booked / confirmed / done / no_show / cancelled (default: booked)"
+            },
+            {
+              "name": "total_price",
+              "type": "money",
+              "required": true,
+              "unique": false,
+              "notes": "Sum of BookingItems"
+            },
+            {
+              "name": "source",
+              "type": "choice_list",
+              "required": true,
+              "unique": false,
+              "notes": "online / phone / waitlist"
+            },
+            {
+              "name": "manage_token",
+              "type": "text",
+              "required": true,
+              "unique": true,
+              "notes": "Random secret for the customer's email link"
+            },
+            {
+              "name": "confirmed_at",
+              "type": "date_time",
+              "required": false,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "cancelled_at",
+              "type": "date_time",
+              "required": false,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "late_cancellation",
+              "type": "yes_no",
+              "required": true,
+              "unique": false,
+              "notes": "Yes if cancelled less than 24 hours before"
+            },
+            {
+              "name": "reminder_sent_at",
+              "type": "date_time",
+              "required": false,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "receipt_number",
+              "type": "text",
+              "required": false,
+              "unique": true,
+              "notes": "e.g., IW-2026-0042, set when the receipt is sent"
+            },
+            {
+              "name": "customer_note",
+              "type": "long_text",
+              "required": false,
+              "unique": false,
+              "notes": "Max 300 characters, no medical details"
+            }
+          ]
+        },
+        {
+          "name": "BookingItems",
+          "purpose": "One line on a booking's itemized list (service, add-on or extra added on the day)",
+          "fields": [
+            {
+              "name": "booking",
+              "type": "link_to_table",
+              "required": true,
+              "unique": false,
+              "notes": null,
+              "links_to": "Bookings"
+            },
+            {
+              "name": "item_type",
+              "type": "choice_list",
+              "required": true,
+              "unique": false,
+              "notes": "service / add_on / extra"
+            },
+            {
+              "name": "service",
+              "type": "link_to_table",
+              "required": false,
+              "unique": false,
+              "notes": "Filled for service lines",
+              "links_to": "Services"
+            },
+            {
+              "name": "add_on",
+              "type": "link_to_table",
+              "required": false,
+              "unique": false,
+              "notes": "Filled for add-on lines",
+              "links_to": "AddOns"
+            },
+            {
+              "name": "name_snapshot",
+              "type": "text",
+              "required": true,
+              "unique": false,
+              "notes": "Name at the time of booking"
+            },
+            {
+              "name": "minutes_snapshot",
+              "type": "whole_number",
+              "required": true,
+              "unique": false,
+              "notes": "Duration at the time of booking"
+            },
+            {
+              "name": "unit_price_snapshot",
+              "type": "money",
+              "required": true,
+              "unique": false,
+              "notes": "Price at the time of booking. Later menu price changes never change old bookings."
+            },
+            {
+              "name": "quantity",
+              "type": "whole_number",
+              "required": true,
+              "unique": false,
+              "notes": "Default 1"
+            }
+          ]
+        },
+        {
+          "name": "WaitlistEntries",
+          "purpose": "One customer waiting for a slot on a given day, including the offer sent to them",
+          "fields": [
+            {
+              "name": "customer",
+              "type": "link_to_table",
+              "required": true,
+              "unique": false,
+              "notes": null,
+              "links_to": "Customers"
+            },
+            {
+              "name": "therapist",
+              "type": "link_to_table",
+              "required": false,
+              "unique": false,
+              "notes": "Empty = any therapist",
+              "links_to": "Therapists"
+            },
+            {
+              "name": "service_ids",
+              "type": "text",
+              "required": true,
+              "unique": false,
+              "notes": "Chosen services and add-ons (or a small link table)"
+            },
+            {
+              "name": "preferred_date",
+              "type": "date",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "earliest_time",
+              "type": "time",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "latest_time",
+              "type": "time",
+              "required": true,
+              "unique": false,
+              "notes": null
+            },
+            {
+              "name": "status",
+              "type": "choice_list",
+              "required": true,
+              "unique": false,
+              "notes": "waiting / offered / booked / expired / removed (default: waiting)"
+            },
+            {
+              "name": "offer_token",
+              "type": "text",
+              "required": false,
+              "unique": true,
+              "notes": "Secret for the offer link"
+            },
+            {
+              "name": "offer_start_at",
+              "type": "date_time",
+              "required": false,
+              "unique": false,
+              "notes": "The freed slot offered"
+            },
+            {
+              "name": "offer_expires_at",
+              "type": "date_time",
+              "required": false,
+              "unique": false,
+              "notes": "30 minutes after the offer is sent"
+            },
+            {
+              "name": "booking",
+              "type": "link_to_table",
+              "required": false,
+              "unique": false,
+              "notes": "Filled when the offer is claimed",
+              "links_to": "Bookings"
+            }
+          ]
+        }
+      ]
+    },
+    "database_how_the_tables_connect_in_words": {
+      "section": "Database — What the App Stores",
+      "question": "Database: How the tables connect, in words",
+      "answer": "One customer can have many bookings and many waitlist entries. Each booking belongs to exactly one customer and one therapist and has one or more booking items. Each booking item is a snapshot of one service, one add-on, or an extra line added on the day. One service can have many add-ons; each add-on belongs to one service. Therapists and services are many-to-many through TherapistServices. Each therapist has many working-hour rows and days off; a day off without a therapist closes the whole studio. A waitlist entry can point to the booking it turned into. Studio and Owners each hold a single row in version 1."
+    },
+    "database_three_sample_records": {
+      "section": "Database — What the App Stores",
+      "question": "Database: Three sample records",
+      "answer": "Bookings (with items): Anna M., therapist Lena, Fri 2 Oct 2026, 17:00-18:15, confirmed, items: Deep tissue massage 60 min EUR 70 + Hot stones add-on EUR 12 = EUR 82, source online. | Jonas K., therapist Sofia, Sat 3 Oct 2026, 10:00-10:55, done, items: Classic facial 45 min EUR 59 + Eye mask treatment add-on EUR 9 + extra 'Face cream 50 ml' EUR 18 added on the day = EUR 86, receipt IW-2026-0042. | Priya S., therapist Lena, Mon 5 Oct 2026, 12:00-12:30, cancelled (late cancellation), items: Foot reflexology 30 min EUR 42, slot refilled from the waitlist by Tom B. (source waitlist). Demo studio: Isar Wellness, open Mon-Sat. Menu for demo data: Massages: Relaxation massage 60 min EUR 65, Deep tissue massage 60 min EUR 70, Back and neck massage 30 min EUR 39. Facials: Classic facial 45 min EUR 59, Express facial 30 min EUR 39. Reflexology: Foot reflexology 30 min EUR 42. Add-ons: Hot stones +15 min EUR 12 and Aromatherapy oil +0 min EUR 5 (massages), Eye mask treatment +10 min EUR 9 (facials). Therapists: Lena (massages, reflexology) and Sofia (facials, relaxation massage)."
+    },
+    "database_how_long_to_keep_information": {
+      "section": "Database — What the App Stores",
+      "question": "Database: How long to keep information",
+      "answer": "Keep bookings and receipts for 2 years, then anonymize customer names and contact details; the owner can delete a customer on request"
+    },
+    "database_files_and_photos": {
+      "section": "Database — What the App Stores",
+      "question": "Database: Files and photos",
+      "answer": [
+        "Nothing. Just text and numbers"
+      ]
+    },
+    "database_reports_and_downloads": {
+      "section": "Database — What the App Stores",
+      "question": "Database: Reports and downloads",
+      "answer": [
+        "On-screen dashboard with totals and charts",
+        "Download to Excel or CSV",
+        "Printable receipt page (HTML styled for the browser's Print / Save as PDF, no PDF library)"
+      ]
+    },
+    "scope_must_have_features_for_version_1_maximum_3": {
+      "section": "Scope and Build Preferences",
+      "question": "Scope: Must-have features for version 1 (maximum 3)",
+      "answer": "1) Customers book online from the itemized service menu (services + add-ons, therapist, free time) and see an itemized price summary before confirming. 2) Automatic emails: itemized confirmation, 24-hour reminder with one-click confirm/cancel, and automatic waitlist offers when a slot is cancelled. 3) Owner area: calendar/list of bookings, mark done or no-show, adjust final items, send the itemized receipt, and a dashboard with no-show rate and waitlist-refilled slots."
+    },
+    "scope_nice_to_have_features_for_later": {
+      "section": "Scope and Build Preferences",
+      "question": "Scope: Nice-to-have features for later",
+      "answer": "Deposits or no-show fees through Stripe for new customers. SMS or WhatsApp reminders. Therapist logins to see their own schedule. Google Calendar sync. Gift vouchers and packages (e.g., 5 massages). Reviews after a visit. Multiple languages (German and English). Several studios on one platform. Group classes with a capacity."
+    },
+    "scope_what_the_app_should_not_do": {
+      "section": "Scope and Build Preferences",
+      "question": "Scope: What the app should NOT do",
+      "answer": "No online payments in version 1. No customer accounts or passwords (the email link is enough). No storage of health or medical information. No multiple studios or branches. No group classes. No therapist logins. No AI features yet."
+    },
+    "build_technology_preference": {
+      "section": "Scope and Build Preferences",
+      "question": "Build: Technology preference",
+      "answer": "Our class stack: Python (FastAPI) back end + plain HTML and JavaScript front end (recommended)"
+    },
+    "build_database_preference": {
+      "section": "Scope and Build Preferences",
+      "question": "Build: Database preference",
+      "answer": "SQLite on my laptop and in automated tests; free hosted PostgreSQL (Neon free tier) in the deployed app, chosen by one DATABASE_URL setting. No SQLite in production because free hosting wipes the disk on every deploy."
+    },
+    "build_where_the_app_should_run": {
+      "section": "Scope and Build Preferences",
+      "question": "Build: Where the app should run",
+      "answer": "Online from the start"
+    },
+    "build_similar_apps_for_inspiration": {
+      "section": "Scope and Build Preferences",
+      "question": "Build: Similar apps for inspiration",
+      "answer": "Fresha, Treatwell and Calendly. Slotwise is simpler and built for one small studio, with no commission. What makes it different: an automatic waitlist that refills cancelled slots, one-click confirm/cancel in reminder emails to cut no-shows, and itemized pricing that is locked at booking time and becomes the final receipt."
+    },
+    "build_anything_else_the_ai_should_know": {
+      "section": "Scope and Build Preferences",
+      "question": "Build: Anything else the AI should know",
+      "answer": "MAIN PURPOSE: this app exists to practise CI/CD with GitHub Actions and deploying to a free cloud tier, so it must stay lightweight. Hosting: ONE free Render web service runs FastAPI, which also serves the plain HTML/CSS/JS front end as static files (no separate front-end deploy, no Node build step). Database: SQLAlchemy with DATABASE_URL; SQLite locally and in tests, Neon free PostgreSQL in production; create tables with a simple startup migration or Alembic. Keep dependencies minimal: fastapi, uvicorn, sqlalchemy, psycopg[binary], pydantic, bcrypt, pytest, httpx, ruff. No Redis, Celery, background worker, Docker Compose or PDF library. The app must start in under 10 seconds with under 512 MB RAM and cope with free-tier sleep and cold starts. Background work runs only through POST /internal/run-jobs, called every 15 minutes by a scheduled GitHub Actions workflow with the secret JOBS_SECRET. Emails go through one send_email() function: print to the log by default, use a free email API (e.g., Resend) only if EMAIL_API_KEY is set. Charts: a few simple CSS bars or one small Chart.js script from a CDN. All settings come from environment variables (DATABASE_URL, SECRET_KEY, JOBS_SECRET, EMAIL_API_KEY, OWNER_EMAIL, OWNER_PASSWORD for the seed); include .env.example and never commit secrets. Provide a small Dockerfile (python:3.12-slim) so the app runs the same everywhere. CI/CD with GitHub Actions: (1) ci.yml on every pull request and push: ruff lint, pytest against SQLite; (2) deploy.yml on push to main after tests pass: trigger the Render deploy hook (secret RENDER_DEPLOY_HOOK_URL, Render auto-deploy turned off), wait, then smoke test GET /health on the live URL and fail the run if it does not answer; (3) jobs.yml: cron every 15 minutes calling /internal/run-jobs. Write tests for the key rules: no double booking, price snapshot, cancellation deadline, waitlist offer order. Use Europe/Berlin time and EUR everywhere. Seed demo data for Isar Wellness: the menu, two therapists (Lena and Sofia), working hours and about 20 sample bookings. Generate manage and offer tokens with a secure random generator and hash the owner password with bcrypt. Build in thin vertical slices, each merged through a pull request that passes CI and deploys: slice 1 = /health, public menu, owner login and the full pipeline live; slice 2 = availability and booking with items; slice 3 = manage link and emails; slice 4 = owner bookings and receipts; slice 5 = waitlist and run-jobs; slice 6 = dashboard. Keep the core generic (provider, service, booking)."
+    },
+    "final_check_answers_are_specific": {
+      "section": "Final Check",
+      "question": "Final check: Answers are specific",
+      "answer": [
+        "I replaced the examples with my own real names, numbers and details, and a stranger could build my app from these answers."
+      ]
+    },
+    "final_check_how_clear_does_the_idea_feel_right_now": {
+      "section": "Final Check",
+      "question": "Final check: How clear does the idea feel right now?",
+      "answer": 4
+    }
+  }
+}
