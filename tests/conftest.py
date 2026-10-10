@@ -19,6 +19,10 @@ TEST_SETTINGS = Settings(
     seed_demo_data=True,
 )
 
+# Requests reach the app from Render's internal proxy, which is what makes
+# X-Forwarded-For trustworthy (app/security.py: client_ip).
+RENDER_PROXY = "10.0.0.1"
+
 # Saturday 10 Oct 2026, midday in Berlin
 FROZEN_NOW = datetime(2026, 10, 10, 12, 0, tzinfo=clock.BERLIN)
 
@@ -31,11 +35,13 @@ def frozen_now(monkeypatch):
 
 @pytest.fixture
 def make_client():
-    """Factory: make_client(seed_demo_data=False, ...) -> started TestClient."""
+    """Factory: make_client(seed_demo_data=False, peer="93.184.216.34", ...) -> started client."""
     clients = []
 
-    def _make(settings: Settings | None = None, **overrides) -> TestClient:
-        client = TestClient(create_app(replace(settings or TEST_SETTINGS, **overrides)))
+    def _make(settings: Settings | None = None, peer: str = RENDER_PROXY, **overrides):
+        client = TestClient(
+            create_app(replace(settings or TEST_SETTINGS, **overrides)), client=(peer, 50000)
+        )
         client.__enter__()  # runs startup: create tables + seed
         clients.append(client)
         return client
