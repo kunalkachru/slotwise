@@ -1,0 +1,25 @@
+[project]
+name = "slotwise"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    # SQLite has no native decimal type; money is exact on PostgreSQL in production.
+    # Starlette suggests httpx2; httpx is the test client on the allowed dependency list.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+    "ignore:Dialect sqlite\\+pysqlite does \\*not\\* support Decimal objects natively",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency injection pattern
+extend-immutable-calls = ["fastapi.Depends"]
