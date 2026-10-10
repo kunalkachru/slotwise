@@ -129,6 +129,7 @@ Conventions:
   - The client IP is the **rightmost** `X-Forwarded-For` entry, the one Render's proxy appends. It is only believed when the direct sender is a private or loopback address, i.e. Render's internal proxy. A caller reaching the app directly is judged by its own address.
   - uvicorn runs with `--no-proxy-headers`, because `--forwarded-allow-ips='*'` would trust the leftmost, visitor-controlled entry.
   - These rules come from two security reviews (2026-10-10).
+  - **Accepted risk (2026-10-11):** an attacker who keeps the per-email limit full can block owner logins from any browser without a device cookie: a new browser, cleared cookies, an expired cookie, or the very first login. **Recovery:** restart or redeploy the Render service. The counters live in memory, so this clears the lockout immediately.
 - **Email links never act on GET.** "Confirm I'm coming" opens `manage.html?token=…&action=confirm`, and the page then makes the POST. This stops email link scanners from confirming or cancelling bookings.
 - **Time is controlled through `clock.now()`.** Tests fix it so the 2-hour, 24-hour, 60-day and 30-minute rules can be tested deterministically.
 - **Render builds from the Dockerfile [decision].** Check in slice 1 that `ZoneInfo("Europe/Berlin")` works in the slim image. If it doesn't, add the `tzdata` package.
