@@ -1,0 +1,72 @@
+name: CI
+
+# Skip CI when a push or PR changes only documentation. If any other file changes too,
+# CI runs as normal. Keep both lists identical.
+on:
+  push:
+    paths-ignore:
+      - "**.md"
+      - "doc/**"
+      - ".claude/**"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - "doc/**"
+      - ".claude/**"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Pytest (SQLite)
+        run: pytest
+
+  docker:
+    name: Docker image starts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t slotwise:ci .
+
+      - name: Start container and check /health
+        run: |
+          docker run -d --name slotwise -p 8000:8000 \
+            -e RENDER_GIT_COMMIT="${GITHUB_SHA}" \
+            -e SEED_DEMO_DATA=true \
+            -e DATABASE_URL=sqlite:////tmp/slotwise.db \
+            slotwise:ci
+          for i in $(seq 1 30); do
+            if body=$(curl -fsS http://localhost:8000/health); then
+              echo "$body"
+              echo "$body" | grep -q "\"version\":\"${GITHUB_SHA}\"" && exit 0
+            fi
+            sleep 1
+          done
+          docker logs slotwise
+          exit 1

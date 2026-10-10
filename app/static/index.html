@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Book online · Slotwise</title>
+  <meta name="description" content="See the treatment menu with prices and book online.">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container">
+      <a class="logo" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#33C375" d="M20 3C10 3 4 8.5 4 15.5c0 1.6.4 3 1 4.2C6.8 13 11 9.6 16 8c-4.3 2.6-7.4 6.6-8.6 12 1.2.6 2.6 1 4.1 1C18.6 21 21 14 20 3z"/></svg><span data-studio-name>Slotwise</span></a>
+      <a class="btn btn-small" href="/book.html">Book now</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="studio" aria-labelledby="studio-name">
+      <h1 id="studio-name" data-studio-name>&nbsp;</h1>
+      <ul class="studio-facts">
+        <li><strong>Address</strong><span id="studio-address"></span></li>
+        <li><strong>Phone</strong><a id="studio-phone" href="#"></a></li>
+        <li><strong>Hours</strong><span id="studio-hours"></span></li>
+      </ul>
+      <p class="policy" id="studio-policy" hidden></p>
+    </section>
+
+    <section aria-label="Treatment menu">
+      <div id="menu"><p class="state">Loading the menu…</p></div>
+    </section>
+
+    <details class="manage" id="manage">
+      <summary>Manage my booking</summary>
+      <p>Open the link in your confirmation email to view, confirm or cancel your booking and to see your receipt.</p>
+    </details>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>Online booking by <a class="logo" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#33C375" d="M20 3C10 3 4 8.5 4 15.5c0 1.6.4 3 1 4.2C6.8 13 11 9.6 16 8c-4.3 2.6-7.4 6.6-8.6 12 1.2.6 2.6 1 4.1 1C18.6 21 21 14 20 3z"/></svg> Slotwise</a></span>
+      <a href="/owner/login.html">Studio login</a>
+    </div>
+  </footer>
+
+  <script type="module" src="/js/home.js"></script>
+</body>
+</html>

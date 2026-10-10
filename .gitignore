@@ -62,3 +62,6 @@ db.sqlite3
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local SQLite databases
+*.db
