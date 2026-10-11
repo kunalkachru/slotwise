@@ -64,3 +64,72 @@ def db(client):
 
 def login(client: TestClient, email: str = OWNER_EMAIL, password: str = OWNER_PASSWORD):
     return client.post("/auth/login", json={"email": email, "password": password})
+
+
+@pytest.fixture
+def empty_calendar(client):
+    """Demo menu and therapists, but no bookings or customers."""
+    from sqlalchemy import delete
+
+    from app.models import Booking, BookingItem, Customer
+
+    with client.app.state.session_factory() as session:
+        session.execute(delete(BookingItem))
+        session.execute(delete(Booking))
+        session.execute(delete(Customer))
+        session.commit()
+    return client
+
+
+def menu_ids(client) -> dict:
+    """{"Deep tissue massage": 2, ("Deep tissue massage", "Hot stones"): 4, ...}"""
+    ids: dict = {}
+    for category in client.get("/public/services").json():
+        for service in category["services"]:
+            ids[service["name"]] = service["id"]
+            for add_on in service["add_ons"]:
+                ids[(service["name"], add_on["name"])] = add_on["id"]
+    return ids
+
+
+def therapist_id(client, name: str) -> int:
+    from sqlalchemy import select
+
+    from app.models import Therapist
+
+    with client.app.state.session_factory() as session:
+        return session.scalar(select(Therapist.id).where(Therapist.display_name == name))
+
+
+CUSTOMER = {
+    "first_name": "Anna",
+    "last_name": "Müller",
+    "email": "anna.mueller@example.com",
+    "phone": "+49 151 0000 0001",
+}
+
+
+def book(client, services, day, start, therapist=None, add_ons=(), **customer):
+    ids = menu_ids(client)
+    body = {
+        "service_ids": [ids[s] for s in services],
+        "add_on_ids": [ids[a] for a in add_ons],
+        "therapist_id": therapist_id(client, therapist) if therapist else None,
+        "date": day,
+        "start_time": start,
+        **CUSTOMER,
+        **customer,
+    }
+    return client.post("/public/bookings", json=body)
+
+
+def slots(client, services, day, therapist=None, add_ons=()):
+    ids = menu_ids(client)
+    params = {
+        "date": day,
+        "service_ids": ",".join(str(ids[s]) for s in services),
+        "add_on_ids": ",".join(str(ids[a]) for a in add_ons),
+    }
+    if therapist:
+        params["therapist_id"] = therapist_id(client, therapist)
+    return client.get("/public/availability", params=params)
