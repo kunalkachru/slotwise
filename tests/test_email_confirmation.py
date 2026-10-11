@@ -195,3 +195,42 @@ def test_confirming_cannot_go_past_the_cap(empty_calendar, db):
     with client.app.state.session_factory() as session:
         statuses = session.scalars(select(WaitlistEntry.status)).all()
     assert statuses.count("waiting") == MAX_OPEN_ENTRIES_PER_CUSTOMER
+
+
+def test_simultaneous_confirmations_cannot_pass_the_cap(make_client, frozen_now, tmp_path):
+    """Security review finding: count-then-confirm must be atomic."""
+    import threading
+
+    from app.logic.waitlist import MAX_OPEN_ENTRIES_PER_CUSTOMER, confirm_entry
+
+    client = make_client(database_url=f"sqlite:///{tmp_path / 'race.db'}")
+    limiter = client.app.state.booking_limiter
+    days = ("2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17",
+            "2026-10-19", "2026-10-20", "2026-10-21")
+    for day in days:
+        limiter._events.clear()
+        join(client, "Tom", day=day, confirm=False)
+    factory = client.app.state.session_factory
+    with factory() as session:
+        tokens = session.scalars(select(WaitlistEntry.confirm_token)).all()
+    barrier = threading.Barrier(len(tokens))
+    outcomes: list[str] = []
+
+    def attempt(token):
+        with factory() as session:
+            barrier.wait()
+            try:
+                confirm_entry(session, token)
+                outcomes.append("ok")
+            except Exception as exc:  # AppError 409
+                outcomes.append(getattr(exc, "status_code", repr(exc)))
+
+    threads = [threading.Thread(target=attempt, args=(t,)) for t in tokens]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert outcomes.count("ok") == MAX_OPEN_ENTRIES_PER_CUSTOMER, outcomes
+    with factory() as session:
+        assert session.scalars(select(WaitlistEntry.status)).all().count("waiting") == (
+            MAX_OPEN_ENTRIES_PER_CUSTOMER)

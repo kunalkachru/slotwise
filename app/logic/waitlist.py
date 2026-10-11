@@ -10,6 +10,7 @@ Rules (blueprint + PLAN.md decisions):
 - Offers and claims skip the 2-hour notice, so late cancellations can be refilled.
 """
 
+import threading
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
@@ -144,12 +145,26 @@ def _confirm_expired(entry: WaitlistEntry) -> bool:
     return clock.now() >= entry.created_at + timedelta(hours=WAITLIST_CONFIRM_HOURS)
 
 
+# One Render instance: a process-wide lock makes "count open entries, then confirm"
+# atomic; on PostgreSQL the customer row is also locked (security review: race).
+_confirm_lock = threading.Lock()
+
+
 def confirm_entry(db: Session, token: str) -> tuple[WaitlistEntry, int | None]:
     """Double opt-in link. Returns the entry and its queue position once waiting."""
+    with _confirm_lock:
+        return _confirm_entry(db, token)
+
+
+def _confirm_entry(db: Session, token: str) -> tuple[WaitlistEntry, int | None]:
     entry = db.scalar(select(WaitlistEntry).where(WaitlistEntry.confirm_token == token)) \
         if token else None
     if entry is None:
         raise AppError(404, "Waitlist request not found. Please check the link in your email.")
+    if db.bind.dialect.name == "postgresql":
+        db.execute(select(Customer.id).where(Customer.id == entry.customer_id)
+                   .with_for_update()).all()
+        db.refresh(entry)
     if entry.status == "pending":
         if _confirm_expired(entry):
             entry.status = "expired"
