@@ -270,6 +270,8 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - "Fits the freed slot" uses the normal free-slot check (working hours, other bookings, buffers, therapist skills).
   - Reminders go out once, within 24 h of the start, and only for bookings made more than 24 h ahead **[decision]**.
   - Joining is refused for days when no qualified therapist works. It's limited to 10 joins per IP per hour, **3 per inbox per day**, and at most 5 open entries per customer.
+  - **Every join outcome emails the address owner:** added, already on the list, or the 5-entry limit reached. Nothing fails silently.
+  - **Accepted risk (2026-10-11):** without verifying email ownership, a stranger can use someone's address to take up their waitlist places (at most 3 joins per day, 5 open entries). The owner of the address is emailed each time, and the studio owner can remove entries. **Proper fix later:** double opt-in, where an entry only counts once the address owner clicks a confirmation link. That needs a new waitlist status, so it waits until a migration tool (Alembic) is adopted.
   - **Join responses reveal nothing (security review):** the API always answers "received", for new and duplicate joins alike. The queue position, or "already on the list", is **emailed** to the address instead. This replaces the blueprint's 409 and on-screen position **[decision]**.
   - When the owner removes an entry with an open offer, the offer is withdrawn, not passed on.
   - The offer page shows the slot, not the customer's details.

@@ -29,7 +29,7 @@ from app.errors import (
 from app.logic.availability import free_slots_by_therapist, get_studio
 from app.logic.booking import CustomerDetails, create_booking, find_or_create_customer
 from app.logic.selection import Selection, qualified_therapists, resolve_selection
-from app.models import DayOff, Therapist, WaitlistEntry
+from app.models import Customer, DayOff, Therapist, WaitlistEntry
 from app.security import new_token
 
 OPEN = ("waiting", "offered")
@@ -62,9 +62,14 @@ MAX_OPEN_ENTRIES_PER_CUSTOMER = 5
 
 @dataclass
 class JoinResult:
-    entry: WaitlistEntry | None  # None when the per-customer cap was reached
-    position: int | None
-    created: bool  # False: they were already waiting that day (nothing changed)
+    outcome: str  # "created" | "already" (waiting that day) | "limit" (cap reached)
+    customer: Customer
+    entry: WaitlistEntry | None = None
+    position: int | None = None
+
+    @property
+    def created(self) -> bool:
+        return self.outcome == "created"
 
 
 def join(db: Session, request: JoinRequest) -> JoinResult:
@@ -98,12 +103,12 @@ def join(db: Session, request: JoinRequest) -> JoinResult:
     ))
     if existing is not None:
         db.commit()
-        return JoinResult(existing, queue_position(db, existing), created=False)
+        return JoinResult("already", customer, existing, queue_position(db, existing))
     open_entries = db.scalar(select(func.count()).select_from(WaitlistEntry).where(
         WaitlistEntry.customer_id == customer.id, WaitlistEntry.status.in_(OPEN)))
     if open_entries >= MAX_OPEN_ENTRIES_PER_CUSTOMER:
-        db.commit()
-        return JoinResult(None, None, created=False)
+        db.commit()  # the caller emails the address owner: never a silent no-op
+        return JoinResult("limit", customer)
     entry = WaitlistEntry(
         customer=customer,
         therapist_id=request.therapist_id,
@@ -116,7 +121,7 @@ def join(db: Session, request: JoinRequest) -> JoinResult:
     )
     db.add(entry)
     db.commit()
-    return JoinResult(entry, queue_position(db, entry), created=True)
+    return JoinResult("created", customer, entry, queue_position(db, entry))
 
 
 def queue_position(db: Session, entry: WaitlistEntry) -> int:

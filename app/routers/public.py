@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.emails import confirmation_email, waitlist_joined_email
+from app.emails import confirmation_email, waitlist_joined_email, waitlist_limit_email
 from app.errors import TOO_MANY_BOOKINGS, AppError
 from app.logic import waitlist
 from app.logic.availability import check_date_in_range, free_slots
@@ -221,9 +221,14 @@ def join_waitlist(body: WaitlistIn, request: Request, db: Session = Depends(get_
     except Exception:
         limiter.release([ip_key, email_key])
         raise
-    if result.entry is not None:
+    studio = load_studio(db)
+    # Every outcome emails the address owner; the response is the same for all of them.
+    if result.outcome == "limit":
+        request.app.state.mailer.send(waitlist_limit_email(
+            result.customer, body.preferred_date, studio, waitlist.MAX_OPEN_ENTRIES_PER_CUSTOMER))
+    else:
         request.app.state.mailer.send(waitlist_joined_email(
-            result.entry, result.position, load_studio(db), already=not result.created))
+            result.entry, result.position, studio, already=not result.created))
     return WaitlistJoinOut(status="received", preferred_date=body.preferred_date)
 
 

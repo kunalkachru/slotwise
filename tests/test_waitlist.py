@@ -110,6 +110,11 @@ def test_open_entries_per_customer_are_capped(empty_calendar, db):
         limiter._events.clear()  # isolate the cap from the daily join limit
         assert join(client, "Tom", day=day).status_code == 200
     assert db.query(WaitlistEntry).count() == wl.MAX_OPEN_ENTRIES_PER_CUSTOMER
+    # Security review finding: the join that changed nothing is not silent.
+    last = client.app.state.mailer.outbox[-1]
+    assert last.to == "tom@example.com"
+    assert "could not add you to the waitlist" in last.text
+    assert "already has 5 open waitlist requests" in last.text
 
 
 def test_join_validation(empty_calendar):
