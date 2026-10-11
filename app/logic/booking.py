@@ -40,10 +40,26 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 NAME_PUNCTUATION = set(" -'’.")
 
 
+DOT_INSIDE_WORD = re.compile(r"\.\S")
+
+
 def _is_plain_name(name: str) -> bool:
-    """Letters (any alphabet), spaces, hyphens, apostrophes and dots. Names end up in
-    emails we send, so no URLs, digits, @ or markup (security review, slice 3)."""
-    return all(ch.isalpha() or ch in NAME_PUNCTUATION for ch in name)
+    """Letters (any alphabet), spaces, hyphens, apostrophes, and dots only before a space
+    or at the end ("Jr.", "J. R."). Names end up in emails we send, so no URLs, domains
+    like "evil.com", digits, @ or markup (security reviews, slice 3)."""
+    return all(ch.isalpha() or ch in NAME_PUNCTUATION for ch in name) and not (
+        DOT_INSIDE_WORD.search(name)
+    )
+
+
+def mailbox_key(email: str) -> str:
+    """One key per real inbox, for rate limiting: lower-case, without +tags, and for
+    Gmail without dots (anna+1@x and a.nna@gmail.com reach the same person)."""
+    local, _, domain = email.strip().lower().partition("@")
+    local = local.split("+", 1)[0]
+    if domain in ("gmail.com", "googlemail.com"):
+        local, domain = local.replace(".", ""), "gmail.com"
+    return f"{local}@{domain}"
 
 # One Render instance: a process-wide lock makes "check the slot is free, then insert"
 # atomic even on SQLite. On PostgreSQL the therapist rows are also locked FOR UPDATE.

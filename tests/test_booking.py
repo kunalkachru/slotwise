@@ -185,12 +185,12 @@ def test_names_must_be_plain_text(empty_calendar):
     """Security review finding: names go into emails, so no URLs, digits or markup."""
     client = empty_calendar
     for bad in ("<script>alert(1)</script>", "Visit https://evil.example", "Anna2",
-                "a@b.example"):
+                "a@b.example", "Visit evil.com", "evil.com.", "Ann.example"):
         response = book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", first_name=bad)
         assert response.status_code == 422, bad
         assert response.json()["detail"] == "Please use only letters in your name."
     ok = book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia",
-              first_name="Zoë", last_name="O'Neil-Åström Jr.")
+              first_name="Zoë J. R.", last_name="O'Neil-Åström Jr.")
     assert ok.status_code == 200
 
 
@@ -214,3 +214,49 @@ def test_booking_limits_per_ip_and_per_email(empty_calendar):
                                json={"service_ids": [1], "add_on_ids": [], "date": TUESDAY,
                                      "start_time": "10:00", **CUSTOMER})
     assert from_busy_ip.status_code == 429
+
+
+def test_plus_addresses_and_gmail_dots_share_one_limit(empty_calendar):
+    """Security review finding: anna+1@, anna+2@... reach one inbox, so count together."""
+    from app.logic.booking import mailbox_key
+
+    assert mailbox_key(" Anna+promo@Example.com ") == "anna@example.com"
+    assert mailbox_key("a.n.na+x@googlemail.com") == "anna@gmail.com"
+    assert mailbox_key("a.nna@example.com") == "a.nna@example.com"  # dots only matter at Gmail
+
+    client = empty_calendar
+    for hour in range(10, 15):
+        assert book(client, ["Back and neck massage"], TUESDAY, f"{hour}:00", "Lena",
+                    email=f"anna+{hour}@example.com").status_code == 200
+    assert book(client, ["Back and neck massage"], TUESDAY, "16:00", "Lena",
+                email="ANNA+again@example.com").status_code == 429
+
+
+def test_failed_bookings_do_not_use_up_the_limit(empty_calendar):
+    client = empty_calendar
+    for _ in range(8):  # all rejected: Sunday, studio closed
+        assert book(client, ["Back and neck massage"], "2026-10-11", "11:00", "Lena",
+                    email="same@example.com").status_code == 400
+    assert book(client, ["Back and neck massage"], TUESDAY, "10:00", "Lena",
+                email="same@example.com").status_code == 200
+
+
+def test_limit_check_and_record_are_atomic():
+    """Security review finding: concurrent requests must not all pass the check."""
+    from app.security import RateLimiter
+
+    limiter = RateLimiter()
+    passed: list[bool] = []
+    barrier = threading.Barrier(40)
+
+    def attempt():
+        barrier.wait()
+        passed.append(limiter.try_acquire([("ip:x", 10, 3600), ("email:y", 100, 3600)]))
+
+    threads = [threading.Thread(target=attempt) for _ in range(40)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert passed.count(True) == 10
+    assert limiter.count("ip:x", 3600) == 10 and limiter.count("email:y", 3600) == 10

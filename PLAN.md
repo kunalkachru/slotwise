@@ -216,8 +216,8 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - Email links are built from `PUBLIC_URL`, or Render's automatic `RENDER_EXTERNAL_URL`. Resend's sender is `EMAIL_FROM` **[decision]**.
   - The manage view returns no customer details, because the link holder may not own the email.
   - Security review:
-    - Names may only contain letters, spaces, `-`, `'` and `.`, because they appear in emails we send.
-    - Booking is limited to 10 per IP per hour and 5 per email per day (429), against inbox flooding and calendar filling.
+    - Names may only contain letters, spaces, `-`, `'`, and a `.` before a space or at the end ("Jr."), because they appear in emails we send. No domains like `evil.com`.
+    - Booking is limited to 10 per IP per hour and 5 per inbox per day (429), against inbox flooding and calendar filling. The inbox key drops `+tags` and Gmail dots. The limit is reserved atomically before booking and released if the booking fails.
     - A log filter hides manage/offer tokens in every log line, including uvicorn's access log. Logged emails mask the recipient.
 - **Front end:** Manage booking (details, Confirm I'm coming, Cancel with an "Are you sure?" prompt, Book again).
 - **Tests:**

@@ -18,6 +18,7 @@ from app.logic.booking import (
     create_booking,
     free_cancellation_until,
     get_by_token,
+    mailbox_key,
 )
 from app.logic.selection import parse_ids, require_therapists, resolve_selection
 from app.models import CATEGORIES, Service, Studio
@@ -122,23 +123,26 @@ def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
     ip_key = "ip:" + client_ip(
         request.client.host if request.client else None, request.headers.get("x-forwarded-for")
     )
-    email_key = "email:" + body.email.strip().lower()
-    if (
-        limiter.count(ip_key, 3600) >= BOOKINGS_PER_IP_PER_HOUR
-        or limiter.count(email_key, 86400) >= BOOKINGS_PER_EMAIL_PER_DAY
-    ):
+    email_key = "email:" + mailbox_key(body.email)
+    # Reserve a place under both limits before booking; give it back if booking fails.
+    if not limiter.try_acquire([
+        (ip_key, BOOKINGS_PER_IP_PER_HOUR, 3600),
+        (email_key, BOOKINGS_PER_EMAIL_PER_DAY, 86400),
+    ]):
         raise AppError(429, TOO_MANY_BOOKINGS)
-    selection = resolve_selection(db, body.service_ids, body.add_on_ids)
-    booking = create_booking(
-        db,
-        selection,
-        body.date,
-        body.start_time,
-        body.therapist_id,
-        CustomerDetails(body.first_name, body.last_name, body.email, body.phone, body.note),
-    )
-    limiter.record(ip_key)
-    limiter.record(email_key)
+    try:
+        selection = resolve_selection(db, body.service_ids, body.add_on_ids)
+        booking = create_booking(
+            db,
+            selection,
+            body.date,
+            body.start_time,
+            body.therapist_id,
+            CustomerDetails(body.first_name, body.last_name, body.email, body.phone, body.note),
+        )
+    except Exception:
+        limiter.release([ip_key, email_key])
+        raise
     settings = request.app.state.settings
     request.app.state.mailer.send(confirmation_email(booking, load_studio(db), settings.public_url))
     return BookingOut.from_booking(booking, first_name=body.first_name.strip())
