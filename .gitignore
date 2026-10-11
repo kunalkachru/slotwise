@@ -65,3 +65,6 @@ Thumbs.db
 
 # Local SQLite databases
 *.db
+
+# Node (the Figma Make export in doc/design/figma-make/ is reference-only, never built)
+node_modules/

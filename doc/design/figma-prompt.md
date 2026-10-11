@@ -16,7 +16,7 @@ All texts, labels and messages in this file were taken from the code at commit `
 |---|---|---|---|
 | A. Generate | You, in Figma Make | Paste Parts 1–3 one after another | Style guide, component sheet, all screens |
 | B. Review and fix | You, in Figma Make | Check the screens against the checklist below and ask Figma for corrections | A design you're happy with |
-| C. Hand over | You → me | Share the link and/or screenshots | I can see the design |
+| C. Hand over | You → me | Export the Make code into `doc/design/figma-make/`, plus a few screenshots if I ask | I can read the exact CSS and see the design |
 | D. Port | Me, in this repo | Re-create the look in our HTML/CSS in 6 small PRs, behind the "Classic look / New look" switch | New look live, old look still available |
 | E. Decide | You | Try both looks on your phone and laptop | Classic stays the default; later you may make New the default (or remove one look) |
 
@@ -55,15 +55,61 @@ Go through the screens with this checklist. For anything wrong, write a short co
 
 ### Stage C — Hand the design over to me
 
-Pick one of these; both work:
+#### C1. Export the code (main hand-over)
 
-1. **Screenshots (free, recommended for most screens):** export or screenshot each frame and paste them into our chat. Name them like `C2-booking-390-d.png` (screen, size, frame letter) so we can talk about them precisely.
-2. **The Figma link (for exact values):**
-   - In Figma Make, use **Share → Copy link** and paste it here.
-   - With it, I read the design tokens and look at the most complex screens directly.
-   - Your Figma plan allows about **20 such reads per month**, so I'll use only 3–5: tokens, component sheet, and the booking, manage and bookings screens. Everything else comes from the screenshots.
+1. In Figma Make, open the code view and use its download or export option to get the project as a zip, if your plan allows it.
+2. Unzip it into **`doc/design/figma-make/`** in this repo. Keep the `src/` folder, `index.html`, the CSS files and `package.json`. **Leave out** `node_modules/` and any `dist/` or `build/` folder; `.gitignore` excludes them anyway.
+3. Tell me it's there. I commit it on its own branch and PR. A docs-only PR skips CI.
 
-You don't need to send me any code from Figma Make. We won't use it.
+**This folder is a "dead" reference library.** Nothing builds, serves, tests or deploys it:
+
+| Part of our pipeline | Why it ignores `doc/design/figma-make/` |
+|---|---|
+| CI (`ci.yml`) and deploy (`deploy.yml`) | both skip changes under `doc/**` |
+| Docker image | `.dockerignore` excludes `doc`, and the image copies only `app/` |
+| The live website | only `app/static/` is served |
+| pytest / ruff | pytest only looks in `tests/`; ruff only checks Python files |
+
+I **read** it to get the exact values (CSS variables, spacing, sizes, inline SVG icons, hover, focus and disabled styles) and re-create them in our own files. I never copy the React code into the app.
+
+If you agree at that point, I can also **run it locally** (`npm install`, then `npm run dev`) and open it in the browser pane at 390px and 1440px, next to our pages. That needs Node on your Mac and downloads the packages listed in its `package.json`, so I'll ask first. If it runs, I take most screenshots myself.
+
+#### C2. Screenshots (only what the code can't tell me)
+
+If the code runs locally, I need **none, or only a few** from you. If it doesn't run, or you couldn't export the code, this is the set I need: **about 20 images, not one per frame.**
+
+| # | What | Width | Why |
+|---|---|---|---|
+| 1 | Style guide page | desktop | overall feel, colours together |
+| 2 | Component sheet (all states) | desktop | buttons, inputs, chips, badges, alerts |
+| 3–4 | C1 Home | 390 and 1440 | the first impression |
+| 5–6 | C2 Booking, frame (d) "time chosen" | 390 (with the bottom bar) and 1440 (with the summary card) | the most important page |
+| 7 | C2 Booking, frame (f) field errors | 390 | the error styling |
+| 8 | C2 Booking, German frame | 390 | long words |
+| 9 | C2-W Waitlist box with success message | 390 | |
+| 10 | C3 Booking result "Almost done" | 390 | |
+| 11–12 | C4 Manage: "Awaiting your confirmation", and "Cancel question open" | 390 | key states |
+| 13 | C5 Offer with countdown | 390 | |
+| 14 | C7 Receipt | 1440 | print layout |
+| 15 | O1 Login | 390 | |
+| 16–17 | O2 Dashboard | 1440 and 390 | tiles, chart, table |
+| 18 | O3 Bookings, Day view | 1440 | calendar cards |
+| 19 | O3 Bookings, Week view | 390 | sideways scrolling |
+| 20 | O3-D Booking detail dialog | 1440 | panel layout |
+| 21 | Owner menu open on mobile | 390 | the collapsed menu |
+| 22 | Owner page error state | 1440 | |
+
+The other screens (services, therapists, waitlist, settings, the other dialogs and states) follow the same components, so I only ask if something is unclear.
+
+**How to take them:**
+- **If Make shows design frames:** select a frame, then in the right panel choose Export → PNG, 2x → Export.
+- **If Make shows a live preview:** set the preview width to 390 or 1440. On a Mac, press Cmd+Shift+4, then Space, then click the preview window.
+- **Name** each file `<screen>-<width>-<frame>.png`, for example `C2-390-d.png` or `O2-1440.png`.
+- **Deliver** them by pasting into our chat, or by dropping them into `doc/design/screens/`.
+
+#### C3. The Figma link (optional)
+
+**Share → Copy link** lets me read tokens or a component directly through the Figma connection. That costs some of your **20 calls per month**, so with the exported code I'll rarely need it.
 
 ### Stage D — Port the design into the app (my job, 6 PRs)
 
@@ -84,6 +130,7 @@ The details are in the last section of this file. In short:
 
 ### Quick answers
 
+- **"Why not just use Figma's React code as our front end?"** That would be a rewrite of every page and would need a Node build step, which our CI/CD setup deliberately avoids. The exported code stays a reference library in `doc/design/figma-make/`. A React front end is possible later as a **separate project** (see PLAN.md, "Later"), and the CSS tokens from this redesign would carry over to it.
 - **"Will Figma change my live app?"** No. Figma Make only produces designs and a prototype. Only the PRs in stage D change the app.
 - **"Can I edit the prompt?"** Yes, but keep the texts and the "Technology rules" section unchanged. If you add a feature to the prompt, tell me, because the server would need it too.
 - **"What if Figma ignores an instruction?"** Quote the section number back to it, e.g. *"Please follow Part 1, section 5, rule 4: no icon packages, inline SVG only."*
@@ -312,7 +359,7 @@ Draw each component on the component sheet with every state listed. Use only the
 
 ### 5. Technology rules (very important)
 
-Our app is **plain HTML, CSS and JavaScript** served by a Python (FastAPI) server. There is **no framework, no Tailwind and no build step**, and it must stay that way. We will **not** copy generated React code. We will use your design as a visual reference and re-create it in our own HTML and CSS.
+Our app is **plain HTML, CSS and JavaScript** served by a Python (FastAPI) server. There is **no framework, no Tailwind and no build step**, and it must stay that way. We will **read** your generated code and CSS as an exact reference, but we will **not** run your React code in our app. We will re-create the look in our own HTML and CSS. Clean CSS custom properties make that easy.
 
 So please:
 
@@ -1112,14 +1159,13 @@ This opens from "Add booking". Title: **"Add phone booking"**, with "×" to clos
 
 ### 1. What we take from Figma
 
-- **The Figma Make output is only a visual reference.** We do **not** copy its React or Tailwind code. We re-create the look in our own `app/static/` files, keeping our HTML structure, IDs and scripts. Every hook the JavaScript needs is listed in [`doc/ui-inventory.md`](../ui-inventory.md) and must survive the port.
-- **How I'll read the result.** The Figma connection is limited to 20 calls a month on the Starter plan with a View seat, so I'll keep it cheap:
-  1. You share the Make file link (or its "copy link" for the generated design).
-  2. I use about 3–5 calls:
-     - `get_variable_defs` once, for the tokens;
-     - `get_screenshot` for the component sheet and for the 2–3 most complex screens: booking (C2), manage (C4) and owner bookings (O3);
-     - at most one `get_design_context` for a component whose spacing is unclear.
-  3. For everything else, screenshots you paste into the chat are just as good and cost no calls. A full set of 390px and 1440px screenshots of every screen is ideal.
+- **Main source: the exported code** in `doc/design/figma-make/`. It's a reference-only library, never built, served or tested (see Stage C1).
+  - **CSS:** its custom properties should use our token names (Part 1, section 5). They become the `:root[data-theme="calm"]` block in `calm.css`, almost one to one.
+  - **Component styles:** buttons, cards, chips and so on are translated into rules on our existing classes (see the mapping in section 4), scoped under `[data-theme="calm"]`.
+  - **Icons:** its inline SVGs are copied into our markup or scripts.
+  - **Never:** its React components, state logic or Tailwind classes are never copied into `app/static/`. Our HTML structure, IDs and scripts stay, and every hook listed in [`doc/ui-inventory.md`](../ui-inventory.md) must survive the port.
+- **Seeing it rendered:** with your OK, I run the export locally (`npm install && npm run dev`, outside the app) and compare it with our pages in the browser pane at 390px and 1440px. Otherwise I use the screenshots from Stage C2.
+- **Figma connection (optional):** at most 1–3 of the 20 monthly calls, e.g. `get_variable_defs` if the exported CSS doesn't carry the tokens.
 
 ### 2. Keeping the classic look switchable
 
