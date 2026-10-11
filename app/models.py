@@ -1,5 +1,5 @@
-"""All tables (PLAN.md section 2). Defined up front because tables are created with
-create_all, which never alters existing tables on the persistent Neon database."""
+"""All tables (PLAN.md section 2). The schema is managed by Alembic (app/migrations):
+after changing a model, add a migration (`alembic revision --autogenerate -m ...`)."""
 
 from datetime import UTC, date, datetime, time
 from decimal import Decimal

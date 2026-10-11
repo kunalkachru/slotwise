@@ -247,11 +247,12 @@ def _seed_demo_bookings(session, services, therapists, customers) -> None:
 
 
 if __name__ == "__main__":
-    from app.db import Base, make_engine, make_session_factory
+    from app.db import make_engine, make_session_factory
+    from app.migrate import migrate
 
     logging.basicConfig(level=logging.INFO)
     settings = Settings.from_env()
     engine = make_engine(settings.database_url)
-    Base.metadata.create_all(engine)
+    migrate(engine)
     with make_session_factory(engine)() as db:
         seed(db, settings)

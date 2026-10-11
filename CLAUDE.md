@@ -16,8 +16,8 @@ Slotwise is a booking app for one small appointment-based studio. The demo studi
 
 - **Back end:** Python 3.12 + FastAPI + SQLAlchemy.
 - **Front end:** plain HTML, CSS and JS, served as static files by the same FastAPI app. There is no Node build step and no separate front-end deploy.
-- **Database:** chosen only by `DATABASE_URL`. Local runs and tests use SQLite. Production uses Neon free PostgreSQL through `psycopg[binary]`; never SQLite, because Render wipes the disk. Tables are created by a simple startup migration or by Alembic.
-- **Allowed dependencies:** fastapi, uvicorn, sqlalchemy, psycopg[binary], pydantic, bcrypt, pytest, httpx, ruff. Not allowed: Redis, Celery, a background worker, Docker Compose, or a PDF library. Receipts are HTML pages styled for the browser's print dialog. Charts are CSS bars or one Chart.js file from a CDN.
+- **Database:** chosen only by `DATABASE_URL`. Local runs and tests use SQLite. Production uses Neon free PostgreSQL through `psycopg[binary]`; never SQLite, because Render wipes the disk. The schema is managed by **Alembic** and migrated at startup. A database created before Alembic (the live one) is stamped at the baseline `0001` on its first start.
+- **Allowed dependencies:** fastapi, uvicorn, sqlalchemy, psycopg[binary], pydantic, bcrypt, alembic (added after v1), pytest, httpx, ruff. Not allowed: Redis, Celery, a background worker, Docker Compose, or a PDF library. Receipts are HTML pages styled for the browser's print dialog. Charts are CSS bars or one Chart.js file from a CDN.
 - **Hosting limits:** one free Render web service. The app must start in under 10 seconds, use less than 512 MB of RAM, and survive sleep and cold starts.
 - **Docker:** a small `Dockerfile` based on `python:3.12-slim`.
 - **Config:** comes only from environment variables. Keep `.env.example` in sync with this list:
@@ -38,7 +38,13 @@ cp .env.example .env && set -a && . ./.env && set +a && .venv/bin/uvicorn app.ma
 docker build -t slotwise . && docker run --rm -p 8000:8000 --env-file .env slotwise
 ```
 
-- **Local startup:** creates the tables and seeds them. Delete `slotwise.db` to start over.
+- **Local startup:** runs the Alembic migrations (`app/migrate.py`), then seeds. Delete `slotwise.db` to start over.
+- **Schema changes (Alembic):**
+  1. Edit `app/models.py`.
+  2. Run `.venv/bin/alembic revision --autogenerate -m "what changed"`. It writes to `app/migrations/versions/`, and `DATABASE_URL` picks the database to compare against.
+  3. **Read the file.** CHECK-constraint changes (allowed statuses) aren't detected and must be written by hand. SQLite needs `batch_alter_table`, which autogenerate already uses.
+  4. Run `.venv/bin/alembic upgrade head` (or just start the app). `tests/test_migrations.py` fails if models and migrations drift apart.
+  5. Never edit a migration that's deployed; add a new one.
 - **Tests:** each test gets a fresh in-memory database through the `make_client` / `client` fixtures in `tests/conftest.py`. `frozen_now` pins `app.clock.now` to Sat 10 Oct 2026 12:00 Berlin. Every time rule must read the time through `app.clock.now()` so tests can freeze it.
 - **Browser preview:** the preview runner can't read this folder, so `.claude/launch.json` only attaches to `http://localhost:8000`. Start uvicorn from the shell first.
 

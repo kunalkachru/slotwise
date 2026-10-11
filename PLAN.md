@@ -326,7 +326,7 @@ There are no open questions.
 Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items are in priority order within each group.
 
 ### Next up (agreed order)
-1. **Adopt Alembic for database migrations.** This is the foundation for items 2 and 3. Right now tables are only created (`create_all`), never changed, so any change to an existing table needs this.
+1. ✅ **Done (PR `feature-alembic`): Adopt Alembic for database migrations.** The baseline `0001` equals the slice-1 schema. The live database is stamped automatically on its first start; checked against PostgreSQL 16 in Docker. This is the foundation for items 2 and 3. Right now tables are only created (`create_all`), never changed, so any change to an existing table needs this.
    - **Enable once:**
      1. Add `alembic` to `requirements.txt`, then run `alembic init migrations`.
      2. In `migrations/env.py`, use `Settings.from_env().database_url` and `Base.metadata`, with `render_as_batch=True` so SQLite works too.
