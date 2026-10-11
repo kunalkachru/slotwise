@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.emails import confirmation_email
+from app.emails import confirmation_email, waitlist_joined_email
 from app.errors import TOO_MANY_BOOKINGS, AppError
 from app.logic import waitlist
 from app.logic.availability import check_date_in_range, free_slots
@@ -195,28 +195,36 @@ def cancel(token: str, request: Request, db: Session = Depends(get_db)):
 # ---------- Waitlist (slice 5) ----------
 
 WAITLIST_JOINS_PER_IP_PER_HOUR = 10
+WAITLIST_JOINS_PER_EMAIL_PER_DAY = 3
 
 
 @router.post("/waitlist", response_model=WaitlistJoinOut)
 def join_waitlist(body: WaitlistIn, request: Request, db: Session = Depends(get_db)):
+    details = CustomerDetails(body.first_name, body.last_name, body.email, body.phone).cleaned()
     limiter = request.app.state.booking_limiter
     ip_key = "waitlist-ip:" + client_ip(
         request.client.host if request.client else None, request.headers.get("x-forwarded-for")
     )
-    if not limiter.try_acquire([(ip_key, WAITLIST_JOINS_PER_IP_PER_HOUR, 3600)]):
+    email_key = "waitlist-email:" + mailbox_key(details.email)
+    # Per IP and per inbox, so nobody can sign a stranger up for many days of emails.
+    if not limiter.try_acquire([
+        (ip_key, WAITLIST_JOINS_PER_IP_PER_HOUR, 3600),
+        (email_key, WAITLIST_JOINS_PER_EMAIL_PER_DAY, 86400),
+    ]):
         raise AppError(429, TOO_MANY_BOOKINGS)
     try:
-        entry, position = waitlist.join(db, waitlist.JoinRequest(
+        result = waitlist.join(db, waitlist.JoinRequest(
             service_ids=body.service_ids, add_on_ids=body.add_on_ids,
             therapist_id=body.therapist_id, preferred_date=body.preferred_date,
-            earliest_time=body.earliest_time, latest_time=body.latest_time,
-            details=CustomerDetails(body.first_name, body.last_name, body.email, body.phone),
+            earliest_time=body.earliest_time, latest_time=body.latest_time, details=details,
         ))
     except Exception:
-        limiter.release([ip_key])
+        limiter.release([ip_key, email_key])
         raise
-    return WaitlistJoinOut(position=position, preferred_date=entry.preferred_date,
-                           status=entry.status)
+    if result.entry is not None:
+        request.app.state.mailer.send(waitlist_joined_email(
+            result.entry, result.position, load_studio(db), already=not result.created))
+    return WaitlistJoinOut(status="received", preferred_date=body.preferred_date)
 
 
 def _offer_view(db: Session, entry) -> OfferOut:

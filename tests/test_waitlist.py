@@ -57,15 +57,59 @@ def lena_booked(empty_calendar):
 
 # ---------- joining ----------
 
-def test_join_returns_queue_position_and_rejects_duplicates(empty_calendar):
+def joined_mails(client):
+    return [e for e in client.app.state.mailer.outbox if e.subject.startswith("Waitlist for")]
+
+
+def test_join_emails_the_position_and_the_response_reveals_nothing(empty_calendar, db):
     client = empty_calendar
-    assert join(client, "Tom").json() == {"position": 1, "preferred_date": TUESDAY,
-                                          "status": "waiting"}
-    assert join(client, "Mia").json()["position"] == 2
+    first = join(client, "Tom")
+    assert first.status_code == 200
+    assert first.json() == {"status": "received", "preferred_date": TUESDAY}
+    join(client, "Mia")
+    [tom, mia] = joined_mails(client)
+    assert tom.to == "tom@example.com" and "number 1" in tom.text
+    assert mia.to == "mia@example.com" and "number 2" in mia.text
+
+    # Joining again for the same day: same response, no new entry, an email to the owner.
     again = join(client, "Tom", services=("Back and neck massage",))
-    assert again.status_code == 409
-    assert again.json()["detail"] == "You are already on the waitlist for this day."
+    assert again.status_code == 200 and again.json() == first.json()
+    assert db.query(WaitlistEntry).count() == 2
+    assert "already on the waitlist" in joined_mails(client)[-1].text
     assert join(client, "Tom", day="2026-10-14").status_code == 200  # another day is fine
+    assert db.query(WaitlistEntry).count() == 3
+
+
+def test_joins_are_limited_per_inbox(empty_calendar):
+    """Security review finding: nobody can sign a stranger up for many days of emails."""
+    client = empty_calendar
+    ids = menu_ids(client)
+    for i, day in enumerate(("2026-10-13", "2026-10-14", "2026-10-15")):
+        response = client.post("/public/waitlist", headers={"X-Forwarded-For": f"203.0.113.{i}"},
+                               json={"service_ids": [ids["Foot reflexology"]], "add_on_ids": [],
+                                     "preferred_date": day, "earliest_time": "09:00",
+                                     "latest_time": "18:00", "first_name": "Victim",
+                                     "last_name": "X", "email": f"victim+{i}@example.com",
+                                     "phone": "+49 151 0000 0100"})
+        assert response.status_code == 200
+    blocked = client.post("/public/waitlist", headers={"X-Forwarded-For": "203.0.113.99"},
+                          json={"service_ids": [ids["Foot reflexology"]], "add_on_ids": [],
+                                "preferred_date": "2026-10-16", "earliest_time": "09:00",
+                                "latest_time": "18:00", "first_name": "Victim", "last_name": "X",
+                                "email": "VICTIM@example.com", "phone": "+49 151 0000 0100"})
+    assert blocked.status_code == 429
+
+
+def test_open_entries_per_customer_are_capped(empty_calendar, db):
+    from app.logic import waitlist as wl
+
+    client = empty_calendar
+    limiter = client.app.state.booking_limiter
+    for day in ("2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17",
+                "2026-10-19"):
+        limiter._events.clear()  # isolate the cap from the daily join limit
+        assert join(client, "Tom", day=day).status_code == 200
+    assert db.query(WaitlistEntry).count() == wl.MAX_OPEN_ENTRIES_PER_CUSTOMER
 
 
 def test_join_validation(empty_calendar):

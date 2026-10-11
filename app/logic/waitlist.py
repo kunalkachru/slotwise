@@ -19,7 +19,6 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.emails import Mailer, waitlist_offer_email
 from app.errors import (
-    ALREADY_ON_WAITLIST,
     DATE_OUT_OF_RANGE,
     INVALID_TIME_WINDOW,
     OFFER_ALREADY_CLAIMED,
@@ -58,8 +57,19 @@ class JoinRequest:
     details: CustomerDetails
 
 
-def join(db: Session, request: JoinRequest) -> tuple[WaitlistEntry, int]:
-    """Add an entry; returns it with its position in the queue for that day."""
+MAX_OPEN_ENTRIES_PER_CUSTOMER = 5
+
+
+@dataclass
+class JoinResult:
+    entry: WaitlistEntry | None  # None when the per-customer cap was reached
+    position: int | None
+    created: bool  # False: they were already waiting that day (nothing changed)
+
+
+def join(db: Session, request: JoinRequest) -> JoinResult:
+    """Add an entry, or report the existing one. The caller must give the same response
+    either way, so the API never reveals who is on the waitlist (security review)."""
     selection = resolve_selection(db, request.service_ids, request.add_on_ids)
     therapists = qualified_therapists(db, selection)
     if request.therapist_id is not None:
@@ -81,14 +91,19 @@ def join(db: Session, request: JoinRequest) -> tuple[WaitlistEntry, int]:
     details = request.details.cleaned()
     customer = find_or_create_customer(db, details)
     db.flush()
-    duplicate = db.scalar(select(WaitlistEntry.id).where(
+    existing = db.scalar(select(WaitlistEntry).where(
         WaitlistEntry.customer_id == customer.id,
         WaitlistEntry.preferred_date == request.preferred_date,
         WaitlistEntry.status.in_(OPEN),
     ))
-    if duplicate:
-        db.rollback()
-        raise AppError(409, ALREADY_ON_WAITLIST)
+    if existing is not None:
+        db.commit()
+        return JoinResult(existing, queue_position(db, existing), created=False)
+    open_entries = db.scalar(select(func.count()).select_from(WaitlistEntry).where(
+        WaitlistEntry.customer_id == customer.id, WaitlistEntry.status.in_(OPEN)))
+    if open_entries >= MAX_OPEN_ENTRIES_PER_CUSTOMER:
+        db.commit()
+        return JoinResult(None, None, created=False)
     entry = WaitlistEntry(
         customer=customer,
         therapist_id=request.therapist_id,
@@ -101,7 +116,7 @@ def join(db: Session, request: JoinRequest) -> tuple[WaitlistEntry, int]:
     )
     db.add(entry)
     db.commit()
-    return entry, queue_position(db, entry)
+    return JoinResult(entry, queue_position(db, entry), created=True)
 
 
 def queue_position(db: Session, entry: WaitlistEntry) -> int:

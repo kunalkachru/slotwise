@@ -33,7 +33,6 @@ NAME_CHARACTERS = "Please use only letters in your name."
 TOO_MANY_BOOKINGS = "Too many bookings in a short time. Please call the studio."
 
 # Waitlist (slice 5)
-ALREADY_ON_WAITLIST = "You are already on the waitlist for this day."
 OFFER_NOT_FOUND = "Offer not found."
 OFFER_EXPIRED = "Sorry, this offer has expired."
 OFFER_ALREADY_CLAIMED = "This offer was already claimed."

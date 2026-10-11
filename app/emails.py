@@ -221,3 +221,31 @@ def waitlist_offer_email(entry, studio, public_url: str, when: str, therapist_na
         ),
         reply_to=studio.email,
     )
+
+
+def waitlist_joined_email(entry, position: int, studio, already: bool) -> Email:
+    """Sent to the address that joined, so only its owner learns the queue position."""
+    day = entry.preferred_date.strftime("%A %-d %B")
+    window = f"{entry.earliest_time:%H:%M}–{entry.latest_time:%H:%M}"
+    if already:
+        intro = (f"Hello {entry.customer.first_name}, you are already on the waitlist at "
+                 f"{studio.name} for {day} ({window}), number {position}.")
+    else:
+        intro = (f"Hello {entry.customer.first_name}, you are on the waitlist at {studio.name} "
+                 f"for {day} ({window}), number {position}.")
+    detail = ("If a time frees up, we'll email you a link to claim it; the first person to "
+              "claim gets it. If you didn't ask for this, ignore this email or call us.")
+    footer = f"{studio.name} · {studio.address} · {studio.phone}"
+    esc = html.escape
+    return Email(
+        to=entry.customer.email,
+        subject=f"Waitlist for {day} · {studio.name}",
+        text=f"{intro}\n\n{detail}\n\n{footer}",
+        html=(
+            '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
+            f'max-width:520px;color:#1d2a24"><h2 style="color:#1F8756">You\'re on the '
+            f"waitlist</h2><p>{esc(intro)}</p><p>{esc(detail)}</p>"
+            f'<p style="color:#5d6b64;font-size:14px">{esc(footer)}</p></div>'
+        ),
+        reply_to=studio.email,
+    )

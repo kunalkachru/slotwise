@@ -269,7 +269,8 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - Waitlist offers and claims skip the 2-hour notice (like phone bookings), so late cancellations can be refilled **[decision]**.
   - "Fits the freed slot" uses the normal free-slot check (working hours, other bookings, buffers, therapist skills).
   - Reminders go out once, within 24 h of the start, and only for bookings made more than 24 h ahead **[decision]**.
-  - Joining is refused for days when no qualified therapist works. It's limited to 10 joins per IP per hour.
+  - Joining is refused for days when no qualified therapist works. It's limited to 10 joins per IP per hour, **3 per inbox per day**, and at most 5 open entries per customer.
+  - **Join responses reveal nothing (security review):** the API always answers "received", for new and duplicate joins alike. The queue position, or "already on the list", is **emailed** to the address instead. This replaces the blueprint's 409 and on-screen position **[decision]**.
   - When the owner removes an entry with an open offer, the offer is withdrawn, not passed on.
   - The offer page shows the slot, not the customer's details.
   - **You (manual):** add the GitHub Actions secret `JOBS_SECRET` with the same value as on Render, otherwise `jobs.yml` fails at its configuration check.

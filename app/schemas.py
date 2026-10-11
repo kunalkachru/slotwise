@@ -382,9 +382,11 @@ class WaitlistIn(BaseModel):
 
 
 class WaitlistJoinOut(BaseModel):
-    position: int
+    """Identical whether the person was added or already waiting, so the API can't be
+    used to find out who is on the waitlist. The position is emailed instead."""
+
+    status: str  # always "received"
     preferred_date: date
-    status: str
 
 
 class OfferLineOut(BaseModel):
