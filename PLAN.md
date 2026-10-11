@@ -305,6 +305,14 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - The weekly chart uses grouped columns on one axis, two validated categorical colours (not the brand green), a legend, a hover/focus tooltip and a table view. It's light theme only, like the rest of the app (blueprint: light background).
 - **Done when:** the three success numbers (no-show rate, waitlist refill share, online share) are visible on the live dashboard.
 
+### After slice 6: Studio settings
+- `GET/PUT /owner/studio` and the owner page **Studio settings**:
+  - **Details:** name, address, phone, reply-to email and opening-hours text. These are shown on the home page, receipts and every email.
+  - **Booking rules:** minimum notice, booking window, free-cancellation hours, waitlist offer minutes.
+  - **Receipts:** the receipt prefix.
+- The customer-facing notice/window error messages now follow these rules. With the defaults they're exactly the blueprint's wording.
+- Replaces the demo values (e.g. the fake `hello@isar-wellness.example.com` reply-to) before real customers use the app.
+
 ## 5. Resolved questions (2026-10-10)
 
 There are no open questions.

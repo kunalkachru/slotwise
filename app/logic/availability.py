@@ -20,7 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import clock
-from app.errors import DATE_OUT_OF_RANGE, AppError
+from app.errors import AppError, date_out_of_range
 from app.logic.selection import Selection
 from app.models import Booking, DayOff, Studio, Therapist
 
@@ -53,7 +53,7 @@ def check_date_in_range(db: Session, day: date) -> None:
     studio = get_studio(db)
     today = clock.now().date()
     if day < today or day > today + timedelta(days=studio.booking_window_days):
-        raise AppError(422, DATE_OUT_OF_RANGE, field="date")
+        raise AppError(422, date_out_of_range(studio.booking_window_days), field="date")
 
 
 @dataclass(frozen=True)

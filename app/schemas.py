@@ -451,3 +451,19 @@ class OwnerWaitlistOut(BaseModel):
     offer_expires_at: datetime | None
     offer_time: str | None
     booking_id: int | None
+
+
+# ---------- Studio settings ----------
+
+
+class StudioSettings(ORMModel):
+    name: str = Field(max_length=120)
+    address: str = Field(max_length=255)
+    phone: str = Field(max_length=40)
+    email: str = Field(max_length=255)
+    opening_hours_text: str = Field(default="", max_length=255)
+    min_notice_hours: int
+    free_cancellation_hours: int
+    booking_window_days: int
+    waitlist_offer_minutes: int
+    receipt_prefix: str = Field(max_length=10)

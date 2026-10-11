@@ -40,6 +40,7 @@ from app.schemas import (
     ServiceIn,
     SlotOut,
     StatusIn,
+    StudioSettings,
     TherapistAdminOut,
     TherapistIn,
 )
@@ -302,3 +303,16 @@ def owner_waitlist(date: date | None = None, db: Session = Depends(get_db)):
 def remove_waitlist_entry(entry_id: int, db: Session = Depends(get_db)) -> Response:
     waitlist.remove_entry(db, entry_id)
     return Response(status_code=204)
+
+
+# ---------- Studio settings ----------
+
+
+@router.get("/studio", response_model=StudioSettings)
+def studio_settings(db: Session = Depends(get_db)):
+    return get_studio(db)
+
+
+@router.put("/studio", response_model=StudioSettings)
+def update_studio(body: StudioSettings, db: Session = Depends(get_db)):
+    return catalog.save_studio(db, catalog.StudioInput(**body.model_dump()))
