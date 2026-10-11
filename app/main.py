@@ -6,10 +6,11 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.config import Settings
-from app.db import Base, make_engine, make_session_factory
+from app.db import make_engine, make_session_factory
 from app.emails import Mailer
 from app.errors import install_error_handlers
 from app.logs import install_log_redaction
+from app.migrate import migrate
 from app.routers import auth, health, internal, owner, public
 from app.security import LoginLimiter, RateLimiter
 from app.seed import seed
@@ -26,7 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         cfg = settings or Settings.from_env()
         engine = make_engine(cfg.database_url)
-        Base.metadata.create_all(engine)
+        migrate(engine)  # Alembic: create or upgrade the schema
         app.state.settings = cfg
         app.state.engine = engine
         app.state.session_factory = make_session_factory(engine)
