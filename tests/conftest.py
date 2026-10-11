@@ -17,6 +17,7 @@ TEST_SETTINGS = Settings(
     owner_email=OWNER_EMAIL,
     owner_password=OWNER_PASSWORD,
     seed_demo_data=True,
+    jobs_secret="test-jobs-secret",
 )
 
 # Requests reach the app from Render's internal proxy, which is what makes

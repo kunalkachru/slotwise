@@ -38,7 +38,9 @@ def _one_of(column: str, values: tuple[str, ...], name: str) -> CheckConstraint:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(UTC)
+    from app import clock  # the one source of "now", so tests can freeze it
+
+    return clock.now().astimezone(UTC)
 
 
 class Timestamped:
@@ -258,3 +260,5 @@ class WaitlistEntry(Timestamped, Base):
     offer_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     offered_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"))
+
+    customer: Mapped[Customer] = relationship()

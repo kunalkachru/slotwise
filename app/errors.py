@@ -32,6 +32,13 @@ NOTE_TOO_LONG = "Please keep the note under 300 characters."
 NAME_CHARACTERS = "Please use only letters in your name."
 TOO_MANY_BOOKINGS = "Too many bookings in a short time. Please call the studio."
 
+# Waitlist (slice 5)
+ALREADY_ON_WAITLIST = "You are already on the waitlist for this day."
+OFFER_NOT_FOUND = "Offer not found."
+OFFER_EXPIRED = "Sorry, this offer has expired."
+OFFER_ALREADY_CLAIMED = "This offer was already claimed."
+INVALID_TIME_WINDOW = "Please choose an earliest time before the latest time."
+
 # Manage link (slice 3)
 BOOKING_NOT_FOUND = "Booking not found. Please check the link in your email."
 CANNOT_CONFIRM = "This booking can no longer be confirmed."

@@ -164,7 +164,9 @@ def create_booking(
     details: CustomerDetails,
     source: str = "online",
 ) -> Booking:
-    for_owner = source == "phone"  # owner-entered bookings skip the notice period
+    # Owner phone bookings and claimed waitlist offers skip the notice period, so a
+    # late cancellation can still be refilled [decision].
+    for_owner = source in ("phone", "waitlist")
     details = details.cleaned()
     start_at = parse_start(day, start_time)
     if not booking_limits(db, for_owner).allows(start_at):

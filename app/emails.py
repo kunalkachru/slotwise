@@ -163,7 +163,9 @@ def confirmation_email(booking, studio, public_url: str) -> Email:
 
 def reminder_email(booking, studio, public_url: str) -> Email:
     """Sent 24 hours before (slice 5 schedules it) with one-click confirm and cancel."""
-    intro = f"Hello {booking.customer.first_name}, a reminder of your appointment tomorrow."
+    intro = (f"Hello {booking.customer.first_name}, a reminder of your appointment on "
+             f"{_when(booking)}. Please confirm you're coming, or cancel so someone on the "
+             "waitlist can have the time.")
     footer = f"{studio.name} · {studio.address} · {studio.phone}"
     links = [
         ("Confirm I'm coming", manage_link(public_url, booking, "confirm")),
@@ -173,7 +175,7 @@ def reminder_email(booking, studio, public_url: str) -> Email:
         to=booking.customer.email,
         subject=f"Reminder: {_when(booking)} · {studio.name}",
         text=_text_body(intro, booking, links, footer),
-        html=_html_page("See you tomorrow", intro, booking, links, footer),
+        html=_html_page("See you soon", intro, booking, links, footer),
         reply_to=studio.email,
     )
 
@@ -189,5 +191,33 @@ def receipt_email(booking, studio, public_url: str) -> Email:
         subject=f"Receipt {booking.receipt_number} · {studio.name}",
         text=_text_body(intro, booking, links, footer),
         html=_html_page(f"Receipt {booking.receipt_number}", intro, booking, links, footer),
+        reply_to=studio.email,
+    )
+
+
+def waitlist_offer_email(entry, studio, public_url: str, when: str, therapist_name: str,
+                         minutes: int) -> Email:
+    """A freed slot for someone on the waitlist; first come, valid for a short time."""
+    expires = entry.offer_expires_at.astimezone(BERLIN).strftime("%H:%M")
+    link = f"{public_url}/offer.html?token={entry.offer_token}"
+    intro = (f"Hello {entry.customer.first_name}, a time you were waiting for at {studio.name} "
+             f"is free: {when} with {therapist_name} ({minutes} min).")
+    detail = f"Claim it before {expires}. After that it goes to the next person on the waitlist."
+    footer = f"{studio.name} · {studio.address} · {studio.phone}"
+    esc = html.escape
+    return Email(
+        to=entry.customer.email,
+        subject=f"A time is free: {when} · {studio.name}",
+        text=f"{intro}\n\n{detail}\n\nClaim this time: {link}\n\n{footer}",
+        html=(
+            '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
+            'max-width:520px;color:#1d2a24">'
+            f'<h2 style="color:#1F8756">A time is free for you</h2><p>{esc(intro)}</p>'
+            f"<p><strong>{esc(detail)}</strong></p>"
+            f'<p><a href="{esc(link)}" style="display:inline-block;padding:10px 16px;'
+            f'border-radius:8px;background:#1F8756;color:#fff;text-decoration:none;'
+            f'font-weight:600">Claim this time</a></p>'
+            f'<p style="color:#5d6b64;font-size:14px">{esc(footer)}</p></div>'
+        ),
         reply_to=studio.email,
     )

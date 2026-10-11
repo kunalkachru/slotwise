@@ -1,0 +1,61 @@
+name: Jobs
+
+# Every 15 minutes: ask the app to send due reminders, expire waitlist offers (passing
+# each slot to the next person) and anonymize old customer data. The free Render
+# instance sleeps and has no scheduler of its own, so GitHub Actions is the clock.
+#
+# Needs (Settings → Secrets and variables → Actions):
+#   secret   JOBS_SECRET   the same value as JOBS_SECRET in the Render environment
+#   variable APP_URL       already used by deploy.yml
+#
+# Notes: scheduled workflows run only from the default branch, can start a few minutes
+# late when GitHub is busy, and are paused after 60 days without repository activity.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: # run now from the Actions tab
+
+# Never two runs at once; a run that is still going finishes before the next starts.
+concurrency:
+  group: run-jobs
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run-jobs:
+    name: POST /internal/run-jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      APP_URL: ${{ vars.APP_URL }}
+      JOBS_SECRET: ${{ secrets.JOBS_SECRET }}
+    steps:
+      - name: Check configuration
+        run: |
+          missing=0
+          if [ -z "$APP_URL" ]; then echo "::error::Variable APP_URL is not set."; missing=1; fi
+          if [ -z "$JOBS_SECRET" ]; then echo "::error::Secret JOBS_SECRET is not set."; missing=1; fi
+          exit "$missing"
+
+      - name: Run jobs
+        run: |
+          # A sleeping free instance can take up to a minute to wake: long timeout, retries.
+          status=$(curl -sS -o result.json -w '%{http_code}' -X POST \
+            --retry 3 --retry-delay 20 --retry-all-errors --max-time 120 \
+            -H "X-Jobs-Secret: ${JOBS_SECRET}" \
+            "${APP_URL%/}/internal/run-jobs")
+          echo "HTTP $status"
+          cat result.json; echo
+          if [ "$status" != "200" ]; then
+            echo "::error::run-jobs returned HTTP $status"
+            exit 1
+          fi
+          {
+            echo "### run-jobs"
+            echo '```json'
+            cat result.json
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

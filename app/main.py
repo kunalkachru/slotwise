@@ -10,7 +10,7 @@ from app.db import Base, make_engine, make_session_factory
 from app.emails import Mailer
 from app.errors import install_error_handlers
 from app.logs import install_log_redaction
-from app.routers import auth, health, owner, public
+from app.routers import auth, health, internal, owner, public
 from app.security import LoginLimiter, RateLimiter
 from app.seed import seed
 
@@ -41,7 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="Slotwise", lifespan=lifespan, docs_url="/api/docs", redoc_url=None)
     install_error_handlers(app)
-    for module in (health, public, auth, owner):
+    for module in (health, public, auth, owner, internal):
         app.include_router(module.router)
     # Mounted last so API routes win; html=True serves index.html for "/".
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

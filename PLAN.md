@@ -264,6 +264,15 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - `POST /internal/run-jobs` (JOBS_SECRET header; idempotent): sends reminders due within 24 hours, expires offers and passes the slot to the next entry, anonymizes customers whose last booking is more than 2 years old. Keep this in one function, `anonymize_customer()`, so that customer deletion can reuse it later.
 - **Front end:** the Join waitlist form on Book when no times are free, Claim waitlist slot (with a countdown), and the owner Waitlist page.
 - **Infrastructure:** `jobs.yml`, a cron every 15 minutes plus `workflow_dispatch` for manual runs.
+- **Decisions made while building:**
+  - Each entry gets one offer: expired → `expired`, declined → `removed`, and the slot then goes to the next entry. Customers can join again **[decision]**.
+  - Waitlist offers and claims skip the 2-hour notice (like phone bookings), so late cancellations can be refilled **[decision]**.
+  - "Fits the freed slot" uses the normal free-slot check (working hours, other bookings, buffers, therapist skills).
+  - Reminders go out once, within 24 h of the start, and only for bookings made more than 24 h ahead **[decision]**.
+  - Joining is refused for days when no qualified therapist works. It's limited to 10 joins per IP per hour.
+  - When the owner removes an entry with an open offer, the offer is withdrawn, not passed on.
+  - The offer page shows the slot, not the customer's details.
+  - **You (manual):** add the GitHub Actions secret `JOBS_SECRET` with the same value as on Render, otherwise `jobs.yml` fails at its configuration check.
 - **Tests:**
   - **Waitlist offer order**: join order, filtered by date, time window, therapist and duration
   - only one open offer per slot

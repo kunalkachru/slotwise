@@ -98,7 +98,7 @@ The jobs must be idempotent, because a call can come late or twice.
   - Uses the GitHub `production` environment.
   - Concurrency group `deploy-production` with cancel-in-progress.
   - Needs the secret `RENDER_DEPLOY_HOOK_URL` and the variable `APP_URL`.
-- `jobs.yml`: a cron every 15 minutes that calls `/internal/run-jobs` with `JOBS_SECRET`.
+- `jobs.yml`: a cron every 15 minutes (plus a manual run button) that POSTs `/internal/run-jobs` with the `X-Jobs-Secret` header. It needs the GitHub secret `JOBS_SECRET`, equal to Render's `JOBS_SECRET`. run-jobs (`app/logic/jobs.py`) must stay idempotent: it expires offers and passes them on, sends due reminders, and anonymizes customers 2 years after their last booking.
 
 GitHub repo: `kunalkachru/slotwise` (public), default branch `main`.
 

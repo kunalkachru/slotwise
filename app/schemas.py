@@ -363,3 +363,61 @@ class DayOffOut(BaseModel):
     therapist_name: str | None
     date: date
     reason: str | None
+
+
+# ---------- Slice 5: waitlist ----------
+
+
+class WaitlistIn(BaseModel):
+    service_ids: list[int] = Field(min_length=1, max_length=10)
+    add_on_ids: list[int] = Field(default_factory=list, max_length=20)
+    therapist_id: int | None = None
+    preferred_date: date
+    earliest_time: time
+    latest_time: time
+    first_name: str = Field(max_length=80)
+    last_name: str = Field(max_length=80)
+    email: str = Field(max_length=255)
+    phone: str = Field(max_length=40)
+
+
+class WaitlistJoinOut(BaseModel):
+    position: int
+    preferred_date: date
+    status: str
+
+
+class OfferLineOut(BaseModel):
+    name: str
+    price: MoneyStr
+
+
+class OfferOut(BaseModel):
+    """Shown to whoever holds the offer link: the slot, not the customer's details."""
+
+    status: str  # open | claimed | expired
+    date: date
+    time: str
+    therapist_name: str
+    total_minutes: int
+    total_price: MoneyStr
+    lines: list[OfferLineOut]
+    expires_at: datetime
+
+
+class OwnerWaitlistOut(BaseModel):
+    id: int
+    customer_name: str
+    email: str
+    phone: str
+    services: list[str]
+    preferred_date: date
+    earliest_time: str
+    latest_time: str
+    therapist_name: str | None
+    joined_at: datetime
+    status: str
+    offered_at: datetime | None
+    offer_expires_at: datetime | None
+    offer_time: str | None
+    booking_id: int | None

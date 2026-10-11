@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.db import get_db
 from app.emails import confirmation_email, receipt_email
-from app.logic import catalog
+from app.logic import catalog, waitlist
 from app.logic.availability import check_date_in_range, free_slots, get_studio
 from app.logic.booking import CustomerDetails, create_booking
 from app.logic.owner_bookings import (
@@ -34,6 +34,7 @@ from app.schemas import (
     HoursListIn,
     ItemsIn,
     OwnerBookingOut,
+    OwnerWaitlistOut,
     ServiceAdminOut,
     ServiceIn,
     SlotOut,
@@ -146,8 +147,15 @@ def phone_booking(body: BookingIn, request: Request, db: Session = Depends(get_d
 
 
 @router.put("/bookings/{booking_id}/status", response_model=OwnerBookingOut)
-def set_status(booking_id: int, body: StatusIn, db: Session = Depends(get_db)):
-    return _out(change_status(db, get_booking(db, booking_id), body.status))
+def set_status(booking_id: int, body: StatusIn, request: Request, db: Session = Depends(get_db)):
+    booking = get_booking(db, booking_id)
+    was_cancelled = booking.status == "cancelled"
+    booking = change_status(db, booking, body.status)
+    if booking.status == "cancelled" and not was_cancelled:
+        waitlist.offer_slot(db, request.app.state.mailer,
+                            request.app.state.settings.public_url,
+                            booking.therapist_id, booking.start_at)
+    return _out(booking)
 
 
 @router.put("/bookings/{booking_id}/items", response_model=OwnerBookingOut)
@@ -238,4 +246,38 @@ def add_day_off(body: DayOffIn, db: Session = Depends(get_db)):
 @router.delete("/days-off/{day_off_id}", status_code=204)
 def delete_day_off(day_off_id: int, db: Session = Depends(get_db)) -> Response:
     catalog.delete_day_off(db, day_off_id)
+    return Response(status_code=204)
+
+
+# ---------- Waitlist ----------
+
+
+def _waitlist_out(db: Session, e) -> OwnerWaitlistOut:
+    from app.models import AddOn, Service
+
+    names = [db.get(Service, i).name for i in e.service_ids if db.get(Service, i)]
+    names += [f"+ {db.get(AddOn, i).name}" for i in e.add_on_ids if db.get(AddOn, i)]
+    therapist = db.get(Therapist, e.therapist_id) if e.therapist_id else None
+    return OwnerWaitlistOut(
+        id=e.id, customer_name=f"{e.customer.first_name} {e.customer.last_name}",
+        email=e.customer.email, phone=e.customer.phone, services=names,
+        preferred_date=e.preferred_date, earliest_time=e.earliest_time.strftime("%H:%M"),
+        latest_time=e.latest_time.strftime("%H:%M"),
+        therapist_name=therapist.display_name if therapist else None,
+        joined_at=e.created_at, status=e.status, offered_at=e.offered_at,
+        offer_expires_at=e.offer_expires_at,
+        offer_time=e.offer_start_at.astimezone(clock.BERLIN).strftime("%a %-d %b %H:%M")
+        if e.offer_start_at else None,
+        booking_id=e.booking_id,
+    )
+
+
+@router.get("/waitlist", response_model=list[OwnerWaitlistOut])
+def owner_waitlist(date: date | None = None, db: Session = Depends(get_db)):
+    return [_waitlist_out(db, e) for e in waitlist.list_entries(db, date)]
+
+
+@router.delete("/waitlist/{entry_id}", status_code=204)
+def remove_waitlist_entry(entry_id: int, db: Session = Depends(get_db)) -> Response:
+    waitlist.remove_entry(db, entry_id)
     return Response(status_code=204)
