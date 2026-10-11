@@ -1,0 +1,181 @@
+"""Booking rules: no double booking, price snapshot, validation, customer reuse."""
+
+import threading
+from datetime import date, timedelta
+from decimal import Decimal
+
+from sqlalchemy import func, select
+
+from app.logic.booking import CustomerDetails, create_booking
+from app.logic.selection import resolve_selection
+from app.models import Booking, Customer, Service
+from tests.conftest import CUSTOMER, book, menu_ids
+
+TUESDAY = "2026-10-13"
+TUESDAY_DATE = date(2026, 10, 13)
+
+
+def test_booking_snapshots_items_and_totals(empty_calendar, db):
+    response = book(empty_calendar, ["Deep tissue massage"], TUESDAY, "17:00", "Lena",
+                    add_ons=[("Deep tissue massage", "Hot stones")], note="Sore shoulders")
+    assert response.status_code == 200, response.json()
+    body = response.json()
+    assert body["total_price"] == "82.00"
+    assert body["total_minutes"] == 75
+    assert (body["date"], body["time"], body["therapist_name"]) == (TUESDAY, "17:00", "Lena")
+    assert [(i["name"], i["unit_price"]) for i in body["items"]] == [
+        ("Deep tissue massage", "70.00"), ("Hot stones", "12.00")]
+    assert body["status"] == "booked" and body["source"] == "online"
+    assert len(body["manage_token"]) >= 40
+
+    booking = db.get(Booking, body["id"])
+    assert booking.end_at - booking.start_at == timedelta(minutes=75)
+    assert booking.blocked_until - booking.end_at == timedelta(minutes=10)
+    assert booking.customer_note == "Sore shoulders"
+
+
+def test_price_snapshot_survives_menu_changes(empty_calendar, db):
+    body = book(empty_calendar, ["Deep tissue massage"], TUESDAY, "12:00", "Lena").json()
+    service = db.scalar(select(Service).where(Service.name == "Deep tissue massage"))
+    service.price = Decimal("99.00")
+    service.name = "Deep tissue massage (new)"
+    db.commit()
+
+    db.expire_all()
+    booking = db.get(Booking, body["id"])
+    assert booking.total_price == Decimal("70.00")
+    assert booking.items[0].unit_price_snapshot == Decimal("70.00")
+    assert booking.items[0].name_snapshot == "Deep tissue massage"
+
+
+def test_no_double_booking(empty_calendar):
+    client = empty_calendar
+    assert book(client, ["Deep tissue massage"], TUESDAY, "12:00", "Lena").status_code == 200
+    for start in ("12:00", "12:30", "11:00", "13:00"):  # same or overlapping (buffer incl.)
+        response = book(client, ["Deep tissue massage"], TUESDAY, start, "Lena",
+                        email="tom.becker@example.com")
+        assert response.status_code == 400, start
+        assert response.json()["detail"] == "That time was just taken. Please pick another."
+    assert book(client, ["Deep tissue massage"], TUESDAY, "13:15", "Lena",
+                email="tom.becker@example.com").status_code == 200
+
+
+def test_concurrent_requests_for_the_same_slot_book_it_once(make_client, frozen_now, tmp_path):
+    client = make_client(database_url=f"sqlite:///{tmp_path / 'race.db'}")
+    factory = client.app.state.session_factory
+    with factory() as db:
+        db.query(Booking).delete()
+        db.commit()
+    ids = menu_ids(client)
+    results: list[str] = []
+    barrier = threading.Barrier(4)
+
+    def attempt(n: int):
+        with factory() as db:
+            selection = resolve_selection(db, [ids["Foot reflexology"]], [])
+            barrier.wait()
+            try:
+                create_booking(db, selection, TUESDAY_DATE, "15:00", None,
+                               CustomerDetails("Guest", str(n), f"guest{n}@example.com",
+                                               "+49 151 0000 0000"))
+                results.append("booked")
+            except Exception as exc:  # AppError 400
+                results.append(getattr(exc, "message", repr(exc)))
+
+    threads = [threading.Thread(target=attempt, args=(n,)) for n in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert results.count("booked") == 1, results
+    assert results.count("That time was just taken. Please pick another.") == 3
+    with factory() as db:
+        assert db.scalar(select(func.count()).select_from(Booking)) == 1
+
+
+
+def test_booking_needs_two_hours_notice_and_at_most_60_days(empty_calendar):
+    client = empty_calendar
+    for day, start in (("2026-10-10", "13:00"), ("2026-12-10", "10:00")):
+        response = book(client, ["Classic facial"], day, start, "Sofia")
+        assert response.status_code == 422
+        assert response.json()["detail"] == (
+            "Please choose a time between 2 hours and 60 days from now."
+        )
+
+
+def test_off_step_and_outside_hours_times_are_rejected(empty_calendar):
+    client = empty_calendar
+    assert book(client, ["Classic facial"], TUESDAY, "10:05", "Sofia").status_code == 422
+    # 16:30 + 45 min ends at 17:15, after Sofia's 17:00 finish
+    assert book(client, ["Classic facial"], TUESDAY, "16:30", "Sofia").status_code == 400
+    assert book(client, ["Deep tissue massage"], TUESDAY, "10:00", "Sofia").status_code == 400
+
+
+def test_customer_details_are_validated_with_field_names(empty_calendar):
+    client = empty_calendar
+    cases = [
+        ({"email": "not-an-email"}, "email", "Please enter a valid email address"),
+        ({"phone": ""}, "phone", "Please enter your phone number."),
+        ({"first_name": " "}, "first_name", "Please enter your first name."),
+        ({"note": "x" * 301}, "note", "Please keep the note under 300 characters."),
+    ]
+    for override, field, message in cases:
+        response = book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", **override)
+        assert response.status_code == 422
+        assert response.json()["detail"] == message
+        assert response.json()["fields"][0]["field"] == field
+
+
+def test_returning_customer_is_matched_by_email(empty_calendar, db):
+    client = empty_calendar
+    book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia")
+    book(client, ["Express facial"], TUESDAY, "12:00", "Sofia", email="  ANNA.Mueller@Example.com ")
+    customers = db.scalars(select(Customer)).all()
+    assert len(customers) == 1
+    assert customers[0].email == CUSTOMER["email"]
+    assert len(customers[0].bookings) == 2
+
+
+def test_a_stranger_cannot_change_or_learn_a_customers_saved_details(empty_calendar, db):
+    """Security review findings: unauthenticated bookings must not overwrite PII, and
+    the response must not reveal the saved name behind an email address."""
+    client = empty_calendar
+    book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia")
+    response = book(client, ["Express facial"], TUESDAY, "12:00", "Sofia",
+                    first_name="Mallory", last_name="X", phone="+49 999 999 999")
+    assert response.json()["customer_first_name"] == "Mallory"
+    assert CUSTOMER["first_name"] not in response.text
+    assert CUSTOMER["last_name"] not in response.text
+    customer = db.scalar(select(Customer).where(Customer.email == CUSTOMER["email"]))
+    assert (customer.first_name, customer.last_name, customer.phone) == (
+        CUSTOMER["first_name"], CUSTOMER["last_name"], CUSTOMER["phone"])
+
+
+def test_inactive_service_or_foreign_add_on_is_rejected(empty_calendar, db):
+    client = empty_calendar
+    wrong_add_on = book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia",
+                        add_ons=[("Deep tissue massage", "Hot stones")])
+    assert wrong_add_on.status_code == 422
+
+    ids = menu_ids(client)
+    db.get(Service, ids["Classic facial"]).active = False
+    db.commit()
+    response = client.post("/public/bookings", json={
+        "service_ids": [ids["Classic facial"]], "add_on_ids": [], "therapist_id": None,
+        "date": TUESDAY, "start_time": "10:00", **CUSTOMER})
+    assert response.status_code == 422
+
+
+def test_repeated_ids_count_once(empty_calendar):
+    """Security review finding: duplicate ids must not multiply lines or the price."""
+    client = empty_calendar
+    ids = menu_ids(client)
+    response = client.post("/public/bookings", json={
+        "service_ids": [ids["Deep tissue massage"]] * 3,
+        "add_on_ids": [ids[("Deep tissue massage", "Hot stones")]] * 2,
+        "therapist_id": None, "date": TUESDAY, "start_time": "15:00", **CUSTOMER})
+    assert response.status_code == 200, response.json()
+    body = response.json()
+    assert [i["name"] for i in body["items"]] == ["Deep tissue massage", "Hot stones"]
+    assert (body["total_price"], body["total_minutes"]) == ("82.00", 75)

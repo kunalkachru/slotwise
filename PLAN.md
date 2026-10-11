@@ -193,6 +193,9 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - `GET /public/therapists?service_ids=` (therapists who offer *every* chosen service; 404 if none)
   - `GET /public/availability` (15-minute steps; inside working hours; days off excluded; existing `blocked_until` respected; notice and window rules; "no preference" combines all therapists)
   - `POST /public/bookings` (validation, create or reuse the customer by email, item snapshots, locked re-check)
+  - The appointment itself must end inside working hours; the cleanup buffer may run past closing **[decision]**.
+  - A booking with an existing email reuses that customer but **never changes their saved name or phone**. Anyone can type any email, so overwriting would let strangers edit other customers' contact details (security review). Updating contact details belongs to a verified flow later.
+  - "Check free, then insert" runs under a process-wide lock (one Render instance) plus `SELECT … FOR UPDATE` on the therapist rows in PostgreSQL. A threaded test proves two concurrent requests can't both book a slot.
 - **Front end:** Book (Calendly-style one step at a time: services → add-ons → therapist → date → time buttons → details → itemized summary → Confirm) and Booking confirmation.
 - **Tests:**
   - **No double booking**, including the buffer and a simulated race
