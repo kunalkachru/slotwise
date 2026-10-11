@@ -130,13 +130,22 @@ def test_customer_details_are_validated_with_field_names(empty_calendar):
 def test_returning_customer_is_matched_by_email(empty_calendar, db):
     client = empty_calendar
     book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia")
-    book(client, ["Express facial"], TUESDAY, "12:00", "Sofia",
-         email="  ANNA.Mueller@Example.com ", phone="+49 151 9999 9999")
+    book(client, ["Express facial"], TUESDAY, "12:00", "Sofia", email="  ANNA.Mueller@Example.com ")
     customers = db.scalars(select(Customer)).all()
     assert len(customers) == 1
     assert customers[0].email == CUSTOMER["email"]
-    assert customers[0].phone == "+49 151 9999 9999"
     assert len(customers[0].bookings) == 2
+
+
+def test_a_stranger_cannot_change_a_customers_saved_details(empty_calendar, db):
+    """Security review finding: unauthenticated bookings must not overwrite PII."""
+    client = empty_calendar
+    book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia")
+    book(client, ["Express facial"], TUESDAY, "12:00", "Sofia",
+         first_name="Mallory", last_name="X", phone="+49 999 999 999")
+    customer = db.scalar(select(Customer).where(Customer.email == CUSTOMER["email"]))
+    assert (customer.first_name, customer.last_name, customer.phone) == (
+        CUSTOMER["first_name"], CUSTOMER["last_name"], CUSTOMER["phone"])
 
 
 def test_inactive_service_or_foreign_add_on_is_rejected(empty_calendar, db):
@@ -152,3 +161,17 @@ def test_inactive_service_or_foreign_add_on_is_rejected(empty_calendar, db):
         "service_ids": [ids["Classic facial"]], "add_on_ids": [], "therapist_id": None,
         "date": TUESDAY, "start_time": "10:00", **CUSTOMER})
     assert response.status_code == 422
+
+
+def test_repeated_ids_count_once(empty_calendar):
+    """Security review finding: duplicate ids must not multiply lines or the price."""
+    client = empty_calendar
+    ids = menu_ids(client)
+    response = client.post("/public/bookings", json={
+        "service_ids": [ids["Deep tissue massage"]] * 3,
+        "add_on_ids": [ids[("Deep tissue massage", "Hot stones")]] * 2,
+        "therapist_id": None, "date": TUESDAY, "start_time": "15:00", **CUSTOMER})
+    assert response.status_code == 200, response.json()
+    body = response.json()
+    assert [i["name"] for i in body["items"]] == ["Deep tissue massage", "Hot stones"]
+    assert (body["total_price"], body["total_minutes"]) == ("82.00", 75)

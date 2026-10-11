@@ -76,14 +76,21 @@ def parse_start(day: date, start_time: str) -> datetime:
 
 
 def find_or_create_customer(db: Session, details: CustomerDetails) -> Customer:
+    """Match returning customers by email, without changing their saved details.
+
+    Booking needs no login, so anyone could type someone else's email. Overwriting the
+    stored name or phone from that request would let a stranger change another
+    customer's contact details (security review, slice 2).
+    """
     customer = db.scalar(select(Customer).where(Customer.email == details.email))
     if customer is None:
-        customer = Customer(email=details.email, first_name="", last_name="", phone="")
+        customer = Customer(
+            email=details.email,
+            first_name=details.first_name,
+            last_name=details.last_name,
+            phone=details.phone,
+        )
         db.add(customer)
-    # Returning customers: keep the latest name and phone they gave us.
-    customer.first_name = details.first_name
-    customer.last_name = details.last_name
-    customer.phone = details.phone
     return customer
 
 

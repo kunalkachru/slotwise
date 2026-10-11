@@ -77,12 +77,15 @@ def parse_ids(raw: str | None) -> list[int]:
 
 
 def resolve_selection(db: Session, service_ids: list[int], add_on_ids: list[int]) -> Selection:
+    # Each service and add-on counts once, however often a client repeats its id.
+    service_ids = list(dict.fromkeys(service_ids))
+    add_on_ids = list(dict.fromkeys(add_on_ids))
     if not service_ids:
         raise AppError(422, CHOOSE_A_SERVICE, field="service_ids")
     services = db.scalars(
         select(Service).where(Service.id.in_(service_ids), Service.active.is_(True))
     ).all()
-    if len(services) != len(set(service_ids)):
+    if len(services) != len(service_ids):
         raise AppError(422, SERVICE_UNAVAILABLE, field="service_ids")
 
     add_ons: list[AddOn] = []
@@ -91,7 +94,7 @@ def resolve_selection(db: Session, service_ids: list[int], add_on_ids: list[int]
             db.scalars(select(AddOn).where(AddOn.id.in_(add_on_ids), AddOn.active.is_(True))).all()
         )
         chosen = set(service_ids)
-        if len(add_ons) != len(set(add_on_ids)) or any(a.service_id not in chosen for a in add_ons):
+        if len(add_ons) != len(add_on_ids) or any(a.service_id not in chosen for a in add_ons):
             raise AppError(422, SERVICE_UNAVAILABLE, field="add_on_ids")
 
     by_id = {s.id: s for s in services}
