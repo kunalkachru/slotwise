@@ -42,17 +42,18 @@ DOMAIN_RE = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-
 
 def canonical_email(raw: str) -> str | None:
     """The one form of an address used everywhere: validation, storage, sending and
-    rate limiting, so no two spellings of an inbox can be treated differently
-    (security review, slice 3). Lower-case ASCII local part without quotes or "..";
-    domain converted to its IDNA (xn--) form, no trailing dot. None if invalid."""
-    local, at, domain = raw.strip().lower().partition("@")
-    if not at or not local or not domain or len(raw) > 254:
+    rate limiting, so no two spellings of an inbox can be treated differently.
+
+    ASCII only, and the only change made is trimming and lower-casing ASCII letters.
+    No Unicode mapping of any kind: Python's IDNA 2003 codec turns "straße.de" into
+    "strasse.de" (possibly someone else's domain), and str.lower() turns some
+    non-ASCII characters into ASCII (Kelvin sign -> "k"). Internationalised domains
+    can be entered in their xn-- form (security reviews, slice 3)."""
+    raw = raw.strip()
+    if not raw.isascii() or len(raw) > 254:
         return None
-    try:
-        domain = domain.encode("idna").decode("ascii")
-    except UnicodeError:
-        return None
-    if not LOCAL_PART_RE.match(local) or not DOMAIN_RE.match(domain):
+    local, at, domain = raw.lower().partition("@")
+    if not at or not LOCAL_PART_RE.match(local) or not DOMAIN_RE.match(domain):
         return None
     return f"{local}@{domain}"
 NAME_PUNCTUATION = set(" -'’.")

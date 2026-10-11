@@ -270,16 +270,18 @@ def test_one_canonical_form_per_inbox():
     from app.logic.booking import canonical_email
 
     assert canonical_email(" Anna@EXAMPLE.com ") == "anna@example.com"
-    assert canonical_email("anna@exämple.com") == "anna@xn--exmple-cua.com"
     assert canonical_email("anna@xn--exmple-cua.com") == "anna@xn--exmple-cua.com"
     for invalid in ("anna@example.com.", '"anna"@example.com', "a..nna@example.com",
                     ".anna@example.com", "anna.@example.com", "ännä@example.com",
-                    "anna@example", "anna@@example.com", "anna@-x.com", "not-an-email"):
+                    "anna@example", "anna@@example.com", "anna@-x.com", "not-an-email",
+                    # no silent Unicode mapping (parser-differential review finding):
+                    "anna@straße.de", "anna@exämple.com", "\u212anna@example.com",
+                    "anna@\uff45xample.com"):
         assert canonical_email(invalid) is None, invalid
 
 
 def test_confirmation_goes_to_the_canonical_address(empty_calendar):
     client = empty_calendar
-    book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", email=" Anna@Exämple.COM ")
+    book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", email=" Anna@Example.COM ")
     [email] = list(client.app.state.mailer.outbox)
-    assert email.to == "anna@xn--exmple-cua.com"
+    assert email.to == "anna@example.com"

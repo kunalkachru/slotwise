@@ -217,7 +217,7 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - The manage view returns no customer details, because the link holder may not own the email.
   - Security review:
     - Names may only contain letters, spaces, `-`, `'`, and a `.` before a space or at the end ("Jr."), because they appear in emails we send. No domains like `evil.com`.
-    - Booking is limited to 10 per IP per hour and 5 per inbox per day (429), against inbox flooding and calendar filling. The inbox key drops `+tags` and Gmail dots. The limit is reserved atomically before booking and released if the booking fails.
+    - Booking is limited to 10 per IP per hour and 5 per inbox per day (429), against inbox flooding and calendar filling. The inbox key drops `+tags` and Gmail dots. Email addresses are ASCII only, with one canonical form for validation, storage, sending and limits, and no Unicode/IDNA remapping (which could turn `straße.de` into someone else's `strasse.de`). The limit is reserved atomically before booking and released if the booking fails.
     - A log filter hides manage/offer tokens in every log line, including uvicorn's access log. Logged emails mask the recipient.
 - **Front end:** Manage booking (details, Confirm I'm coming, Cancel with an "Are you sure?" prompt, Book again).
 - **Tests:**
