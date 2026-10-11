@@ -123,7 +123,12 @@ def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
     ip_key = "ip:" + client_ip(
         request.client.host if request.client else None, request.headers.get("x-forwarded-for")
     )
-    email_key = "email:" + mailbox_key(body.email)
+    # Validate first, so the limit key comes from the same canonical address the
+    # confirmation email is sent to.
+    details = CustomerDetails(
+        body.first_name, body.last_name, body.email, body.phone, body.note
+    ).cleaned()
+    email_key = "email:" + mailbox_key(details.email)
     # Reserve a place under both limits before booking; give it back if booking fails.
     if not limiter.try_acquire([
         (ip_key, BOOKINGS_PER_IP_PER_HOUR, 3600),
@@ -138,7 +143,7 @@ def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
             body.date,
             body.start_time,
             body.therapist_id,
-            CustomerDetails(body.first_name, body.last_name, body.email, body.phone, body.note),
+            details,
         )
     except Exception:
         limiter.release([ip_key, email_key])

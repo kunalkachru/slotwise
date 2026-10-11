@@ -36,7 +36,25 @@ from app.logic.selection import Selection, require_therapists
 from app.models import Booking, Customer, Therapist
 from app.security import new_token
 
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+LOCAL_PART_RE = re.compile(r"^[a-z0-9_%+-]+(?:\.[a-z0-9_%+-]+)*$")
+DOMAIN_RE = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$")
+
+
+def canonical_email(raw: str) -> str | None:
+    """The one form of an address used everywhere: validation, storage, sending and
+    rate limiting, so no two spellings of an inbox can be treated differently
+    (security review, slice 3). Lower-case ASCII local part without quotes or "..";
+    domain converted to its IDNA (xn--) form, no trailing dot. None if invalid."""
+    local, at, domain = raw.strip().lower().partition("@")
+    if not at or not local or not domain or len(raw) > 254:
+        return None
+    try:
+        domain = domain.encode("idna").decode("ascii")
+    except UnicodeError:
+        return None
+    if not LOCAL_PART_RE.match(local) or not DOMAIN_RE.match(domain):
+        return None
+    return f"{local}@{domain}"
 NAME_PUNCTUATION = set(" -'’.")
 
 
@@ -53,9 +71,10 @@ def _is_plain_name(name: str) -> bool:
 
 
 def mailbox_key(email: str) -> str:
-    """One key per real inbox, for rate limiting: lower-case, without +tags, and for
-    Gmail without dots (anna+1@x and a.nna@gmail.com reach the same person)."""
-    local, _, domain = email.strip().lower().partition("@")
+    """One key per real inbox, for rate limiting. Takes a canonical_email() result and
+    also drops +tags and, for Gmail, dots (anna+1@x and a.nna@gmail.com reach the
+    same person)."""
+    local, _, domain = email.partition("@")
     local = local.split("+", 1)[0]
     if domain in ("gmail.com", "googlemail.com"):
         local, domain = local.replace(".", ""), "gmail.com"
@@ -77,7 +96,7 @@ class CustomerDetails:
     def cleaned(self) -> "CustomerDetails":
         first = self.first_name.strip()
         last = self.last_name.strip()
-        email = self.email.strip().lower()
+        email = canonical_email(self.email)
         phone = self.phone.strip()
         note = (self.note or "").strip() or None
         if not first:
@@ -88,7 +107,7 @@ class CustomerDetails:
             raise AppError(422, NAME_CHARACTERS, field="first_name")
         if not _is_plain_name(last):
             raise AppError(422, NAME_CHARACTERS, field="last_name")
-        if not EMAIL_RE.match(email) or len(email) > 255:
+        if email is None:
             raise AppError(422, INVALID_EMAIL, field="email")
         if sum(ch.isdigit() for ch in phone) < 6 or len(phone) > 40:
             raise AppError(422, MISSING_PHONE, field="phone")

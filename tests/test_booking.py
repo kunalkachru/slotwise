@@ -218,11 +218,14 @@ def test_booking_limits_per_ip_and_per_email(empty_calendar):
 
 def test_plus_addresses_and_gmail_dots_share_one_limit(empty_calendar):
     """Security review finding: anna+1@, anna+2@... reach one inbox, so count together."""
-    from app.logic.booking import mailbox_key
+    from app.logic.booking import canonical_email, mailbox_key
 
-    assert mailbox_key(" Anna+promo@Example.com ") == "anna@example.com"
-    assert mailbox_key("a.n.na+x@googlemail.com") == "anna@gmail.com"
-    assert mailbox_key("a.nna@example.com") == "a.nna@example.com"  # dots only matter at Gmail
+    def key(raw):
+        return mailbox_key(canonical_email(raw))
+
+    assert key(" Anna+promo@Example.com ") == "anna@example.com"
+    assert key("a.n.na+x@googlemail.com") == "anna@gmail.com"
+    assert key("a.nna@example.com") == "a.nna@example.com"  # dots only matter at Gmail
 
     client = empty_calendar
     for hour in range(10, 15):
@@ -260,3 +263,23 @@ def test_limit_check_and_record_are_atomic():
         t.join()
     assert passed.count(True) == 10
     assert limiter.count("ip:x", 3600) == 10 and limiter.count("email:y", 3600) == 10
+
+
+def test_one_canonical_form_per_inbox():
+    """Security review finding: validation, storage, sending and limits use one form."""
+    from app.logic.booking import canonical_email
+
+    assert canonical_email(" Anna@EXAMPLE.com ") == "anna@example.com"
+    assert canonical_email("anna@exämple.com") == "anna@xn--exmple-cua.com"
+    assert canonical_email("anna@xn--exmple-cua.com") == "anna@xn--exmple-cua.com"
+    for invalid in ("anna@example.com.", '"anna"@example.com', "a..nna@example.com",
+                    ".anna@example.com", "anna.@example.com", "ännä@example.com",
+                    "anna@example", "anna@@example.com", "anna@-x.com", "not-an-email"):
+        assert canonical_email(invalid) is None, invalid
+
+
+def test_confirmation_goes_to_the_canonical_address(empty_calendar):
+    client = empty_calendar
+    book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", email=" Anna@Exämple.COM ")
+    [email] = list(client.app.state.mailer.outbox)
+    assert email.to == "anna@xn--exmple-cua.com"
