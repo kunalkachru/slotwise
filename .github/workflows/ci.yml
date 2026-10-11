@@ -1,9 +1,13 @@
 name: CI
 
 # Skip CI when a push or PR changes only documentation. If any other file changes too,
-# CI runs as normal. Keep both lists identical.
+# CI runs as normal. Keep the paths-ignore lists here and in deploy.yml identical.
+# Pushes to main are tested by deploy.yml, which calls this workflow before deploying,
+# so main isn't tested twice.
 on:
   push:
+    branches-ignore:
+      - main
     paths-ignore:
       - "**.md"
       - "doc/**"
@@ -13,6 +17,7 @@ on:
       - "**.md"
       - "doc/**"
       - ".claude/**"
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}

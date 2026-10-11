@@ -157,9 +157,10 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
   - an empty `GET /owner/dashboard` protected by the session
 - **Front end:** Home (studio header, menu grouped by category with prices aligned right, Book now, footer "Studio login"), Owner login, and a Dashboard shell with the side menu.
-- **Infrastructure:** Dockerfile, requirements, pyproject (ruff), `.env.example` (including `SEED_DEMO_DATA`), README, `ci.yml`.
+- **Infrastructure:** Dockerfile, requirements, pyproject (ruff), `.env.example` (including `SEED_DEMO_DATA`), README, `ci.yml`, `deploy.yml`.
 - **`deploy.yml`:**
-  - Runs the tests, then POSTs to `RENDER_DEPLOY_HOOK_URL`.
+  - Calls `ci.yml` as a reusable workflow; `ci.yml` itself skips pushes to `main`, so `main` is tested once.
+  - Then POSTs to `RENDER_DEPLOY_HOOK_URL&ref=$GITHUB_SHA`. Render deploys exactly the tested commit, not merely the newest one on `main` **[decision]**. 200 and 202 (queued) count as success.
   - Then polls `GET $APP_URL/health` every ~15 seconds for up to 10 minutes, until the returned `version` equals `github.sha`. The run fails if it never does. Errors and timeouts while polling count as "not yet", because cold starts and restarts are expected.
   - Uses `concurrency: { group: deploy-production, cancel-in-progress: true }` **[decision]**. Otherwise two quick pushes would make the older run wait for a commit that was replaced, and time out.
 - **Manual setup (you):**

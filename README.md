@@ -46,8 +46,18 @@ docker run --rm -p 8000:8000 --env-file .env slotwise
 See [.env.example](.env.example). `RENDER_GIT_COMMIT` is set by Render and returned as
 `version` by `GET /health` (`"dev"` when unset).
 
-## CI
+## CI/CD
 
-`.github/workflows/ci.yml` runs on every push and pull request:
-- ruff and pytest
-- a Docker build, then a check that the container answers `/health` with the commit SHA
+- **`ci.yml`:** ruff, pytest, and a Docker build that must answer `/health` with the commit SHA.
+  - Runs on pushes to branches other than `main` and on pull requests.
+  - Changes that touch only `**.md`, `doc/**` or `.claude/**` skip it.
+- **`deploy.yml`:** runs on every push to `main`.
+  1. Runs `ci.yml`.
+  2. Triggers the Render deploy hook for that exact commit.
+  3. Waits up to 10 minutes for the live `/health` to report the commit, and fails otherwise.
+  - Can also be started by hand from the Actions tab.
+
+Setup for deploys (GitHub → Settings → Secrets and variables → Actions):
+- **Secret `RENDER_DEPLOY_HOOK_URL`:** from Render → your service → Settings → Deploy Hook.
+- **Variable `APP_URL`:** the live URL, e.g. `https://slotwise.onrender.com`.
+- **Render:** turn **Auto-Deploy off**, so only the workflow deploys.
