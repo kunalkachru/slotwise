@@ -1,0 +1,90 @@
+name: Deploy
+
+# Every push to main: run CI, deploy that exact commit to Render, then wait until the
+# live /health reports it. The run fails if CI fails or the new version never appears.
+#
+# Needs (Settings → Secrets and variables → Actions):
+#   secret   RENDER_DEPLOY_HOOK_URL   Render → service → Settings → Deploy Hook
+#   variable APP_URL                  e.g. https://slotwise.onrender.com
+# Turn Render's own Auto-Deploy off, so only this workflow deploys.
+on:
+  push:
+    branches:
+      - main
+    paths-ignore: # same list as ci.yml: docs-only changes neither test nor deploy
+      - "**.md"
+      - "doc/**"
+      - ".claude/**"
+  workflow_dispatch: # manual redeploy of the latest main from the Actions tab
+
+# One production deploy at a time. A newer push cancels an older run, which would
+# otherwise wait for a commit that is no longer the newest.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy to Render
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
+    env:
+      DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      APP_URL: ${{ vars.APP_URL }}
+    steps:
+      - name: Check configuration
+        run: |
+          missing=0
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "::error::Secret RENDER_DEPLOY_HOOK_URL is not set."; missing=1
+          fi
+          if [ -z "$APP_URL" ]; then
+            echo "::error::Variable APP_URL is not set."; missing=1
+          fi
+          exit "$missing"
+
+      - name: Trigger Render deploy of this commit
+        run: |
+          # ref= pins the deploy to the commit CI just tested (Git-backed services).
+          # The hook URL holds a key; GitHub masks it, and it is never echoed here.
+          status=$(curl -sS -o response.json -w '%{http_code}' -X POST \
+            --retry 3 --retry-delay 5 --max-time 30 \
+            "${DEPLOY_HOOK}&ref=${GITHUB_SHA}")
+          case "$status" in
+            200) echo "Render deploy started: $(jq -r '.deploy.id // .id // "id not returned"' response.json)" ;;
+            202) echo "Another deploy is running; Render queued this one." ;;
+            *)   echo "::error::Render deploy hook returned HTTP $status"; cat response.json; exit 1 ;;
+          esac
+
+      - name: Wait until /health reports this commit
+        run: |
+          url="${APP_URL%/}/health"
+          deadline=$(( $(date +%s) + 600 ))
+          echo "Waiting up to 10 minutes for $url to report version ${GITHUB_SHA}"
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            # Errors and timeouts count as "not yet": cold starts and restarts are expected.
+            body=$(curl -sS --max-time 15 "$url" 2>/dev/null || true)
+            version=$(printf '%s' "$body" | jq -r '.version // empty' 2>/dev/null || true)
+            status=$(printf '%s' "$body" | jq -r '.status // empty' 2>/dev/null || true)
+            if [ "$version" = "$GITHUB_SHA" ] && [ "$status" = "ok" ]; then
+              echo "Live: version ${version:0:7}, status $status"
+              echo "Deployed \`${GITHUB_SHA:0:7}\` to ${APP_URL}" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "$(date -u +%H:%M:%S) not yet: version='${version:0:7}' status='${status:-no answer}'"
+            sleep 15
+          done
+          echo "::error::${url} did not report version ${GITHUB_SHA} within 10 minutes."
+          exit 1

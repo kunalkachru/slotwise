@@ -85,11 +85,16 @@ The jobs must be idempotent, because a call can come late or twice.
 
 ## CI/CD (GitHub Actions)
 
-- `ci.yml`: runs on every push and PR. Steps: ruff, then pytest on SQLite.
-- `deploy.yml`: runs on push to `main` after tests pass.
-  - It POSTs to `RENDER_DEPLOY_HOOK_URL`; Render auto-deploy is off.
-  - It then polls `GET $APP_URL/health` for up to 10 minutes, until `version == github.sha`, and fails otherwise. Errors while polling count as "not yet".
-  - A concurrency group with cancel-in-progress stops overlapping deploys from timing out.
+- `ci.yml`: ruff, pytest on SQLite, and a Docker build whose container must answer `/health`.
+  - Runs on pushes to other branches and on PRs. Docs-only changes (`**.md`, `doc/**`, `.claude/**`) skip it.
+  - It is also a reusable workflow (`workflow_call`). Pushes to `main` are tested by `deploy.yml` calling it, so `main` isn't tested twice.
+- `deploy.yml`: runs on push to `main` (same docs-only skip) and by hand from the Actions tab (`workflow_dispatch`).
+  1. Runs `ci.yml`.
+  2. POSTs to `RENDER_DEPLOY_HOOK_URL&ref=$GITHUB_SHA`, so Render deploys exactly the tested commit. 200 (started) and 202 (queued) count as success. Render's own auto-deploy must stay off.
+  3. Polls `GET $APP_URL/health` every 15 s for up to 10 minutes, until `version == github.sha` and `status == ok`, and fails otherwise. Errors while polling count as "not yet".
+  - Uses the GitHub `production` environment.
+  - Concurrency group `deploy-production` with cancel-in-progress.
+  - Needs the secret `RENDER_DEPLOY_HOOK_URL` and the variable `APP_URL`.
 - `jobs.yml`: a cron every 15 minutes that calls `/internal/run-jobs` with `JOBS_SECRET`.
 
 GitHub repo: `kunalkachru/slotwise` (public), default branch `main`.
