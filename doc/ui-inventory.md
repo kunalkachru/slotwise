@@ -24,7 +24,7 @@ Recorded at commit `0646f34`.
 | sessionStorage `slotwise:lastBooking` | | `book.js` writes, `confirmation.js` reads | |
 | 🎨 Shared classes created by scripts | | | `.btn`, `.btn-block`, `.btn-ghost`, `.btn-small`, `.btn-danger-ghost`, `.muted`, `.notice`, `.state`, `.alert`, `.success-note`, `.pay-note`, `.facts` (`dl`), `.lines` (`table` with `tr.total` and `td.sub`), `.row`, `.actions`, `.field`, `.field-hint`, `.field-error`, `.status-badge <status>` |
 
-**Status classes** on `.status-badge` and `.cal-card` are the raw status values: `pending`, `expired`, `booked`, `confirmed`, `done`, `no_show` and `cancelled`. The owner waitlist maps its own statuses onto these same classes:
+**Status classes** on `.status-badge` and `.cal-card` are the raw status values: `pending`, `expired`, `booked`, `confirmed`, `done`, `no_show` and `cancelled`. Today the owner waitlist maps its own statuses onto these same classes. **Decided:** the redesign replaces this mapping with its own classes, `wl-pending`, `wl-waiting`, `wl-offered`, `wl-booked`, `wl-expired` and `wl-removed`, in `owner-waitlist.js` `BADGE`. The current mapping:
 
 | Waitlist status | Class it uses |
 |---|---|
@@ -121,7 +121,9 @@ There is no top bar and no language switch on the receipt, but `i18n.js` is stil
 | 🎨 `.soon`, `.badge` | | for menu items without an `href` (none at the moment) |
 | `.owner-main`, `.page-head`, `.toolbar` | | HTML structure; free to restyle |
 
-**Redesign note:** the mobile top-menu button and the "Classic look" switch get added here, in `startOwnerPage()`.
+**Redesign notes:**
+- The mobile top-menu button and the "Classic look" switch get added here, in `startOwnerPage()`.
+- **Decided:** a new `showPageError(error, path)` helper here replaces the silent `init().catch(() => {})` on every owner page, and the bare `document.body.textContent = error.message` in the shell. It uses `ApiError.status` (`0` = no response) and `error.message`; see the porting section 2.8 of the Figma prompt.
 
 ### `owner/login.html` (`js/owner-login.js`)
 

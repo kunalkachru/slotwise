@@ -18,7 +18,7 @@ All texts, labels and messages in this file were taken from the code at commit `
 | B. Review and fix | You, in Figma Make | Check the screens against the checklist below and ask Figma for corrections | A design you're happy with |
 | C. Hand over | You → me | Share the link and/or screenshots | I can see the design |
 | D. Port | Me, in this repo | Re-create the look in our HTML/CSS in 6 small PRs, behind the "Classic look / New look" switch | New look live, old look still available |
-| E. Decide | You | Try both looks on your phone and laptop | Choose the default look (or remove one later) |
+| E. Decide | You | Try both looks on your phone and laptop | Classic stays the default; later you may make New the default (or remove one look) |
 
 **Nothing in the app changes during stages A–C.** Figma only produces pictures and a throwaway prototype. The real app changes only in stage D, through normal PRs that you review and merge.
 
@@ -74,12 +74,12 @@ The details are in the last section of this file. In short:
 3. A small **"Classic look" / "New look"** button in the top bar (customer pages) and in the side menu (owner area) switches between them. Your browser remembers the choice.
 4. The work is split into six PRs: tokens and switch, base styles, components, customer pages, owner pages, polish.
 5. **Each PR:** you see screenshots in both looks. CI must be green (the server tests don't change). You merge it, and it goes live automatically on Render.
-6. Until you pick a default, visitors keep seeing the **Classic look**. Only someone who presses "New look" sees the new design. So half-finished steps never confuse real customers.
+6. **Decided:** the **Classic look is the default** for everyone. **Both customers and the owner** can switch to the New look with the button, and each browser remembers its own choice. So half-finished steps never confuse real customers.
 
 ### Stage E — Decide
 
 1. Use both looks on your phone and laptop for a few days. Book a test appointment and try the manage, cancel and waitlist flows.
-2. Then tell me which should be the **default**.
+2. The Classic look stays the default (decided). If you later want the New look as the default, tell me; it's a one-line change.
 3. Later you can also decide to **remove** the other look. That is one clean-up PR, and it makes future UI changes cheaper, because every change then needs checking in only one look.
 
 ### Quick answers
@@ -145,6 +145,7 @@ I will send this brief in three parts. This part sets the context, the visual st
 10. **Look switch (new, requested by the studio).** The studio wants to keep the current "Classic" look available next to the new design.
     - Add one small, quiet text button to the customer top bar, next to the language switch. It reads **"Classic look"** (German: "Klassisches Design").
     - In the owner area, put the same button at the bottom of the side menu, above "Log out".
+    - **Both customers and the owner** can switch. The Classic look is the default; the New look (your design) is opt-in.
     - You only design the new look, so this button always shows "Classic look". Keep it visually secondary: it must never compete with "Book now".
 
 ### 2. Visual style: "Calm modern"
@@ -258,7 +259,7 @@ Draw each component on the component sheet with every state listed. Use only the
     | cancelled | Cancelled | Cancelled | danger |
     | expired | Not confirmed | Not confirmed | neutral grey |
 
-    The owner waitlist uses these extra badges: "Awaiting email" (info), "Waiting" (warning), "Offered" (success), "Booked" (success, outlined), "Offer expired" (neutral) and "Removed / declined" (neutral).
+    The owner waitlist uses these extra badges, with their own colours (they don't borrow the booking badges): "Awaiting email" (info), "Waiting" (warning), "Offered" (success), "Booked" (success, outlined), "Offer expired" (neutral) and "Removed / declined" (neutral).
 
     There is also a special badge, "Late cancellation" (danger).
 
@@ -732,6 +733,21 @@ This is Part 3 of 3. **Keep exactly the same "Calm modern" style, tokens and com
 2. **Mobile:** the side menu collapses into a **top bar**: the logo on the left, and the current page name plus a menu button on the right. The menu button opens the same links, "Classic look" and "Log out" as a dropdown panel under the bar.
 3. The main area has a page head: the H1 on the left and page actions on the right (wrapping under the H1 on mobile).
 4. **Loading:** while the owner session is checked, show nothing but a centred spinner or skeleton. Without a session, the owner is sent to the login screen.
+5. **Page error state (shared by every owner page).** When a page can't load its data, the main area shows this instead of the content. It must explain **why** and offer **ways around it**. Design it once, inside the shell, at both sizes:
+   - A warning-triangle icon and the H2 **"This page couldn't load"**.
+   - **The reason**, in normal text: the app's own message. Show two examples:
+     - "Could not reach the server. Please check your connection." (no answer at all);
+     - "Something went wrong. Please try again." (server error).
+   - **A details line**, small and muted, for whoever helps the owner. Examples:
+     - "Details: no response from the server · 14:32";
+     - "Details: status 500 · /owner/dashboard · 14:32".
+   - **"What you can try:"**, a short list:
+     1. "Wait a moment and try again. On the free hosting plan the server sleeps when nobody uses it and can take up to a minute to wake up."
+     2. "Check your internet connection."
+     3. "Switch to the Classic look. If only the new look has a problem, the classic one keeps working." (Only shown in the New look.)
+     4. "If it keeps happening, send the details line above to your developer."
+   - **Buttons:** **"Try again"** (primary; reloads the page) and **"Switch to Classic look"** (secondary; only in the New look).
+   - If the very first check (the owner session) fails for a reason other than "not logged in", show this same state on a page without the side menu.
 
 ### Screen O1 — Studio login
 
@@ -800,7 +816,7 @@ From top to bottom:
 
 - loading ("Loading…" with skeleton tiles);
 - empty day (zeros, "–" and "No data yet");
-- an error alert: "Something went wrong. Please try again."
+- load error: the shared page error state (owner shell, item 5).
 
 ### Screen O3 — Bookings (calendar and list)
 
@@ -848,7 +864,8 @@ From top to bottom:
 **States:**
 
 - loading ("Loading…");
-- error alert (e.g. "Please choose a range of up to 3 months.");
+- error alert inside the page, for a problem with the chosen filters or range (e.g. "Please choose a range of up to 3 months.");
+- load error (the page itself can't load): the shared page error state (owner shell, item 5);
 - empty, as described above.
 
 #### Screen O3-D — Booking detail (dialog)
@@ -960,7 +977,7 @@ This opens from "Add booking". Title: **"Add phone booking"**, with "×" to clos
    - The button "Save".
    - Error: "Extra time must be 0 to 60 minutes."
    - **Toasts:** "Add-on added" or "Add-on saved".
-6. **Loading:** "Loading…"
+6. **Loading:** "Loading…". **Load error:** the shared page error state (owner shell, item 5).
 
 ### Screen O5 — Therapists & hours
 
@@ -1014,7 +1031,7 @@ This opens from "Add booking". Title: **"Add phone booking"**, with "×" to clos
    - The button "Save".
    - **Error:** "Please choose a date."
    - **Toasts:** "Day off added" and "Day off removed".
-7. **Loading:** "Loading…"
+7. **Loading:** "Loading…". **Load error:** the shared page error state (owner shell, item 5).
 
 ### Screen O6 — Waitlist
 
@@ -1039,7 +1056,7 @@ This opens from "Add booking". Title: **"Add phone booking"**, with "×" to clos
 4. **Empty:**
    - "Nobody is on the waitlist." (all upcoming);
    - "Nobody is waiting for this day." (one day).
-5. **Loading:** "Loading…"
+5. **Loading:** "Loading…". **Load error:** the shared page error state (owner shell, item 5).
 
 ### Screen O7 — Studio settings
 
@@ -1072,7 +1089,7 @@ This opens from "Add booking". Title: **"Add phone booking"**, with "×" to clos
    - "Receipt prefix: 1 to 10 letters or digits."
 4. The primary button **"Save settings"**, right-aligned on desktop and full width on mobile.
 5. **Toast:** "Settings saved".
-6. **Loading:** "Loading…"
+6. **Loading:** "Loading…". **Load error:** the shared page error state (owner shell, item 5).
 
 ### Owner flows to show
 
@@ -1126,8 +1143,26 @@ The current design stays exactly as it is. The new design is an extra layer that
    - the mobile booking total bar;
    - the owner mobile menu button;
    - the icons inside buttons.
-6. **Open decision, the default look:** see the report. My suggestion is `classic` until the new look has been checked on real phones, then `calm`.
+6. **Decided:**
+   - **The default look is `classic`.** `theme.js` uses `calm` only when the browser has chosen it.
+   - **Customers and the owner both get the switch.**
+   - **The waitlist statuses get their own badge classes:** `wl-pending`, `wl-waiting`, `wl-offered`, `wl-booked`, `wl-expired` and `wl-removed`, instead of borrowing the booking classes. In `styles.css` they reproduce today's colours exactly, so the classic look doesn't change; `calm.css` gives them the new colours.
+   - **Owner pages get a real error state** instead of staying on "Loading…" (see 2.8).
 7. **Cost:** every later UI change must be checked in both looks. If one look is clearly preferred after a while, we delete the other file and the switch. That is a one-PR clean-up.
+8. **The owner page error state** (decided; useful in both looks, so it comes first):
+   - **Today:**
+     - Most owner scripts end with `init().catch(() => {})`, so a failed load leaves "Loading…" on screen forever.
+     - `owner-shell.js` replaces the whole body with the bare message.
+   - **New helper** `showPageError(error, path)` in `owner-shell.js`. It builds the state described in Part 3, owner shell, item 5:
+     - the reason: `error.message`, which is already translated and friendly;
+     - the details line: `error.status`, where `0` means no response (`api.js` already uses `0` for network failures), plus the request path and the time;
+     - the "What you can try" list;
+     - "Try again", which reloads;
+     - "Switch to Classic look", only while `data-theme="calm"`.
+   - **Wiring:**
+     - each owner page's `.catch(() => {})` becomes `.catch(showPageError)`;
+     - the shell uses the helper too when `/auth/me` fails for a reason other than 401.
+   - **Tests:** none on the server side; checked in the browser by stopping the server and by forcing a 500.
 
 ### 3. Token mapping (Figma tokens → our stylesheet)
 
@@ -1176,6 +1211,7 @@ The current design stays exactly as it is. The new design is an extra layer that
 
 ### 5. Order of work (each step is its own branch and PR)
 
+0. **Owner page error state** (see 2.8): a small behaviour fix, styled in the classic look. It can ship before the Figma design is ready.
 1. **Tokens and switch:**
    - add the new tokens to `styles.css` with classic values (no visual change);
    - add an empty `calm.css`, `theme.js` and the switch button;
@@ -1190,6 +1226,6 @@ The current design stays exactly as it is. The new design is an extra layer that
    - check contrast, tap targets and focus on 390px and 1440px;
    - print the receipt;
    - check every flow in both looks;
-   - then decide the default look.
+   - Classic stays the default; you decide later whether to make the New look the default.
 
 The tests (`pytest`) cover the server and pass unchanged through all six steps. For the visual checks I'll use the browser at 390px and 1440px.
