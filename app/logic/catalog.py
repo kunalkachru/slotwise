@@ -1,6 +1,7 @@
 """Owner management of the menu and the team (slice 4): services, add-ons, therapists,
 weekly hours and days off. Old bookings never change: their lines are snapshots."""
 
+import re
 from dataclasses import dataclass
 from datetime import date, time
 from decimal import Decimal
@@ -9,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.errors import AppError
-from app.models import CATEGORIES, AddOn, DayOff, Service, Therapist, WorkingHours
+from app.models import CATEGORIES, AddOn, DayOff, Service, Studio, Therapist, WorkingHours
 
 DUPLICATE_SERVICE = "A service with this name already exists."
 DUPLICATE_THERAPIST = "A therapist with this name already exists."
@@ -209,3 +210,74 @@ def add_day_off(db: Session, therapist_id: int | None, day: date, reason: str | 
 def delete_day_off(db: Session, day_off_id: int) -> None:
     db.delete(_get(db, DayOff, day_off_id))
     db.commit()
+
+
+# ---------- Studio settings ----------
+
+RECEIPT_PREFIX_RE = re.compile(r"^[A-Z0-9]{1,10}$")
+
+
+@dataclass
+class StudioInput:
+    name: str
+    address: str
+    phone: str
+    email: str
+    opening_hours_text: str
+    min_notice_hours: int
+    free_cancellation_hours: int
+    booking_window_days: int
+    waitlist_offer_minutes: int
+    receipt_prefix: str
+
+
+def save_studio(db: Session, data: StudioInput) -> Studio:
+    """The studio's public details (home page, every email, receipts) and booking rules.
+    Existing bookings keep their times and prices; the rules apply from now on."""
+    from app.logic.booking import canonical_email
+
+    name = _clean_name(data.name, "name")
+    address = " ".join(data.address.split())
+    if not address or len(address) > 255:
+        raise AppError(422, "Please enter the studio address.", field="address")
+    phone = data.phone.strip()
+    if sum(ch.isdigit() for ch in phone) < 6 or len(phone) > 40:
+        raise AppError(422, "Please enter the studio phone number.", field="phone")
+    email = canonical_email(data.email)
+    if email is None:
+        raise AppError(422, "Please enter a valid email address", field="email")
+    hours_text = " ".join(data.opening_hours_text.split())
+    if len(hours_text) > 255:
+        raise AppError(422, "Please keep the opening hours under 255 characters.",
+                       field="opening_hours_text")
+    for field_name, value, low, high, label in (
+        ("min_notice_hours", data.min_notice_hours, 0, 72, "Minimum notice must be 0 to 72 hours."),
+        ("free_cancellation_hours", data.free_cancellation_hours, 0, 168,
+         "Free cancellation must be 0 to 168 hours."),
+        ("booking_window_days", data.booking_window_days, 1, 365,
+         "Booking window must be 1 to 365 days."),
+        ("waitlist_offer_minutes", data.waitlist_offer_minutes, 5, 240,
+         "Waitlist offers must last 5 to 240 minutes."),
+    ):
+        if not low <= value <= high:
+            raise AppError(422, label, field=field_name)
+    prefix = data.receipt_prefix.strip().upper()
+    if not RECEIPT_PREFIX_RE.match(prefix):
+        raise AppError(422, "Receipt prefix: 1 to 10 letters or digits.", field="receipt_prefix")
+
+    studio = db.scalar(select(Studio).limit(1))
+    if studio is None:
+        raise AppError(404, NOT_FOUND)
+    studio.name = name
+    studio.address = address
+    studio.phone = phone
+    studio.email = email
+    studio.opening_hours_text = hours_text
+    studio.min_notice_hours = data.min_notice_hours
+    studio.free_cancellation_hours = data.free_cancellation_hours
+    studio.booking_window_days = data.booking_window_days
+    studio.waitlist_offer_minutes = data.waitlist_offer_minutes
+    studio.receipt_prefix = prefix
+    db.commit()
+    db.refresh(studio)
+    return studio

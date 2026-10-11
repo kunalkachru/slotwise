@@ -18,8 +18,16 @@ NOT_LOGGED_IN = "Please log in."
 
 # Booking (slice 2)
 TIME_TAKEN = "That time was just taken. Please pick another."
-OUTSIDE_BOOKING_WINDOW = "Please choose a time between 2 hours and 60 days from now."
-DATE_OUT_OF_RANGE = "Please choose a date within the next 60 days."
+
+
+def outside_booking_window(min_notice_hours: int, window_days: int) -> str:
+    # Blueprint wording; with the default rules: "between 2 hours and 60 days".
+    hours = f"{min_notice_hours} hour{'s' if min_notice_hours != 1 else ''}"
+    return f"Please choose a time between {hours} and {window_days} days from now."
+
+
+def date_out_of_range(window_days: int) -> str:
+    return f"Please choose a date within the next {window_days} days."
 NO_THERAPIST_FOR_COMBINATION = "No therapist offers this combination. Please remove a service."
 CHOOSE_A_SERVICE = "Please choose at least one service."
 SERVICE_UNAVAILABLE = "One of the chosen treatments is no longer available. Please refresh."

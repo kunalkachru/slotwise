@@ -20,9 +20,9 @@ from app.errors import (
     NAME_CHARACTERS,
     NOT_AN_OFFERED_TIME,
     NOTE_TOO_LONG,
-    OUTSIDE_BOOKING_WINDOW,
     TIME_TAKEN,
     AppError,
+    outside_booking_window,
 )
 from app.logic.availability import (
     booking_limits,
@@ -170,7 +170,9 @@ def create_booking(
     details = details.cleaned()
     start_at = parse_start(day, start_time)
     if not booking_limits(db, for_owner).allows(start_at):
-        raise AppError(422, OUTSIDE_BOOKING_WINDOW, field="start_time")
+        studio = get_studio(db)
+        raise AppError(422, outside_booking_window(
+            studio.min_notice_hours, studio.booking_window_days), field="start_time")
 
     candidates = require_therapists(db, selection)
     if therapist_id is not None:

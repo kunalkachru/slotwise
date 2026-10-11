@@ -19,12 +19,12 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.emails import Mailer, waitlist_offer_email
 from app.errors import (
-    DATE_OUT_OF_RANGE,
     INVALID_TIME_WINDOW,
     OFFER_ALREADY_CLAIMED,
     OFFER_EXPIRED,
     OFFER_NOT_FOUND,
     AppError,
+    date_out_of_range,
 )
 from app.logic.availability import free_slots_by_therapist, get_studio
 from app.logic.booking import CustomerDetails, create_booking, find_or_create_customer
@@ -84,10 +84,9 @@ def join(db: Session, request: JoinRequest) -> JoinResult:
 
         raise AppError(404, NO_THERAPIST_FOR_COMBINATION)
     today = clock.now().date()
-    if not today <= request.preferred_date <= today + timedelta(
-        days=get_studio(db).booking_window_days
-    ):
-        raise AppError(422, DATE_OUT_OF_RANGE, field="preferred_date")
+    window = get_studio(db).booking_window_days
+    if not today <= request.preferred_date <= today + timedelta(days=window):
+        raise AppError(422, date_out_of_range(window), field="preferred_date")
     if request.earliest_time >= request.latest_time:
         raise AppError(422, INVALID_TIME_WINDOW, field="earliest_time")
     if not _anyone_works(db, therapists, request.preferred_date):

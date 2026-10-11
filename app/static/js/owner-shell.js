@@ -9,6 +9,7 @@ const PAGES = [
   { key: "services", label: "Services & add-ons", href: "/owner/services.html" },
   { key: "therapists", label: "Therapists & hours", href: "/owner/therapists.html" },
   { key: "waitlist", label: "Waitlist", href: "/owner/waitlist.html" },
+  { key: "settings", label: "Studio settings", href: "/owner/settings.html" },
 ];
 
 export async function startOwnerPage(active) {
