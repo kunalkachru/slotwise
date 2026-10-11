@@ -169,3 +169,29 @@ def test_confirm_links_are_redacted_in_logs():
 
     token = "A" * 43
     assert token not in redact(f"POST /public/waitlist/confirm/{token} HTTP/1.1")
+
+
+def test_confirming_cannot_go_past_the_cap(empty_calendar, db):
+    """Security review finding: pending requests don't count when joining, so the cap
+    must be checked again at confirmation."""
+    from app.logic.waitlist import MAX_OPEN_ENTRIES_PER_CUSTOMER
+
+    client = empty_calendar
+    limiter = client.app.state.booking_limiter
+    days = ("2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17",
+            "2026-10-19", "2026-10-20")
+    for day in days:  # all pending: none counts toward the cap yet
+        limiter._events.clear()
+        join(client, "Tom", day=day, confirm=False)
+    with client.app.state.session_factory() as session:
+        tokens = session.scalars(select(WaitlistEntry.confirm_token).order_by(
+            WaitlistEntry.id)).all()
+    results = [client.post(f"/public/waitlist/confirm/{t}") for t in tokens]
+    assert [r.status_code for r in results].count(200) == MAX_OPEN_ENTRIES_PER_CUSTOMER
+    rejected = [r for r in results if r.status_code == 409]
+    assert len(rejected) == 2
+    assert rejected[0].json()["detail"] == (
+        "You already have 5 open waitlist requests. Please call the studio to change them.")
+    with client.app.state.session_factory() as session:
+        statuses = session.scalars(select(WaitlistEntry.status)).all()
+    assert statuses.count("waiting") == MAX_OPEN_ENTRIES_PER_CUSTOMER

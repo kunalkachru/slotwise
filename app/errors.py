@@ -53,6 +53,9 @@ ALREADY_CANCELLED_OR_FINISHED = "This booking is already cancelled or finished."
 BOOKING_REQUEST_EXPIRED = (
     "This booking request has expired because it wasn't confirmed in time. Please book again."
 )
+WAITLIST_LIMIT_REACHED = (
+    "You already have 5 open waitlist requests. Please call the studio to change them."
+)
 WAITLIST_REQUEST_EXPIRED = (
     "This waitlist request has expired because it wasn't confirmed in time. Please join again."
 )

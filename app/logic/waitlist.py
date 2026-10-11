@@ -23,6 +23,7 @@ from app.errors import (
     OFFER_ALREADY_CLAIMED,
     OFFER_EXPIRED,
     OFFER_NOT_FOUND,
+    WAITLIST_LIMIT_REACHED,
     WAITLIST_REQUEST_EXPIRED,
     AppError,
     date_out_of_range,
@@ -154,6 +155,16 @@ def confirm_entry(db: Session, token: str) -> tuple[WaitlistEntry, int | None]:
             entry.status = "expired"
             db.commit()
             raise AppError(410, WAITLIST_REQUEST_EXPIRED)
+        # The cap is checked again here: pending requests don't count when joining, so
+        # several could otherwise be confirmed past it (security review).
+        open_entries = db.scalar(select(func.count()).select_from(WaitlistEntry).where(
+            WaitlistEntry.customer_id == entry.customer_id,
+            WaitlistEntry.status.in_(OPEN),
+        ))
+        if open_entries >= MAX_OPEN_ENTRIES_PER_CUSTOMER:
+            entry.status = "removed"
+            db.commit()
+            raise AppError(409, WAITLIST_LIMIT_REACHED)
         entry.status = "waiting"
         db.commit()
     elif entry.status in ("expired", "removed"):
