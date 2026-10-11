@@ -9,7 +9,8 @@ export class ApiError extends Error {
 }
 
 export async function api(path, { method = "GET", body } = {}) {
-  const options = { method, credentials: "same-origin", headers: {} };
+  // Customer pages set <html lang> via i18n.js; the server answers messages in it.
+  const options = { method, credentials: "same-origin", headers: { "X-Lang": pageLang() } };
   if (body !== undefined) {
     options.headers["Content-Type"] = "application/json";
     options.body = JSON.stringify(body);
@@ -59,15 +60,21 @@ export function fill(target, ...children) {
   target.replaceChildren(...children.flat().filter((c) => c != null && c !== false));
 }
 
-const euroWhole = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", minimumFractionDigits: 0 });
-const euroCents = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
+export function pageLang() {
+  return document.documentElement.lang === "de" ? "de" : "en";
+}
 
-// Prices arrive as strings like "70.00"; show "€70" or "€12.50".
+const numberLocale = () => (pageLang() === "de" ? "de-DE" : "en-IE");
+
+// Prices arrive as strings like "70.00"; show "€70" / "€12.50" (English) or
+// "70 €" / "12,50 €" (German).
 export function formatEuro(amount) {
   const value = Number(amount);
-  return Number.isInteger(value) ? euroWhole.format(value) : euroCents.format(value);
+  return new Intl.NumberFormat(numberLocale(), {
+    style: "currency", currency: "EUR", minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+  }).format(value);
 }
 
 export function formatMinutes(minutes) {
-  return `${minutes} min`;
+  return pageLang() === "de" ? `${minutes} Min.` : `${minutes} min`;
 }

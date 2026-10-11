@@ -39,7 +39,25 @@ STUDIO = dict(
     phone="+49 89 0000 0000",
     email="hello@isar-wellness.example.com",
     opening_hours_text="Mon 10:00–19:00 · Tue–Fri 9:00–19:00 · Sat 9:00–17:00 · Sun closed",
+    opening_hours_text_de="Mo 10–19 Uhr · Di–Fr 9–19 Uhr · Sa 9–17 Uhr · So geschlossen",
 )
+
+# German menu texts (name, description) and add-on names
+MENU_DE = {
+    "Relaxation massage": ("Entspannungsmassage", "Sanfte Ganzkörpermassage zum Abschalten."),
+    "Deep tissue massage": ("Tiefengewebsmassage", "Kräftiger Druck für verspannte Muskeln."),
+    "Back and neck massage": ("Rücken- und Nackenmassage",
+                              "Gezielte Entlastung für Schreibtisch-Schultern."),
+    "Classic facial": ("Klassische Gesichtsbehandlung", "Reinigung, Peeling, Maske und Pflege."),
+    "Express facial": ("Express-Gesichtsbehandlung", "Die schnelle Frische für volle Tage."),
+    "Foot reflexology": ("Fußreflexzonenmassage", "Druckpunktbehandlung der Füße."),
+}
+ADD_ONS_DE = {"Hot stones": "Heiße Steine", "Aromatherapy oil": "Aromaöl",
+              "Eye mask treatment": "Augenmaske"}
+BIOS_DE = {
+    "Lena": "Massagetherapeutin mit zehn Jahren Erfahrung in Tiefengewebsmassage.",
+    "Sofia": "Kosmetikerin mit Schwerpunkt Gesichtsbehandlungen und Entspannungsmassage.",
+}
 
 # (category, name, description, minutes, price, add-ons as (name, extra_minutes, price))
 MASSAGE_ADD_ONS = [("Hot stones", 15, "12.00"), ("Aromatherapy oil", 0, "5.00")]
@@ -126,12 +144,15 @@ def _hm(value: str) -> time:
 def _seed_demo(session: Session) -> None:
     services: dict[str, Service] = {}
     for category, name, description, minutes, price, add_ons in MENU:
+        name_de, description_de = MENU_DE.get(name, (None, None))
         service = Service(
             category=category, name=name, description=description,
+            name_de=name_de, description_de=description_de,
             duration_minutes=minutes, price=Decimal(price), buffer_minutes=10,
         )
         service.add_ons = [
-            AddOn(name=a_name, extra_minutes=a_min, price=Decimal(a_price))
+            AddOn(name=a_name, name_de=ADD_ONS_DE.get(a_name), extra_minutes=a_min,
+                  price=Decimal(a_price))
             for a_name, a_min, a_price in add_ons
         ]
         services[name] = service
@@ -139,7 +160,7 @@ def _seed_demo(session: Session) -> None:
 
     therapists: dict[str, Therapist] = {}
     for name, (bio, offered, hours) in THERAPISTS.items():
-        therapist = Therapist(display_name=name, short_bio=bio)
+        therapist = Therapist(display_name=name, short_bio=bio, short_bio_de=BIOS_DE.get(name))
         therapist.services = [services[s] for s in offered]
         therapist.working_hours = [
             WorkingHours(weekday=day, start_time=_hm(start), end_time=_hm(end))

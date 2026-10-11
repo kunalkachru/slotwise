@@ -43,6 +43,8 @@ class ServiceInput:
     price: Decimal
     buffer_minutes: int
     active: bool
+    name_de: str | None = None
+    description_de: str | None = None
 
 
 def list_services(db: Session) -> list[Service]:
@@ -79,6 +81,8 @@ def save_service(db: Session, data: ServiceInput, service_id: int | None = None)
     service.category = data.category
     service.name = name
     service.description = (data.description or "").strip() or None
+    service.name_de = " ".join((data.name_de or "").split())[:120] or None
+    service.description_de = (data.description_de or "").strip()[:500] or None
     service.duration_minutes = data.duration_minutes
     service.price = data.price
     service.buffer_minutes = data.buffer_minutes
@@ -96,6 +100,7 @@ class AddOnInput:
     extra_minutes: int
     price: Decimal
     active: bool
+    name_de: str | None = None
 
 
 def save_add_on(db: Session, data: AddOnInput, add_on_id: int | None = None) -> AddOn:
@@ -107,6 +112,7 @@ def save_add_on(db: Session, data: AddOnInput, add_on_id: int | None = None) -> 
     add_on = _get(db, AddOn, add_on_id) if add_on_id else AddOn()
     add_on.service_id = data.service_id
     add_on.name = name
+    add_on.name_de = " ".join((data.name_de or "").split())[:120] or None
     add_on.extra_minutes = data.extra_minutes
     add_on.price = data.price
     add_on.active = data.active
@@ -125,6 +131,7 @@ class TherapistInput:
     short_bio: str | None
     active: bool
     service_ids: list[int]
+    short_bio_de: str | None = None
 
 
 def list_therapists(db: Session) -> list[Therapist]:
@@ -149,6 +156,7 @@ def save_therapist(db: Session, data: TherapistInput, therapist_id: int | None =
     therapist = _get(db, Therapist, therapist_id) if therapist_id else Therapist()
     therapist.display_name = name
     therapist.short_bio = (data.short_bio or "").strip() or None
+    therapist.short_bio_de = (data.short_bio_de or "").strip()[:500] or None
     therapist.active = data.active
     therapist.services = list(services)
     db.add(therapist)
@@ -229,6 +237,7 @@ class StudioInput:
     booking_window_days: int
     waitlist_offer_minutes: int
     receipt_prefix: str
+    opening_hours_text_de: str | None = None
 
 
 def save_studio(db: Session, data: StudioInput) -> Studio:
@@ -273,6 +282,8 @@ def save_studio(db: Session, data: StudioInput) -> Studio:
     studio.phone = phone
     studio.email = email
     studio.opening_hours_text = hours_text
+    hours_de = " ".join((data.opening_hours_text_de or "").split())
+    studio.opening_hours_text_de = hours_de[:255] or None
     studio.min_notice_hours = data.min_notice_hours
     studio.free_cancellation_hours = data.free_cancellation_hours
     studio.booking_window_days = data.booking_window_days

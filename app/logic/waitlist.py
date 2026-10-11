@@ -58,6 +58,7 @@ class JoinRequest:
     earliest_time: time
     latest_time: time
     details: CustomerDetails
+    language: str = "en"
 
 
 MAX_OPEN_ENTRIES_PER_CUSTOMER = 5
@@ -129,6 +130,7 @@ def join(db: Session, request: JoinRequest) -> JoinResult:
         latest_time=request.latest_time,
         status="pending",  # counts only after the email confirmation (double opt-in)
         confirm_token=new_token(),
+        language=request.language,
     )
     db.add(entry)
     db.commit()
@@ -249,8 +251,7 @@ def offer_slot(db: Session, mailer: Mailer, public_url: str, therapist_id: int,
         entry.offered_at = now
         entry.offer_expires_at = now + timedelta(minutes=studio.waitlist_offer_minutes)
         db.commit()
-        when = local.strftime("%a %-d %b, %H:%M")
-        mailer.send(waitlist_offer_email(entry, studio, public_url, when,
+        mailer.send(waitlist_offer_email(entry, studio, public_url, local,
                                          therapist.display_name, selection.total_minutes))
         return entry
     return None
@@ -299,6 +300,7 @@ def claim(db: Session, mailer: Mailer, public_url: str, token: str):
         CustomerDetails(customer.first_name, customer.last_name, customer.email,
                         customer.phone or "000000"),
         source="waitlist",
+        language=entry.language,
     )
     entry.status = "booked"
     entry.booking_id = booking.id

@@ -1,6 +1,7 @@
-import { api, fill, formatEuro, h } from "/js/api.js";
+import { api, fill, formatEuro, formatMinutes, h } from "/js/api.js";
+import { locale, t } from "/js/i18n.js";
 
-const longDate = new Intl.DateTimeFormat("en-GB", {
+const longDate = new Intl.DateTimeFormat(locale, {
   weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
 });
 const ENVELOPE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M3.5 6.5h17v11h-17z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 7l8 6 8-6"/></svg>';
@@ -19,9 +20,9 @@ async function render() {
   const booking = readBooking();
   if (!booking) {
     fill(target, 
-      h("h1", {}, "Booking details not available"),
-      h("p", { class: "muted" }, "Your booking may still have gone through. Please check with the studio if you're unsure."),
-      h("a", { class: "btn btn-block", href: "/" }, "Back to home"),
+      h("h1", {}, t("conf.missing")),
+      h("p", { class: "muted" }, t("conf.missing_text")),
+      h("a", { class: "btn btn-block", href: "/" }, t("nav.back_home")),
     );
     return;
   }
@@ -30,21 +31,21 @@ async function render() {
 
   const pending = booking.status === "pending";
   const holdUntil = booking.hold_until
-    ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }).format(new Date(booking.hold_until))
+    ? new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }).format(new Date(booking.hold_until))
     : null;
   const icon = h("div", { class: "confirm-icon" });
   icon.innerHTML = pending ? ENVELOPE : CHECK; // static markup, no data
-  document.title = `${pending ? "Check your email" : "Booking confirmed"} · ${studio ? studio.name : "Slotwise"}`;
+  document.title = `${t(pending ? "conf.title_pending" : "conf.title_booked")} · ${studio ? studio.name : "Slotwise"}`;
   fill(target, 
     icon,
-    h("h1", {}, pending ? `Almost done, ${booking.customer_first_name}!` : `You're booked, ${booking.customer_first_name}!`),
+    h("h1", {}, t(pending ? "conf.almost" : "conf.booked", { name: booking.customer_first_name })),
     pending && h("p", { class: "success-note" },
-      `We've emailed you a link. Click it to confirm your booking${holdUntil ? ` by ${holdUntil}` : " within 30 minutes"}; until then we're holding the time for you.`),
+      t("conf.pending_note", { time: holdUntil || "" })),
     h("dl", { class: "facts" },
-      h("dt", {}, "Date"), h("dd", {}, longDate.format(new Date(`${booking.date}T12:00:00Z`))),
-      h("dt", {}, "Time"), h("dd", {}, `${booking.time} (${booking.total_minutes} min)`),
-      h("dt", {}, "Therapist"), h("dd", {}, booking.therapist_name),
-      studio && h("dt", {}, "Where"), studio && h("dd", {}, studio.address),
+      h("dt", {}, t("common.date")), h("dd", {}, longDate.format(new Date(`${booking.date}T12:00:00Z`))),
+      h("dt", {}, t("common.time")), h("dd", {}, `${t("common.at_time", { time: booking.time })} (${formatMinutes(booking.total_minutes)})`),
+      h("dt", {}, t("common.therapist")), h("dd", {}, booking.therapist_name),
+      studio && h("dt", {}, t("common.where")), studio && h("dd", {}, studio.address),
     ),
     h("table", { class: "lines" },
       booking.items.map((item) =>
@@ -53,12 +54,12 @@ async function render() {
           h("td", {}, formatEuro(item.line_total)),
         ),
       ),
-      h("tr", { class: "total" }, h("td", {}, "Total"), h("td", {}, formatEuro(booking.total_price))),
+      h("tr", { class: "total" }, h("td", {}, t("common.total")), h("td", {}, formatEuro(booking.total_price))),
     ),
-    h("p", { class: "pay-note" }, "Pay at the studio"),
-    !pending && h("p", { class: "success-note" }, "A confirmation has been emailed to you. Use the link in your email to confirm, cancel or view your receipt."),
-    pending && h("p", { class: "muted" }, "No email? Check your spam folder. If you don't confirm in time, the time is released for others."),
-    h("a", { class: "btn btn-block", href: "/" }, "Back to home"),
+    h("p", { class: "pay-note" }, t("common.pay")),
+    !pending && h("p", { class: "success-note" }, t("conf.emailed")),
+    pending && h("p", { class: "muted" }, t("conf.spam")),
+    h("a", { class: "btn btn-block", href: "/" }, t("nav.back_home")),
   );
 }
 

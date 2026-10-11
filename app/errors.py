@@ -72,11 +72,14 @@ class AppError(Exception):
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    from app.i18n import request_lang, translate
+
     @app.exception_handler(AppError)
     async def _app_error(request: Request, exc: AppError):
-        body: dict = {"detail": exc.message}
+        message = translate(exc.message, request_lang(request))
+        body: dict = {"detail": message}
         if exc.field:
-            body["fields"] = [{"field": exc.field, "message": exc.message}]
+            body["fields"] = [{"field": exc.field, "message": message}]
         return JSONResponse(body, status_code=exc.status_code)
 
     @app.exception_handler(RequestValidationError)
@@ -86,11 +89,13 @@ def install_error_handlers(app: FastAPI) -> None:
             for err in exc.errors()
         ]
         return JSONResponse(
-            {"detail": "Please check the highlighted fields.", "fields": fields},
+            {"detail": translate("Please check the highlighted fields.", request_lang(request)),
+             "fields": fields},
             status_code=422,
         )
 
     @app.exception_handler(Exception)
     async def _unexpected(request: Request, exc: Exception):
         log.exception("Unhandled error on %s %s", request.method, request.url.path)
-        return JSONResponse({"detail": UNEXPECTED}, status_code=500)
+        return JSONResponse({"detail": translate(UNEXPECTED, request_lang(request))},
+                            status_code=500)

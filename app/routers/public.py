@@ -13,6 +13,7 @@ from app.emails import (
     waitlist_limit_email,
 )
 from app.errors import TOO_MANY_BOOKINGS, AppError
+from app.i18n import category_label, request_lang
 from app.logic import waitlist
 from app.logic.availability import check_date_in_range, free_slots
 from app.logic.availability import get_studio as load_studio
@@ -29,7 +30,7 @@ from app.logic.booking import (
     mailbox_key,
     verify_booking,
 )
-from app.logic.selection import parse_ids, require_therapists, resolve_selection
+from app.logic.selection import localized, parse_ids, require_therapists, resolve_selection
 from app.models import CATEGORIES, Service, Studio, Therapist
 from app.schemas import (
     AddOnOut,
@@ -60,15 +61,18 @@ BOOKINGS_PER_EMAIL_PER_DAY = 5
 
 
 @router.get("/studio", response_model=StudioOut)
-def get_studio(db: Session = Depends(get_db)):
+def get_studio(request: Request, db: Session = Depends(get_db)):
     studio = db.scalar(select(Studio).limit(1))
     if studio is None:
         raise AppError(404, "The studio is not set up yet.")
-    return studio
+    out = StudioOut.model_validate(studio)
+    out.opening_hours_text = localized(
+        studio.opening_hours_text, studio.opening_hours_text_de, request_lang(request))
+    return out
 
 
 @router.get("/services", response_model=list[CategoryOut])
-def list_services(db: Session = Depends(get_db)):
+def list_services(request: Request, db: Session = Depends(get_db)):
     """The public menu: active services grouped by category, each with its active add-ons."""
     services = db.scalars(
         select(Service)
@@ -76,30 +80,40 @@ def list_services(db: Session = Depends(get_db)):
         .options(selectinload(Service.add_ons))
         .order_by(Service.id)
     ).all()
+    lang = request_lang(request)
     menu = []
     for category in CATEGORIES:
         in_category = [
             ServiceOut(
                 id=s.id,
-                name=s.name,
-                description=s.description,
+                name=localized(s.name, s.name_de, lang),
+                description=localized(s.description, s.description_de, lang),
                 duration_minutes=s.duration_minutes,
                 price=s.price,
-                add_ons=[AddOnOut.model_validate(a) for a in s.add_ons if a.active],
+                add_ons=[
+                    AddOnOut(id=a.id, name=localized(a.name, a.name_de, lang),
+                             extra_minutes=a.extra_minutes, price=a.price)
+                    for a in s.add_ons if a.active
+                ],
             )
             for s in services
             if s.category == category
         ]
         if in_category:
-            menu.append(CategoryOut(name=category, services=in_category))
+            menu.append(CategoryOut(name=category, label=category_label(category, lang),
+                                    services=in_category))
     return menu
 
 
 @router.get("/therapists", response_model=list[TherapistOut])
-def list_therapists(service_ids: str = Query(""), db: Session = Depends(get_db)):
+def list_therapists(request: Request, service_ids: str = Query(""),
+                    db: Session = Depends(get_db)):
     """Therapists who offer every chosen service (comma-separated ids)."""
     selection = resolve_selection(db, parse_ids(service_ids), [])
-    return require_therapists(db, selection)
+    lang = request_lang(request)
+    return [TherapistOut(id=t.id, display_name=t.display_name,
+                         short_bio=localized(t.short_bio, t.short_bio_de, lang))
+            for t in require_therapists(db, selection)]
 
 
 @router.get("/availability", response_model=AvailabilityOut)
@@ -158,6 +172,7 @@ def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
             body.start_time,
             body.therapist_id,
             details,
+            language=request_lang(request),
         )
     except Exception:
         limiter.release([ip_key, email_key])
@@ -243,6 +258,7 @@ def join_waitlist(body: WaitlistIn, request: Request, db: Session = Depends(get_
             service_ids=body.service_ids, add_on_ids=body.add_on_ids,
             therapist_id=body.therapist_id, preferred_date=body.preferred_date,
             earliest_time=body.earliest_time, latest_time=body.latest_time, details=details,
+            language=request_lang(request),
         ))
     except Exception:
         limiter.release([ip_key, email_key])
@@ -252,7 +268,8 @@ def join_waitlist(body: WaitlistIn, request: Request, db: Session = Depends(get_
     # Every outcome emails the address owner; the response is the same for all of them.
     if result.outcome == "limit":
         mailer.send(waitlist_limit_email(
-            result.customer, body.preferred_date, studio, waitlist.MAX_OPEN_ENTRIES_PER_CUSTOMER))
+            result.customer, body.preferred_date, studio, waitlist.MAX_OPEN_ENTRIES_PER_CUSTOMER,
+            lang=request_lang(request)))
     elif result.outcome in ("created", "unconfirmed"):
         mailer.send(waitlist_confirm_email(result.entry, studio, public_url))
     else:

@@ -74,6 +74,8 @@ The jobs must be idempotent, because a call can come late or twice.
 
 **Email confirmation:** online bookings start `pending` and only become `booked` via the emailed link (`POST /public/bookings/{token}/verify`); waitlist joins start `pending` until `POST /public/waitlist/confirm/{token}`. "Occupies a slot" is defined once in `availability.occupies_slot()` (pending only during its 30-minute hold). The manage token must never appear in an API response: email is what proves the address.
 
+**Languages (DE/EN):** customer pages import `js/i18n.js` first (word lists, `t()`, the DE/EN switch, `<html lang>`), and `api.js` sends that as `X-Lang`. Server messages stay English in code and are translated centrally (`app/i18n.py: translate`, used by the error handlers). New customer-facing messages need a German entry there. Emails use `booking.language` / `entry.language`. Menu texts use `localized(english, german, lang)`. The owner area is English.
+
 **Seed:** runs on startup only when the `studio` table is empty. It always creates the studio and the owner. Demo data (menu, Lena and Sofia, about 20 bookings) is added only when `SEED_DEMO_DATA=true`, in production too. Every seeded customer must have a fake `@example.com` email address.
 
 **Data model:** the main tables are Studio, Owners, Therapists, Services, AddOns, TherapistServices, WorkingHours, DaysOff, Customers, Bookings, BookingItems and WaitlistEntries.

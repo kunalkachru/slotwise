@@ -14,6 +14,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import timedelta
 
+from app import i18n
 from app.clock import BERLIN
 from app.logs import mask_email, redact
 
@@ -72,15 +73,134 @@ class Mailer:
 
 
 # ---------- Message builders ----------
+#
+# Every email is written in the language the customer used (booking.language /
+# entry.language), English by default. Dates and prices come from app.i18n.
+
+STRINGS = {
+    "en": {
+        "with": "with", "total": "Total", "pay": "Pay at the studio.", "paid": "Paid at the studio.",
+        "hello": "Hello {name}",
+        "confirmed_intro": "{hello}, your booking at {studio} is confirmed.",
+        "confirmed_subject": "Booking confirmed: {when} · {studio}",
+        "confirmed_heading": "You're booked!",
+        "manage": "View or manage your booking",
+        "free_until": "Free cancellation until {deadline}.",
+        "reminder_intro": ("{hello}, a reminder of your appointment on {when}. Please confirm "
+                           "you're coming, or cancel so someone on the waitlist can have the time."),
+        "reminder_subject": "Reminder: {when} · {studio}",
+        "reminder_heading": "See you soon",
+        "coming": "Confirm I'm coming", "cancel": "I need to cancel",
+        "receipt_intro": "{hello}, thank you for your visit to {studio}. Here is your receipt {number}.",
+        "receipt_subject": "Receipt {number} · {studio}",
+        "receipt_heading": "Receipt {number}",
+        "receipt_link": "View or print your receipt",
+        "verify_intro": ("{hello}, please confirm your booking at {studio}. We're holding the "
+                         "time for you until {until}."),
+        "verify_subject": "Please confirm your booking: {when} · {studio}",
+        "verify_heading": "One more step",
+        "verify_link": "Confirm my booking",
+        "verify_footer": "If you didn't make this booking, ignore this email and the time will be released.",
+        "offer_intro": ("{hello}, a time you were waiting for at {studio} is free: {when} with "
+                        "{therapist} ({minutes} min)."),
+        "offer_detail": "Claim it before {expires}. After that it goes to the next person on the waitlist.",
+        "offer_subject": "A time is free: {when} · {studio}",
+        "offer_heading": "A time is free for you",
+        "offer_link": "Claim this time",
+        "joined_intro": "{hello}, you are on the waitlist at {studio} for {day} ({window}), number {position}.",
+        "already_intro": ("{hello}, you are already on the waitlist at {studio} for {day} "
+                          "({window}), number {position}."),
+        "joined_detail": ("If a time frees up, we'll email you a link to claim it; the first person "
+                          "to claim gets it. If you didn't ask for this, ignore this email or call us."),
+        "joined_subject": "Waitlist for {day} · {studio}",
+        "joined_heading": "You're on the waitlist",
+        "limit_intro": ("{hello}, we could not add you to the waitlist at {studio} for {day}: this "
+                        "email address already has {limit} open waitlist requests."),
+        "limit_detail": ("Please call us on {phone} if you want to change them. If you didn't ask "
+                         "for any of this, someone may have used your address; call us and we'll "
+                         "remove the requests."),
+        "limit_subject": "Waitlist request for {day} · {studio}",
+        "wl_confirm_intro": ("{hello}, please confirm that you want to join the waitlist at "
+                             "{studio} for {day} ({window})."),
+        "wl_confirm_detail": ("The request counts once you confirm, and expires after 24 hours. If "
+                              "you didn't ask for this, ignore this email."),
+        "wl_confirm_subject": "Please confirm: waitlist for {day} · {studio}",
+        "wl_confirm_link": "Confirm my waitlist request",
+    },
+    "de": {
+        "with": "bei", "total": "Gesamt", "pay": "Bezahlung im Studio.", "paid": "Im Studio bezahlt.",
+        "hello": "Hallo {name}",
+        "confirmed_intro": "{hello}, Ihre Buchung bei {studio} ist bestätigt.",
+        "confirmed_subject": "Buchung bestätigt: {when} · {studio}",
+        "confirmed_heading": "Sie sind gebucht!",
+        "manage": "Buchung ansehen oder verwalten",
+        "free_until": "Kostenlose Stornierung bis {deadline}.",
+        "reminder_intro": ("{hello}, wir erinnern Sie an Ihren Termin am {when}. Bitte bestätigen "
+                           "Sie, dass Sie kommen, oder sagen Sie ab, damit jemand von der "
+                           "Warteliste den Termin bekommt."),
+        "reminder_subject": "Erinnerung: {when} · {studio}",
+        "reminder_heading": "Bis bald",
+        "coming": "Ich komme", "cancel": "Ich muss absagen",
+        "receipt_intro": ("{hello}, vielen Dank für Ihren Besuch bei {studio}. Hier ist Ihre "
+                          "Quittung {number}."),
+        "receipt_subject": "Quittung {number} · {studio}",
+        "receipt_heading": "Quittung {number}",
+        "receipt_link": "Quittung ansehen oder drucken",
+        "verify_intro": ("{hello}, bitte bestätigen Sie Ihre Buchung bei {studio}. Wir halten "
+                         "den Termin bis {until} für Sie frei."),
+        "verify_subject": "Bitte bestätigen Sie Ihre Buchung: {when} · {studio}",
+        "verify_heading": "Noch ein Schritt",
+        "verify_link": "Buchung bestätigen",
+        "verify_footer": ("Falls Sie diese Buchung nicht vorgenommen haben, ignorieren Sie diese "
+                          "E-Mail; der Termin wird dann wieder freigegeben."),
+        "offer_intro": ("{hello}, ein Termin, auf den Sie bei {studio} gewartet haben, ist frei: "
+                        "{when} bei {therapist} ({minutes} Min.)."),
+        "offer_detail": ("Bitte sichern Sie ihn sich bis {expires}. Danach geht er an die nächste "
+                         "Person auf der Warteliste."),
+        "offer_subject": "Ein Termin ist frei: {when} · {studio}",
+        "offer_heading": "Ein Termin ist für Sie frei",
+        "offer_link": "Termin sichern",
+        "joined_intro": ("{hello}, Sie stehen bei {studio} auf der Warteliste für {day} "
+                         "({window}), Platz {position}."),
+        "already_intro": ("{hello}, Sie stehen bereits bei {studio} auf der Warteliste für {day} "
+                          "({window}), Platz {position}."),
+        "joined_detail": ("Wird ein Termin frei, senden wir Ihnen einen Link; wer zuerst zugreift, "
+                          "bekommt ihn. Falls Sie das nicht angefragt haben, ignorieren Sie diese "
+                          "E-Mail oder rufen Sie uns an."),
+        "joined_subject": "Warteliste für {day} · {studio}",
+        "joined_heading": "Sie stehen auf der Warteliste",
+        "limit_intro": ("{hello}, wir konnten Sie bei {studio} nicht auf die Warteliste für {day} "
+                        "setzen: Diese E-Mail-Adresse hat bereits {limit} offene "
+                        "Wartelisten-Anfragen."),
+        "limit_detail": ("Bitte rufen Sie uns unter {phone} an, wenn Sie sie ändern möchten. Falls "
+                         "Sie nichts davon angefragt haben, hat jemand Ihre Adresse verwendet; "
+                         "rufen Sie uns an, dann entfernen wir die Anfragen."),
+        "limit_subject": "Wartelisten-Anfrage für {day} · {studio}",
+        "wl_confirm_intro": ("{hello}, bitte bestätigen Sie, dass Sie bei {studio} auf die "
+                             "Warteliste für {day} ({window}) möchten."),
+        "wl_confirm_detail": ("Die Anfrage zählt erst nach Ihrer Bestätigung und verfällt nach 24 "
+                              "Stunden. Falls Sie das nicht angefragt haben, ignorieren Sie diese "
+                              "E-Mail."),
+        "wl_confirm_subject": "Bitte bestätigen: Warteliste für {day} · {studio}",
+        "wl_confirm_link": "Wartelisten-Anfrage bestätigen",
+    },
+}
 
 
-def _euro(amount) -> str:
-    return f"€{amount:.2f}"
+def _t(lang: str, key: str, **values) -> str:
+    return STRINGS[i18n.lang_of(lang)][key].format(**values)
+
+
+def _hello(lang: str, customer) -> str:
+    return _t(lang, "hello", name=customer.first_name)
 
 
 def _when(booking) -> str:
-    local = booking.start_at.astimezone(BERLIN)
-    return local.strftime("%A %-d %B %Y, %H:%M")
+    return i18n.long_when(booking.start_at.astimezone(BERLIN), booking.language)
+
+
+def _studio_line(studio) -> str:
+    return f"{studio.name} · {studio.address} · {studio.phone}"
 
 
 def _lines(booking) -> list[tuple[str, str]]:
@@ -89,12 +209,17 @@ def _lines(booking) -> list[tuple[str, str]]:
         label = item.name_snapshot if item.item_type == "service" else f"+ {item.name_snapshot}"
         if item.quantity > 1:
             label += f" × {item.quantity}"
-        rows.append((label, _euro(item.unit_price_snapshot * item.quantity)))
+        rows.append((label, i18n.euro(item.unit_price_snapshot * item.quantity, booking.language)))
     return rows
 
 
 def _total_minutes(booking) -> int:
     return sum(i.minutes_snapshot * i.quantity for i in booking.items)
+
+
+def _minutes(booking) -> str:
+    unit = "Min." if booking.language == "de" else "min"
+    return f"{_total_minutes(booking)} {unit}"
 
 
 def manage_link(public_url: str, booking, action: str | None = None) -> str:
@@ -103,8 +228,9 @@ def manage_link(public_url: str, booking, action: str | None = None) -> str:
 
 
 def _html_page(heading: str, intro: str, booking, buttons: list[tuple[str, str]],
-               footer: str) -> str:
+               footer: str, paid: bool = False) -> str:
     esc = html.escape
+    lang = booking.language
     rows = "".join(
         f'<tr><td style="padding:6px 0;border-bottom:1px solid #e3e9e5">{esc(label)}</td>'
         f'<td style="padding:6px 0;border-bottom:1px solid #e3e9e5;text-align:right">'
@@ -121,200 +247,171 @@ def _html_page(heading: str, intro: str, booking, buttons: list[tuple[str, str]]
         '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
         'max-width:520px;color:#1d2a24">'
         f'<h2 style="color:#1F8756">{esc(heading)}</h2><p>{esc(intro)}</p>'
-        f"<p><strong>{esc(_when(booking))}</strong> with "
-        f"{esc(booking.therapist.display_name)} ({_total_minutes(booking)} min)</p>"
+        f"<p><strong>{esc(_when(booking))}</strong> {_t(lang, 'with')} "
+        f"{esc(booking.therapist.display_name)} ({_minutes(booking)})</p>"
         f'<table style="width:100%;border-collapse:collapse">{rows}'
-        f'<tr><td style="padding:8px 0;font-weight:700">Total</td>'
+        f'<tr><td style="padding:8px 0;font-weight:700">{_t(lang, "total")}</td>'
         f'<td style="padding:8px 0;font-weight:700;text-align:right">'
-        f"{esc(_euro(booking.total_price))}</td></tr></table>"
-        f'<p style="color:#5d6b64">Pay at the studio.</p><p>{links}</p>'
+        f"{esc(i18n.euro(booking.total_price, lang))}</td></tr></table>"
+        f'<p style="color:#5d6b64">{_t(lang, "paid" if paid else "pay")}</p><p>{links}</p>'
         f'<p style="color:#5d6b64;font-size:14px">{esc(footer)}</p></div>'
     )
 
 
-def _text_body(intro: str, booking, links: list[tuple[str, str]], footer: str) -> str:
-    lines = [intro, "", f"{_when(booking)} with {booking.therapist.display_name} "
-             f"({_total_minutes(booking)} min)", ""]
+def _text_body(intro: str, booking, links: list[tuple[str, str]], footer: str,
+               paid: bool = False) -> str:
+    lang = booking.language
+    lines = [intro, "", f"{_when(booking)} {_t(lang, 'with')} {booking.therapist.display_name} "
+             f"({_minutes(booking)})", ""]
     lines += [f"{label:<40} {price:>10}" for label, price in _lines(booking)]
-    lines += [f"{'Total':<40} {_euro(booking.total_price):>10}", "", "Pay at the studio.", ""]
+    lines += [f"{_t(lang, 'total'):<40} {i18n.euro(booking.total_price, lang):>10}", "",
+              _t(lang, "paid" if paid else "pay"), ""]
     lines += [f"{label}: {url}" for label, url in links]
     lines += ["", footer]
     return "\n".join(lines)
 
 
+def _simple(to: str, subject: str, heading: str | None, paragraphs: list[str], footer: str,
+            reply_to: str, button: tuple[str, str] | None = None) -> Email:
+    esc = html.escape
+    text = "\n\n".join(paragraphs + ([f"{button[0]}: {button[1]}"] if button else []) + [footer])
+    link_html = (
+        f'<p><a href="{esc(button[1])}" style="display:inline-block;padding:10px 16px;'
+        f'border-radius:8px;background:#1F8756;color:#fff;text-decoration:none;'
+        f'font-weight:600">{esc(button[0])}</a></p>' if button else ""
+    )
+    body = "".join(f"<p>{esc(p)}</p>" for p in paragraphs)
+    heading_html = f'<h2 style="color:#1F8756">{esc(heading)}</h2>' if heading else ""
+    return Email(
+        to=to, subject=subject, text=text, reply_to=reply_to,
+        html=('<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
+              f'max-width:520px;color:#1d2a24">{heading_html}{body}{link_html}'
+              f'<p style="color:#5d6b64;font-size:14px">{esc(footer)}</p></div>'),
+    )
+
+
 def confirmation_email(booking, studio, public_url: str) -> Email:
+    lang = booking.language
     deadline = (booking.start_at - timedelta(hours=studio.free_cancellation_hours)).astimezone(
-        BERLIN
-    )
-    intro = f"Hello {booking.customer.first_name}, your booking at {studio.name} is confirmed."
-    footer = (
-        f"Free cancellation until {deadline.strftime('%a %-d %b, %H:%M')}. "
-        f"{studio.name} · {studio.address} · {studio.phone}"
-    )
-    links = [("View or manage your booking", manage_link(public_url, booking))]
+        BERLIN)
+    intro = _t(lang, "confirmed_intro", hello=_hello(lang, booking.customer), studio=studio.name)
+    footer = (f"{_t(lang, 'free_until', deadline=i18n.short_when(deadline, lang))} "
+              f"{_studio_line(studio)}")
+    links = [(_t(lang, "manage"), manage_link(public_url, booking))]
     return Email(
         to=booking.customer.email,
-        subject=f"Booking confirmed: {_when(booking)} · {studio.name}",
+        subject=_t(lang, "confirmed_subject", when=_when(booking), studio=studio.name),
         text=_text_body(intro, booking, links, footer),
-        html=_html_page("You're booked!", intro, booking, links, footer),
+        html=_html_page(_t(lang, "confirmed_heading"), intro, booking, links, footer),
         reply_to=studio.email,
     )
 
 
 def reminder_email(booking, studio, public_url: str) -> Email:
-    """Sent 24 hours before (slice 5 schedules it) with one-click confirm and cancel."""
-    intro = (f"Hello {booking.customer.first_name}, a reminder of your appointment on "
-             f"{_when(booking)}. Please confirm you're coming, or cancel so someone on the "
-             "waitlist can have the time.")
-    footer = f"{studio.name} · {studio.address} · {studio.phone}"
+    """Sent 24 hours before (run-jobs) with one-click confirm and cancel."""
+    lang = booking.language
+    intro = _t(lang, "reminder_intro", hello=_hello(lang, booking.customer), when=_when(booking))
     links = [
-        ("Confirm I'm coming", manage_link(public_url, booking, "confirm")),
-        ("I need to cancel", manage_link(public_url, booking, "cancel")),
+        (_t(lang, "coming"), manage_link(public_url, booking, "confirm")),
+        (_t(lang, "cancel"), manage_link(public_url, booking, "cancel")),
     ]
     return Email(
         to=booking.customer.email,
-        subject=f"Reminder: {_when(booking)} · {studio.name}",
-        text=_text_body(intro, booking, links, footer),
-        html=_html_page("See you soon", intro, booking, links, footer),
+        subject=_t(lang, "reminder_subject", when=_when(booking), studio=studio.name),
+        text=_text_body(intro, booking, links, _studio_line(studio)),
+        html=_html_page(_t(lang, "reminder_heading"), intro, booking, links, _studio_line(studio)),
         reply_to=studio.email,
     )
 
 
 def receipt_email(booking, studio, public_url: str) -> Email:
-    intro = (f"Hello {booking.customer.first_name}, thank you for your visit to {studio.name}. "
-             f"Here is your receipt {booking.receipt_number}.")
-    footer = f"Paid at the studio. {studio.name} · {studio.address} · {studio.phone}"
-    links = [("View or print your receipt",
-              f"{public_url}/receipt.html?token={booking.manage_token}")]
+    lang = booking.language
+    number = booking.receipt_number
+    intro = _t(lang, "receipt_intro", hello=_hello(lang, booking.customer), studio=studio.name,
+               number=number)
+    footer = f"{_t(lang, 'paid')} {_studio_line(studio)}"
+    links = [(_t(lang, "receipt_link"), f"{public_url}/receipt.html?token={booking.manage_token}")]
     return Email(
         to=booking.customer.email,
-        subject=f"Receipt {booking.receipt_number} · {studio.name}",
-        text=_text_body(intro, booking, links, footer),
-        html=_html_page(f"Receipt {booking.receipt_number}", intro, booking, links, footer),
-        reply_to=studio.email,
-    )
-
-
-def waitlist_offer_email(entry, studio, public_url: str, when: str, therapist_name: str,
-                         minutes: int) -> Email:
-    """A freed slot for someone on the waitlist; first come, valid for a short time."""
-    expires = entry.offer_expires_at.astimezone(BERLIN).strftime("%H:%M")
-    link = f"{public_url}/offer.html?token={entry.offer_token}"
-    intro = (f"Hello {entry.customer.first_name}, a time you were waiting for at {studio.name} "
-             f"is free: {when} with {therapist_name} ({minutes} min).")
-    detail = f"Claim it before {expires}. After that it goes to the next person on the waitlist."
-    footer = f"{studio.name} · {studio.address} · {studio.phone}"
-    esc = html.escape
-    return Email(
-        to=entry.customer.email,
-        subject=f"A time is free: {when} · {studio.name}",
-        text=f"{intro}\n\n{detail}\n\nClaim this time: {link}\n\n{footer}",
-        html=(
-            '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
-            'max-width:520px;color:#1d2a24">'
-            f'<h2 style="color:#1F8756">A time is free for you</h2><p>{esc(intro)}</p>'
-            f"<p><strong>{esc(detail)}</strong></p>"
-            f'<p><a href="{esc(link)}" style="display:inline-block;padding:10px 16px;'
-            f'border-radius:8px;background:#1F8756;color:#fff;text-decoration:none;'
-            f'font-weight:600">Claim this time</a></p>'
-            f'<p style="color:#5d6b64;font-size:14px">{esc(footer)}</p></div>'
-        ),
-        reply_to=studio.email,
-    )
-
-
-def waitlist_joined_email(entry, position: int, studio, already: bool) -> Email:
-    """Sent to the address that joined, so only its owner learns the queue position."""
-    day = entry.preferred_date.strftime("%A %-d %B")
-    window = f"{entry.earliest_time:%H:%M}–{entry.latest_time:%H:%M}"
-    if already:
-        intro = (f"Hello {entry.customer.first_name}, you are already on the waitlist at "
-                 f"{studio.name} for {day} ({window}), number {position}.")
-    else:
-        intro = (f"Hello {entry.customer.first_name}, you are on the waitlist at {studio.name} "
-                 f"for {day} ({window}), number {position}.")
-    detail = ("If a time frees up, we'll email you a link to claim it; the first person to "
-              "claim gets it. If you didn't ask for this, ignore this email or call us.")
-    footer = f"{studio.name} · {studio.address} · {studio.phone}"
-    esc = html.escape
-    return Email(
-        to=entry.customer.email,
-        subject=f"Waitlist for {day} · {studio.name}",
-        text=f"{intro}\n\n{detail}\n\n{footer}",
-        html=(
-            '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
-            f'max-width:520px;color:#1d2a24"><h2 style="color:#1F8756">You\'re on the '
-            f"waitlist</h2><p>{esc(intro)}</p><p>{esc(detail)}</p>"
-            f'<p style="color:#5d6b64;font-size:14px">{esc(footer)}</p></div>'
-        ),
-        reply_to=studio.email,
-    )
-
-
-def waitlist_limit_email(customer, day, studio, limit: int) -> Email:
-    """A join that changed nothing must not fail silently: tell the address owner."""
-    when = day.strftime("%A %-d %B")
-    intro = (f"Hello {customer.first_name}, we could not add you to the waitlist at "
-             f"{studio.name} for {when}: this email address already has {limit} open "
-             "waitlist requests.")
-    detail = (f"Please call us on {studio.phone} if you want to change them. If you didn't "
-              "ask for any of this, someone may have used your address; call us and we'll "
-              "remove the requests.")
-    footer = f"{studio.name} · {studio.address} · {studio.phone}"
-    esc = html.escape
-    return Email(
-        to=customer.email,
-        subject=f"Waitlist request for {when} · {studio.name}",
-        text=f"{intro}\n\n{detail}\n\n{footer}",
-        html=(
-            '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
-            f'max-width:520px;color:#1d2a24"><p>{esc(intro)}</p><p>{esc(detail)}</p>'
-            f'<p style="color:#5d6b64;font-size:14px">{esc(footer)}</p></div>'
-        ),
+        subject=_t(lang, "receipt_subject", number=number, studio=studio.name),
+        text=_text_body(intro, booking, links, footer, paid=True),
+        html=_html_page(_t(lang, "receipt_heading", number=number), intro, booking, links, footer,
+                        paid=True),
         reply_to=studio.email,
     )
 
 
 def booking_verification_email(booking, studio, public_url: str, hold_until) -> Email:
     """First email after an online booking: only a click proves the address is theirs."""
-    until = hold_until.astimezone(BERLIN).strftime("%H:%M")
-    intro = (f"Hello {booking.customer.first_name}, please confirm your booking at "
-             f"{studio.name}. We're holding the time for you until {until}.")
-    footer = (f"If you didn't make this booking, ignore this email and the time will be "
-              f"released. {studio.name} · {studio.address} · {studio.phone}")
-    links = [("Confirm my booking", manage_link(public_url, booking, "verify"))]
+    lang = booking.language
+    until = i18n.clock_time(hold_until.astimezone(BERLIN), lang)
+    intro = _t(lang, "verify_intro", hello=_hello(lang, booking.customer), studio=studio.name,
+               until=until)
+    footer = f"{_t(lang, 'verify_footer')} {_studio_line(studio)}"
+    links = [(_t(lang, "verify_link"), manage_link(public_url, booking, "verify"))]
     return Email(
         to=booking.customer.email,
-        subject=f"Please confirm your booking: {_when(booking)} · {studio.name}",
+        subject=_t(lang, "verify_subject", when=_when(booking), studio=studio.name),
         text=_text_body(intro, booking, links, footer),
-        html=_html_page("One more step", intro, booking, links, footer),
+        html=_html_page(_t(lang, "verify_heading"), intro, booking, links, footer),
         reply_to=studio.email,
     )
 
 
+def waitlist_offer_email(entry, studio, public_url: str, start_local, therapist_name: str,
+                         minutes: int) -> Email:
+    """A freed slot for someone on the waitlist; first come, valid for a short time."""
+    lang = entry.language
+    when = i18n.short_when(start_local, lang)
+    expires = i18n.clock_time(entry.offer_expires_at.astimezone(BERLIN), lang)
+    unit = "Min." if lang == "de" else "min"
+    intro = _t(lang, "offer_intro", hello=_hello(lang, entry.customer), studio=studio.name,
+               when=when, therapist=therapist_name, minutes=minutes).replace(
+                   f"({minutes} min)", f"({minutes} {unit})")
+    return _simple(
+        entry.customer.email, _t(lang, "offer_subject", when=when, studio=studio.name),
+        _t(lang, "offer_heading"), [intro, _t(lang, "offer_detail", expires=expires)],
+        _studio_line(studio), studio.email,
+        button=(_t(lang, "offer_link"), f"{public_url}/offer.html?token={entry.offer_token}"),
+    )
+
+
+def _window(entry) -> str:
+    return f"{entry.earliest_time:%H:%M}–{entry.latest_time:%H:%M}"
+
+
+def waitlist_joined_email(entry, position: int, studio, already: bool) -> Email:
+    """Sent to the address that joined, so only its owner learns the queue position."""
+    lang = entry.language
+    day = i18n.day_month(entry.preferred_date, lang)
+    intro = _t(lang, "already_intro" if already else "joined_intro",
+               hello=_hello(lang, entry.customer), studio=studio.name, day=day,
+               window=_window(entry), position=position)
+    return _simple(entry.customer.email, _t(lang, "joined_subject", day=day, studio=studio.name),
+                   _t(lang, "joined_heading"), [intro, _t(lang, "joined_detail")],
+                   _studio_line(studio), studio.email)
+
+
+def waitlist_limit_email(customer, day, studio, limit: int, lang: str = "en") -> Email:
+    """A join that changed nothing must not fail silently: tell the address owner."""
+    when = i18n.day_month(day, lang)
+    intro = _t(lang, "limit_intro", hello=_hello(lang, customer), studio=studio.name, day=when,
+               limit=limit)
+    return _simple(customer.email, _t(lang, "limit_subject", day=when, studio=studio.name), None,
+                   [intro, _t(lang, "limit_detail", phone=studio.phone)], _studio_line(studio),
+                   studio.email)
+
+
 def waitlist_confirm_email(entry, studio, public_url: str) -> Email:
     """Double opt-in: the entry only counts once the address owner clicks."""
-    day = entry.preferred_date.strftime("%A %-d %B")
-    window = f"{entry.earliest_time:%H:%M}–{entry.latest_time:%H:%M}"
-    link = f"{public_url}/waitlist-confirm.html?token={entry.confirm_token}"
-    intro = (f"Hello {entry.customer.first_name}, please confirm that you want to join the "
-             f"waitlist at {studio.name} for {day} ({window}).")
-    detail = ("The request counts once you confirm, and expires after 24 hours. If you "
-              "didn't ask for this, ignore this email.")
-    footer = f"{studio.name} · {studio.address} · {studio.phone}"
-    esc = html.escape
-    return Email(
-        to=entry.customer.email,
-        subject=f"Please confirm: waitlist for {day} · {studio.name}",
-        text=f"{intro}\n\n{detail}\n\nConfirm: {link}\n\n{footer}",
-        html=(
-            '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
-            f'max-width:520px;color:#1d2a24"><h2 style="color:#1F8756">One more step</h2>'
-            f"<p>{esc(intro)}</p><p>{esc(detail)}</p>"
-            f'<p><a href="{esc(link)}" style="display:inline-block;padding:10px 16px;'
-            f'border-radius:8px;background:#1F8756;color:#fff;text-decoration:none;'
-            f'font-weight:600">Confirm my waitlist request</a></p>'
-            f'<p style="color:#5d6b64;font-size:14px">{esc(footer)}</p></div>'
-        ),
-        reply_to=studio.email,
+    lang = entry.language
+    day = i18n.day_month(entry.preferred_date, lang)
+    intro = _t(lang, "wl_confirm_intro", hello=_hello(lang, entry.customer), studio=studio.name,
+               day=day, window=_window(entry))
+    return _simple(
+        entry.customer.email, _t(lang, "wl_confirm_subject", day=day, studio=studio.name),
+        _t(lang, "verify_heading"), [intro, _t(lang, "wl_confirm_detail")],
+        _studio_line(studio), studio.email,
+        button=(_t(lang, "wl_confirm_link"),
+                f"{public_url}/waitlist-confirm.html?token={entry.confirm_token}"),
     )

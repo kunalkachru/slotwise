@@ -165,6 +165,7 @@ def create_booking(
     therapist_id: int | None,
     details: CustomerDetails,
     source: str = "online",
+    language: str = "en",
 ) -> Booking:
     # Owner phone bookings and claimed waitlist offers skip the notice period, so a
     # late cancellation can still be refilled [decision].
@@ -193,7 +194,7 @@ def create_booking(
         counts = bookings_per_therapist(db, [t.id for t in free_now], day)
         therapist = pick_therapist(free_now, counts)
 
-        items = selection.snapshot_items()
+        items = selection.snapshot_items(language)
         end_at = start_at + timedelta(minutes=selection.total_minutes)
         booking = Booking(
             customer=find_or_create_customer(db, details),
@@ -208,6 +209,7 @@ def create_booking(
             source=source,
             manage_token=new_token(),
             customer_note=details.note,
+            language=language,
             items=items,
         )
         db.add(booking)

@@ -56,10 +56,11 @@ function render() {
 }
 
 function editTherapist(therapist) {
-  const t = therapist || { display_name: "", short_bio: "", active: true, service_ids: [] };
+  const t = therapist || { display_name: "", short_bio: "", short_bio_de: "", active: true, service_ids: [] };
   openEditor(therapist ? `Edit ${t.display_name}` : "Add therapist", [
     field("display_name", "Name", h("input", { value: t.display_name, required: true, maxlength: "80" })),
     field("short_bio", "Short bio", h("textarea", { maxlength: "500" }, t.short_bio || "")),
+    field("short_bio_de", "Short bio (German)", h("textarea", { maxlength: "500" }, t.short_bio_de || ""), "Leave empty to use the English bio."),
     h("div", { class: "field" }, h("label", {}, "Services offered"),
       services.map((s) => h("label", { class: "check" },
         h("input", { type: "checkbox", name: "service", value: s.id, checked: t.service_ids.includes(s.id) }),
@@ -67,7 +68,8 @@ function editTherapist(therapist) {
     h("label", { class: "check" }, h("input", { type: "checkbox", name: "active", checked: t.active }), "Active (can be booked)"),
   ], async (form) => {
     const body = {
-      display_name: form.display_name.value, short_bio: form.short_bio.value || null, active: form.active.checked,
+      display_name: form.display_name.value, short_bio: form.short_bio.value || null,
+      short_bio_de: form.short_bio_de.value || null, active: form.active.checked,
       service_ids: [...form.querySelectorAll("input[name=service]:checked")].map((i) => Number(i.value)),
     };
     await ownerApi(therapist ? `/owner/therapists/${therapist.id}` : "/owner/therapists", { method: therapist ? "PUT" : "POST", body });

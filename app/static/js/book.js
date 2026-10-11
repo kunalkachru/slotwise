@@ -1,4 +1,5 @@
-import { api, fill, ApiError, formatEuro, h } from "/js/api.js";
+import { api, fill, ApiError, formatEuro, formatMinutes, h } from "/js/api.js";
+import { locale, t } from "/js/i18n.js";
 
 // ---------- State ----------
 const state = {
@@ -17,9 +18,9 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const BERLIN = "Europe/Berlin";
 const isoDay = new Intl.DateTimeFormat("en-CA", { timeZone: BERLIN }); // YYYY-MM-DD
-const dayName = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "UTC" });
-const dayNumber = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-const longDate = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+const dayName = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
+const dayNumber = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", timeZone: "UTC" });
+const longDate = new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 
 const cents = (amount) => Math.round(Number(amount) * 100);
 const euros = (c) => formatEuro((c / 100).toFixed(2));
@@ -37,7 +38,7 @@ function renderServices(menu) {
   const target = $("services");
   fill(target, 
     ...menu.flatMap((category) => [
-      h("p", { class: "choice-group-title" }, category.name),
+      h("p", { class: "choice-group-title" }, category.label || category.name),
       ...category.services.map((service) =>
         h("label", { class: "choice" },
           h("input", {
@@ -46,7 +47,7 @@ function renderServices(menu) {
             onchange: (e) => toggleService(service.id, e.target.checked),
           }),
           h("span", {}, h("span", { class: "choice-name" }, service.name)),
-          h("span", { class: "choice-meta" }, formatEuro(service.price), h("small", {}, `${service.duration_minutes} min`)),
+          h("span", { class: "choice-meta" }, formatEuro(service.price), h("small", {}, formatMinutes(service.duration_minutes))),
         ),
       ),
     ]),
@@ -89,9 +90,9 @@ function renderAddOns() {
         }),
         h("span", {},
           h("span", { class: "choice-name" }, addOn.name),
-          available.length > 1 && state.selectedServices.length > 1 && h("small", { class: "muted" }, ` · with ${addOn.serviceName}`),
+          available.length > 1 && state.selectedServices.length > 1 && h("small", { class: "muted" }, t("book.with_service", { service: addOn.serviceName })),
         ),
-        h("span", { class: "choice-meta" }, `+${formatEuro(addOn.price)}`, h("small", {}, addOn.extra_minutes ? `+${addOn.extra_minutes} min` : "no extra time")),
+        h("span", { class: "choice-meta" }, `+${formatEuro(addOn.price)}`, h("small", {}, addOn.extra_minutes ? `+${formatMinutes(addOn.extra_minutes)}` : t("book.no_extra_time"))),
       ),
     ),
   );
@@ -119,7 +120,7 @@ async function loadTherapists() {
 
 function renderTherapists() {
   const options = state.therapists.length > 1
-    ? [{ id: null, display_name: "No preference" }, ...state.therapists]
+    ? [{ id: null, display_name: t("book.no_preference") }, ...state.therapists]
     : state.therapists;
   fill($("therapists"), 
     ...options.map((t) =>
@@ -159,8 +160,8 @@ function renderDays() {
 }
 
 function i18nDay(day, today) {
-  if (day === today) return "Today";
-  if (day === addDays(today, 1)) return "Tomorrow";
+  if (day === today) return t("book.today");
+  if (day === addDays(today, 1)) return t("book.tomorrow");
   return dayName.format(asDate(day));
 }
 
@@ -176,11 +177,11 @@ function selectDate(day) {
 async function loadTimes() {
   const target = $("times");
   if (!state.date || state.selectedServices.length === 0 || state.therapists.length === 0) {
-    fill(target, h("p", { class: "notice" }, state.date ? "" : "Pick a day to see free times."));
+    fill(target, h("p", { class: "notice" }, state.date ? "" : t("book.pick_day")));
     return;
   }
   const request = ++state.timesRequest; // ignore answers to outdated requests
-  fill(target, h("p", { class: "notice" }, "Looking for free times…"));
+  fill(target, h("p", { class: "notice" }, t("book.looking")));
   const params = new URLSearchParams({
     date: state.date,
     service_ids: state.selectedServices.join(","),
@@ -201,7 +202,7 @@ function renderTimes(slots) {
   const target = $("times");
   if (slots.length === 0) {
     fill(target,
-      h("p", { class: "notice" }, "No free times on this day. Try another day, or join the waitlist below."),
+      h("p", { class: "notice" }, t("book.no_times")),
       waitlistBox());
     return;
   }
@@ -234,8 +235,8 @@ function timeOptions(selected) {
 }
 
 function waitlistBox() {
-  const earliest = h("select", { id: "wl-earliest", "aria-label": "Earliest start" }, timeOptions("09:00"));
-  const latest = h("select", { id: "wl-latest", "aria-label": "Latest start" }, timeOptions("18:00"));
+  const earliest = h("select", { id: "wl-earliest", "aria-label": t("wl.earliest") }, timeOptions("09:00"));
+  const latest = h("select", { id: "wl-latest", "aria-label": t("wl.latest") }, timeOptions("18:00"));
   const message = h("p", { role: "status" });
   const join = async (event) => {
     const button = event.currentTarget;
@@ -246,7 +247,7 @@ function waitlistBox() {
     if (!form.first_name.value || !form.email.value || !form.phone.value) {
       $("details-step").scrollIntoView({ behavior: "smooth" });
       message.className = "field-error";
-      message.textContent = "Please fill in your details below first.";
+      message.textContent = t("wl.fill_details");
       return;
     }
     button.disabled = true;
@@ -259,7 +260,7 @@ function waitlistBox() {
         email: form.email.value, phone: form.phone.value,
       } });
       message.className = "success-note";
-      message.textContent = `Almost done! We've emailed ${form.email.value.trim()} a link. Click it to confirm your place on the waitlist for this day.`;
+      message.textContent = t("wl.joined", { email: form.email.value.trim() });
     } catch (e) {
       const field = e instanceof ApiError && e.body?.fields?.[0]?.field;
       if (!(field && showFieldError(field, e.message))) {
@@ -270,11 +271,11 @@ function waitlistBox() {
     }
   };
   return h("div", { class: "waitlist-box" },
-    h("h3", {}, "Join the waitlist"),
-    h("p", { class: "step-hint" }, "Tell us when you could come. If someone cancels, the first person on the list gets an email and can claim the time."),
-    h("div", { class: "row" }, h("label", { for: "wl-earliest" }, "Between"), earliest, h("label", { for: "wl-latest" }, "and"), latest),
-    h("p", { class: "field-hint" }, "Uses your details from step 6."),
-    h("button", { class: "btn", type: "button", onclick: join }, "Join the waitlist"),
+    h("h3", {}, t("wl.title")),
+    h("p", { class: "step-hint" }, t("wl.hint")),
+    h("div", { class: "row" }, h("label", { for: "wl-earliest" }, t("wl.between")), earliest, h("label", { for: "wl-latest" }, t("wl.and")), latest),
+    h("p", { class: "field-hint" }, t("wl.uses_details")),
+    h("button", { class: "btn", type: "button", onclick: join }, t("wl.join")),
     message,
   );
 }
@@ -297,15 +298,15 @@ function renderSummary() {
   const minutes = lines.reduce((sum, l) => sum + l.minutes, 0);
   const total = lines.reduce((sum, l) => sum + l.price, 0);
   const when = $("summary-when");
-  if (lines.length === 0) when.textContent = "Choose a treatment to start.";
-  else if (state.slot) when.textContent = `${longDate.format(asDate(state.date))} at ${state.slot.time} with ${state.slot.therapist_name}`;
-  else if (state.date) when.textContent = `${longDate.format(asDate(state.date))}, pick a time`;
-  else when.textContent = "Pick a day and time";
+  if (lines.length === 0) when.textContent = t("book.start");
+  else if (state.slot) when.textContent = t("book.when", { date: longDate.format(asDate(state.date)), time: state.slot.time, therapist: state.slot.therapist_name });
+  else if (state.date) when.textContent = t("book.pick_time", { date: longDate.format(asDate(state.date)) });
+  else when.textContent = t("book.pick_day_time");
 
   fill($("summary-lines"), 
     ...lines.map((l) => h("tr", {}, h("td", { class: l.addOn ? "sub" : "" }, l.addOn ? `+ ${l.name}` : l.name), h("td", {}, euros(l.price)))),
-    lines.length > 0 && h("tr", {}, h("td", { class: "sub" }, "Total time"), h("td", { class: "sub" }, `${minutes} min`)),
-    lines.length > 0 && h("tr", { class: "total" }, h("td", {}, "Total"), h("td", {}, euros(total))),
+    lines.length > 0 && h("tr", {}, h("td", { class: "sub" }, t("common.total_time")), h("td", { class: "sub" }, formatMinutes(minutes))),
+    lines.length > 0 && h("tr", { class: "total" }, h("td", {}, t("common.total")), h("td", {}, euros(total))),
   );
   $("confirm").disabled = !(lines.length && state.slot);
 }
@@ -347,7 +348,7 @@ async function confirmBooking(event) {
   };
   const button = $("confirm");
   button.disabled = true;
-  button.textContent = "Booking…";
+  button.textContent = t("book.booking");
   try {
     const booking = await api("/public/bookings", { method: "POST", body });
     try {
@@ -368,7 +369,7 @@ async function confirmBooking(event) {
       loadTimes();
     }
   } finally {
-    button.textContent = "Confirm booking";
+    button.textContent = t("book.confirm");
     renderSummary();
   }
 }
@@ -380,7 +381,7 @@ async function init() {
   api("/public/studio").then((studio) => {
     state.windowDays = studio.booking_window_days;
     document.querySelectorAll("[data-studio-name]").forEach((el) => (el.textContent = studio.name));
-    document.title = `Book · ${studio.name}`;
+    document.title = `${t("book.title")} · ${studio.name}`;
     renderDays();
   }).catch(() => renderDays());
 
@@ -398,7 +399,7 @@ async function init() {
     if (state.selectedServices.length) toggleService(state.selectedServices[0], true);
     renderSummary();
   } catch {
-    fill($("services"), h("p", { class: "field-error" }, "Could not load services."));
+    fill($("services"), h("p", { class: "field-error" }, t("book.services_error")));
   }
 }
 

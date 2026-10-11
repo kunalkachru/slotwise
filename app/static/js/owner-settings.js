@@ -19,7 +19,9 @@ function render(s) {
         text("phone", "Phone", s.phone, { type: "tel", required: true, maxlength: "40" }),
         text("email", "Email (reply-to)", s.email, { type: "email", required: true, maxlength: "255" })),
       text("opening_hours_text", "Opening hours (as shown on the home page)", s.opening_hours_text, { maxlength: "255" },
-        "Separate parts with ' · ', e.g. Mon 10:00–19:00 · Sat 9:00–17:00 · Sun closed. Bookable times come from Therapists & hours.")),
+        "Separate parts with ' · ', e.g. Mon 10:00–19:00 · Sat 9:00–17:00 · Sun closed. Bookable times come from Therapists & hours."),
+      text("opening_hours_text_de", "Opening hours (German)", s.opening_hours_text_de, { maxlength: "255" },
+        "e.g. Mo 10–19 Uhr · Sa 9–17 Uhr · So geschlossen. Leave empty to use the English text.")),
     h("fieldset", {},
       h("legend", {}, "Booking rules"),
       h("p", { class: "lead" }, "Apply from now on. Existing bookings keep their times and prices."),
@@ -44,6 +46,7 @@ function render(s) {
       const saved = await ownerApi("/owner/studio", { method: "PUT", body: {
         name: value("name"), address: value("address"), phone: value("phone"), email: value("email"),
         opening_hours_text: value("opening_hours_text"),
+        opening_hours_text_de: value("opening_hours_text_de") || null,
         min_notice_hours: Number(value("min_notice_hours")), booking_window_days: Number(value("booking_window_days")),
         free_cancellation_hours: Number(value("free_cancellation_hours")), waitlist_offer_minutes: Number(value("waitlist_offer_minutes")),
         receipt_prefix: value("receipt_prefix"),

@@ -42,6 +42,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="Slotwise", lifespan=lifespan, docs_url="/api/docs", redoc_url=None)
     install_error_handlers(app)
+
+    @app.middleware("http")
+    async def revalidate_static_files(request, call_next):
+        """Pages, scripts and styles must never be served stale from a browser cache
+        after a deploy (old api.js + new pages = broken). `no-cache` still lets the
+        browser keep them, but it checks the ETag first (a cheap 304)."""
+        response = await call_next(request)
+        if request.url.path.endswith((".html", ".js", ".css", "/")):
+            response.headers.setdefault("Cache-Control", "no-cache")
+        return response
     for module in (health, public, auth, owner, internal):
         app.include_router(module.router)
     # Mounted last so API routes win; html=True serves index.html for "/".
