@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Slice 1 is built: health, public menu, owner login, seed, Dockerfile and CI. `PLAN.md` holds the agreed folder structure, data model and six slices. Where PLAN.md makes a decision (marked **[decision]**, or recorded in its "Resolved questions" section), it takes precedence over the blueprint.
+All six slices from `PLAN.md` are built and deployed. `PLAN.md` holds the agreed folder structure, data model and six slices. Where PLAN.md makes a decision (marked **[decision]**, or recorded in its "Resolved questions" section), it takes precedence over the blueprint.
 
 The requirements themselves come from `doc/slotwise-blueprint-final.json`, a filled-in requirements form. Under `answers.*` it holds the business rules, error messages, database tables and build constraints; under `derived.api_endpoints` it holds every endpoint with its caller, request, response and errors. Read the relevant part before building a feature. When the code and the blueprint disagree, ask before changing either one.
 

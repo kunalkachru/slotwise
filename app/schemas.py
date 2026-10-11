@@ -64,9 +64,37 @@ class OwnerOut(ORMModel):
     email: str
 
 
+class WeekOut(BaseModel):
+    week_start: date
+    no_shows: int
+    late_cancellations: int
+
+
+class DashboardAppointmentOut(BaseModel):
+    id: int
+    time: str
+    customer_name: str
+    repeat_no_show: bool
+    therapist_name: str
+    services: list[str]
+    total_price: MoneyStr
+    status: str
+
+
 class DashboardOut(BaseModel):
     date: str
     owner_name: str
+    window_start: date | None = None
+    today_bookings: int = 0
+    expected_revenue_today: MoneyStr = Decimal(0)
+    confirmation_rate_today: float | None = None
+    no_show_rate: float | None = None
+    refill_rate: float | None = None
+    revenue_recovered: MoneyStr = Decimal(0)
+    online_share: float | None = None
+    targets: dict[str, float] = Field(default_factory=dict)
+    weeks: list[WeekOut] = Field(default_factory=list)
+    appointments: list[DashboardAppointmentOut] = Field(default_factory=list)
 
 
 # ---------- Slice 2: availability and booking ----------
