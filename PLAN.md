@@ -321,16 +321,52 @@ There are no open questions.
 2. **"No preference" therapist:** the fewest bookings that day, and on a tie the lower therapist id. See section 3; tested in slice 2.
 3. **Seed in production:** demo data only when `SEED_DEMO_DATA=true` and the studio table is empty. Seeded customers use `@example.com` emails. See section 3; tested in slice 1.
 
-## 6. Nice to have (not version 1)
+## 6. To-do list (after version 1)
 
-From the blueprint, plus customer deletion:
-- deleting a customer on request (owner action, reusing `anonymize_customer()`)
-- deposits or no-show fees through Stripe for new customers
-- SMS or WhatsApp reminders
-- therapist logins to see their own schedule
-- Google Calendar sync
-- gift vouchers and packages
-- reviews after a visit
-- German and English
-- several studios on one platform
-- group classes with a capacity
+Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items are in priority order within each group.
+
+### Next up (agreed order)
+1. **Adopt Alembic for database migrations.** This is the foundation for items 2 and 3. Right now tables are only created (`create_all`), never changed, so any change to an existing table needs this.
+   - **Enable once:**
+     1. Add `alembic` to `requirements.txt`, then run `alembic init migrations`.
+     2. In `migrations/env.py`, use `Settings.from_env().database_url` and `Base.metadata`, with `render_as_batch=True` so SQLite works too.
+     3. Generate the baseline: `alembic revision --autogenerate -m "baseline"`.
+     4. **Stamp** the live Neon database instead of re-running the baseline: `DATABASE_URL=<neon> alembic stamp head`. Alternatively, the app stamps the baseline at startup when the tables exist but `alembic_version` doesn't.
+     5. Replace `create_all` at startup with `alembic upgrade head` (Dockerfile or lifespan), so every deploy migrates before the new code runs.
+   - **Use for every schema change:**
+     1. Change `app/models.py`.
+     2. Run `alembic revision --autogenerate -m "…"`.
+     3. **Read the file.** CHECK-constraint changes, such as allowed statuses, aren't detected and must be written by hand.
+     4. Run `alembic upgrade head` locally (`alembic downgrade -1` to undo).
+     5. Commit, then PR, CI, merge, deploy. Deployed migrations are never edited; add a new one instead.
+   - A ready brief exists as the session card "Adopt Alembic and add waitlist double opt-in".
+2. **Email confirmation instead of customer passwords** (the "someone else's email" problem). This is chosen over customer login accounts **[decision]**: accounts add friction (against the ≥ 60 % online goal), plus password storage and reset flows.
+   - **Bookings:** a new booking is held as "pending" for about 30 minutes, and only a click on "Confirm your booking" in the email makes it count.
+   - **Waitlist double opt-in:** entries only count once confirmed. This closes the accepted risk in slice 5.
+   - Needs new statuses, so it waits for item 1.
+3. **German translation (DE / EN).**
+   - All page texts in a German and an English word list, with a DE/EN switch in the top bar. Default to German for German browsers. German dates and prices ("Montag, 12. Oktober", "70,00 €").
+   - The server returns error codes, and the page shows the text in the chosen language.
+   - Emails go out in the customer's language. That needs a `language` column on customers, so it waits for item 1.
+   - Decide whether the owner area is translated too, and whether services get a German name and description field.
+
+### Open setup tasks (owner)
+- [ ] **X-Forwarded-For check** (slice 1 setup): make one failed login with `X-Forwarded-For: 1.2.3.4`. The Render log line "Failed owner login from …" must show your own public IP.
+- [ ] **Own domain for email:** buy a domain, verify it in Resend (EU region, DNS records), then set `EMAIL_FROM` in Render (Save and deploy). Until then emails only reach the Resend account address.
+- [ ] **Real studio details:** replace the demo name, address, phone and the fake reply-to `hello@isar-wellness.example.com` on the **Studio settings** page.
+
+### Smaller improvements
+- **Lunch breaks in the weekly-hours form:** more than one time block per day. The API already supports it; the form edits one block.
+- **"My bookings" by email:** a customer enters their email and gets a link listing all their bookings, a password-free login. Fits with item 2.
+- **Remember a confirmed device** for a while, so regular customers don't have to confirm every booking. Fits with item 2.
+- **Delete a customer on request:** an owner action reusing `anonymize_customer()`.
+
+### Later (from the blueprint)
+- Deposits or no-show fees through Stripe for new customers. This would do the most against no-shows.
+- SMS or WhatsApp reminders (paid per message).
+- Therapist logins to see their own schedule.
+- Google Calendar sync.
+- Gift vouchers and packages (e.g. 5 massages).
+- Reviews after a visit.
+- Several studios on one platform.
+- Group classes with a capacity.
