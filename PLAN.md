@@ -349,7 +349,7 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
     - Phone and waitlist bookings need no click.
     - The booking API response no longer contains the manage token (it only travels by email).
     - Waitlist requests are `pending` until confirmed (24 h) and don't count toward the cap or get offers.
-3. **German translation (DE / EN).**
+3. ✅ **Done (PR `feature-german`, migration `0003`): German translation (DE / EN).** Customer pages, server messages and all emails are in German/English; the language is stored per booking and waitlist entry. The menu, bios and opening hours have German fields (owner-editable; English fallback). Static files now send `Cache-Control: no-cache` so deploys never mix old and new scripts. Still English: the owner area (see Smaller improvements).
    - All page texts in a German and an English word list, with a DE/EN switch in the top bar. Default to German for German browsers. German dates and prices ("Montag, 12. Oktober", "70,00 €").
    - The server returns error codes, and the page shows the text in the chosen language.
    - Emails go out in the customer's language. That needs a `language` column on customers, so it waits for item 1.
@@ -361,6 +361,7 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
 - [ ] **Real studio details:** replace the demo name, address, phone and the fake reply-to `hello@isar-wellness.example.com` on the **Studio settings** page.
 
 ### Smaller improvements
+- **Owner area in German:** the customer side is translated; the owner pages are still English.
 - **Lunch breaks in the weekly-hours form:** more than one time block per day. The API already supports it; the form edits one block.
 - **"My bookings" by email:** a customer enters their email and gets a link listing all their bookings, a password-free login. Fits with item 2.
 - **Remember a confirmed device** for a while, so regular customers don't have to confirm every booking. Fits with item 2.

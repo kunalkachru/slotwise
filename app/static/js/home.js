@@ -1,9 +1,10 @@
 import { api, fill, formatEuro, formatMinutes, h } from "/js/api.js";
+import { t } from "/js/i18n.js";
 
 async function loadStudio() {
   try {
     const studio = await api("/public/studio");
-    document.title = `${studio.name} · Book online`;
+    document.title = `${studio.name} · ${t("home.title")}`;
     document.querySelectorAll("[data-studio-name]").forEach((el) => (el.textContent = studio.name));
     document.getElementById("studio-address").textContent = studio.address;
     const phone = document.getElementById("studio-phone");
@@ -14,10 +15,10 @@ async function loadStudio() {
       ...studio.opening_hours_text.split(" · ").map((part) => h("span", { class: "hours-part" }, part)),
     );
     const policy = document.getElementById("studio-policy");
-    policy.textContent = `Free cancellation up to ${studio.free_cancellation_hours} hours before`;
+    policy.textContent = t("home.policy", { hours: studio.free_cancellation_hours });
     policy.hidden = false;
   } catch {
-    document.querySelector("h1[data-studio-name]").textContent = "Book online";
+    document.querySelector("h1[data-studio-name]").textContent = t("home.title");
   }
 }
 
@@ -31,17 +32,17 @@ function serviceRow(service) {
       h("div", { class: "service-price" }, formatEuro(service.price)),
       h("div", { class: "service-duration" }, formatMinutes(service.duration_minutes)),
     ),
-    service.add_ons.length > 0 && h("ul", { class: "service-addons", "aria-label": "Add-ons" },
+    service.add_ons.length > 0 && h("ul", { class: "service-addons", "aria-label": t("home.addons") },
       service.add_ons.map((a) =>
-        h("li", {}, `+ ${a.name}`, a.extra_minutes ? ` · +${a.extra_minutes} min` : "", ` · ${formatEuro(a.price)}`),
+        h("li", {}, `+ ${a.name}`, a.extra_minutes ? ` · +${formatMinutes(a.extra_minutes)}` : "", ` · ${formatEuro(a.price)}`),
       ),
     ),
     h("div", { class: "service-actions" },
       h("a", {
         class: "btn btn-ghost btn-small",
         href: `/book.html?service=${encodeURIComponent(service.id)}`,
-        "aria-label": `Book ${service.name}`,
-      }, "Book"),
+        "aria-label": t("home.book_aria", { name: service.name }),
+      }, t("home.book")),
     ),
   );
 }
@@ -51,19 +52,19 @@ async function loadMenu() {
   try {
     const categories = await api("/public/services");
     if (categories.length === 0) {
-      fill(target, h("p", { class: "state" }, "The menu is being prepared. Please call us to book."));
+      fill(target, h("p", { class: "state" }, t("home.menu_empty")));
       return;
     }
     fill(target, 
       ...categories.map((category) =>
         h("section", { class: "menu-category", "aria-label": category.name },
-          h("h2", {}, category.name),
+          h("h2", {}, category.label || category.name),
           category.services.map(serviceRow),
         ),
       ),
     );
   } catch {
-    fill(target, h("p", { class: "state" }, "Could not load the menu. Please refresh."));
+    fill(target, h("p", { class: "state" }, t("home.menu_error")));
   }
 }
 

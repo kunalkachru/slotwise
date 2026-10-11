@@ -15,6 +15,11 @@ from app.errors import (
 from app.models import AddOn, BookingItem, Service, Therapist
 
 
+def localized(english: str | None, german: str | None, lang: str) -> str | None:
+    """The German text when asked for and filled in; otherwise the English one."""
+    return german if lang == "de" and german else english
+
+
 @dataclass(frozen=True)
 class Selection:
     services: list[Service]
@@ -43,16 +48,19 @@ class Selection:
     def total_price(self) -> Decimal:
         return sum((i.unit_price_snapshot * i.quantity for i in self.snapshot_items()), Decimal(0))
 
-    def snapshot_items(self) -> list[BookingItem]:
-        """Booking lines that copy today's name, minutes and price (PLAN.md: price snapshot)."""
+    def snapshot_items(self, lang: str = "en") -> list[BookingItem]:
+        """Booking lines that copy today's name, minutes and price (PLAN.md: price snapshot).
+        Names are copied in the language the customer booked in (English fallback)."""
         items = [
-            BookingItem(item_type="service", service_id=s.id, name_snapshot=s.name,
+            BookingItem(item_type="service", service_id=s.id,
+                        name_snapshot=localized(s.name, s.name_de, lang),
                         minutes_snapshot=s.duration_minutes, unit_price_snapshot=s.price,
                         quantity=1)
             for s in self.services
         ]
         items += [
-            BookingItem(item_type="add_on", add_on_id=a.id, name_snapshot=a.name,
+            BookingItem(item_type="add_on", add_on_id=a.id,
+                        name_snapshot=localized(a.name, a.name_de, lang),
                         minutes_snapshot=a.extra_minutes, unit_price_snapshot=a.price,
                         quantity=1)
             for a in self.add_ons

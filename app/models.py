@@ -30,6 +30,7 @@ BOOKING_STATUSES = ("pending", "booked", "confirmed", "done", "no_show", "cancel
 BOOKING_SOURCES = ("online", "phone", "waitlist")
 ITEM_TYPES = ("service", "add_on", "extra")
 # pending: joined, waiting for the email confirmation (double opt-in)
+LANGUAGES = ("en", "de")
 WAITLIST_STATUSES = ("pending", "waiting", "offered", "booked", "expired", "removed")
 
 Money = Numeric(10, 2)
@@ -59,6 +60,7 @@ class Studio(Timestamped, Base):
     phone: Mapped[str] = mapped_column(String(40))
     email: Mapped[str] = mapped_column(String(255))
     opening_hours_text: Mapped[str] = mapped_column(String(255), default="")
+    opening_hours_text_de: Mapped[str | None] = mapped_column(String(255))
     min_notice_hours: Mapped[int] = mapped_column(default=2)
     free_cancellation_hours: Mapped[int] = mapped_column(default=24)
     booking_window_days: Mapped[int] = mapped_column(default=60)
@@ -89,6 +91,7 @@ class Therapist(Timestamped, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     display_name: Mapped[str] = mapped_column(String(80), unique=True)
     short_bio: Mapped[str | None] = mapped_column(Text)
+    short_bio_de: Mapped[str | None] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     services: Mapped[list["Service"]] = relationship(
@@ -115,6 +118,8 @@ class Service(Timestamped, Base):
     category: Mapped[str] = mapped_column(String(40))
     name: Mapped[str] = mapped_column(String(120), unique=True)
     description: Mapped[str | None] = mapped_column(Text)
+    name_de: Mapped[str | None] = mapped_column(String(120))
+    description_de: Mapped[str | None] = mapped_column(Text)
     duration_minutes: Mapped[int] = mapped_column(Integer)
     price: Mapped[Decimal] = mapped_column(Money)
     buffer_minutes: Mapped[int] = mapped_column(default=10)
@@ -138,6 +143,7 @@ class AddOn(Timestamped, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     service_id: Mapped[int] = mapped_column(ForeignKey("services.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(120))
+    name_de: Mapped[str | None] = mapped_column(String(120))
     extra_minutes: Mapped[int] = mapped_column(Integer)
     price: Mapped[Decimal] = mapped_column(Money)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -215,6 +221,8 @@ class Booking(Timestamped, Base):
     receipt_number: Mapped[str | None] = mapped_column(String(30), unique=True)
     receipt_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     customer_note: Mapped[str | None] = mapped_column(String(300))
+    # Language the customer booked in: emails about this booking use it.
+    language: Mapped[str] = mapped_column(String(2), default="en", server_default="en")
 
     customer: Mapped[Customer] = relationship(back_populates="bookings")
     therapist: Mapped[Therapist] = relationship()
@@ -264,5 +272,6 @@ class WaitlistEntry(Timestamped, Base):
     offer_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     offered_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"))
+    language: Mapped[str] = mapped_column(String(2), default="en", server_default="en")
 
     customer: Mapped[Customer] = relationship()

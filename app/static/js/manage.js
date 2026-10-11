@@ -1,4 +1,5 @@
-import { api, fill, formatEuro, h } from "/js/api.js";
+import { api, fill, formatEuro, formatMinutes, h } from "/js/api.js";
+import { locale, t } from "/js/i18n.js";
 
 const params = new URLSearchParams(location.search);
 const token = params.get("token") || "";
@@ -6,16 +7,13 @@ const action = params.get("action"); // "verify" (booking email) | "confirm" | "
 const target = document.getElementById("manage");
 
 const BERLIN = "Europe/Berlin";
-const longDate = new Intl.DateTimeFormat("en-GB", {
+const longDate = new Intl.DateTimeFormat(locale, {
   weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
 });
-const shortDateTime = new Intl.DateTimeFormat("en-GB", {
+const shortDateTime = new Intl.DateTimeFormat(locale, {
   weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: BERLIN,
 });
-const STATUS_LABELS = {
-  pending: "Awaiting your confirmation", expired: "Not confirmed",
-  booked: "Booked", confirmed: "Confirmed", done: "Completed", no_show: "Missed", cancelled: "Cancelled",
-};
+const statusLabel = (status) => t(`status.${status}`);
 
 let studio = null;
 let message = null; // { text, kind } shown above the booking after an action
@@ -25,9 +23,9 @@ const bookingUrl = () => `/public/bookings/${encodeURIComponent(token)}`;
 
 function showError(text) {
   fill(target, 
-    h("h1", {}, "Booking not found"),
+    h("h1", {}, t("manage.not_found")),
     h("p", { class: "muted" }, text),
-    h("a", { class: "btn btn-block", href: "/" }, "Back to home"),
+    h("a", { class: "btn btn-block", href: "/" }, t("nav.back_home")),
   );
 }
 
@@ -36,28 +34,28 @@ function render(booking) {
   const policy = booking.can_cancel
     ? h("p", { class: `policy-note${isLateNow ? " late" : ""}` },
         isLateNow
-          ? "Free cancellation has ended. You can still cancel, but it counts as a late cancellation."
-          : `Free cancellation until ${shortDateTime.format(new Date(booking.free_cancellation_until))}.`)
+          ? t("manage.late_policy")
+          : t("manage.free_until", { when: shortDateTime.format(new Date(booking.free_cancellation_until)) }))
     : null;
 
   const cancelBlock = booking.can_cancel && (askingToCancel
-    ? h("div", { class: "confirm-cancel", role: "group", "aria-label": "Confirm cancellation" },
-        h("p", {}, isLateNow ? "Are you sure? This counts as a late cancellation." : "Are you sure you want to cancel?"),
+    ? h("div", { class: "confirm-cancel", role: "group", "aria-label": t("manage.confirm_cancel") },
+        h("p", {}, t(isLateNow ? "manage.sure_late" : "manage.sure")),
         h("div", { class: "row" },
-          h("button", { class: "btn", type: "button", style: "background: var(--danger)", onclick: () => act("cancel") }, "Yes, cancel booking"),
-          h("button", { class: "btn btn-ghost", type: "button", onclick: () => { askingToCancel = false; render(booking); } }, "Keep my booking"),
+          h("button", { class: "btn", type: "button", style: "background: var(--danger)", onclick: () => act("cancel") }, t("manage.yes_cancel")),
+          h("button", { class: "btn btn-ghost", type: "button", onclick: () => { askingToCancel = false; render(booking); } }, t("manage.keep")),
         ))
-    : h("button", { class: "btn btn-danger-ghost btn-block", type: "button", onclick: () => { askingToCancel = true; render(booking); } }, "Cancel booking"));
+    : h("button", { class: "btn btn-danger-ghost btn-block", type: "button", onclick: () => { askingToCancel = true; render(booking); } }, t("manage.cancel")));
 
   fill(target, 
     message && h("p", { class: message.kind === "error" ? "alert" : "success-note", role: "status" }, message.text),
-    h("span", { class: `status-badge ${booking.status}` }, STATUS_LABELS[booking.status] || booking.status),
-    h("h1", {}, "Your booking"),
+    h("span", { class: `status-badge ${booking.status}` }, statusLabel(booking.status)),
+    h("h1", {}, t("manage.h1")),
     h("dl", { class: "facts" },
-      h("dt", {}, "Date"), h("dd", {}, longDate.format(new Date(`${booking.date}T12:00:00Z`))),
-      h("dt", {}, "Time"), h("dd", {}, `${booking.time} (${booking.total_minutes} min)`),
-      h("dt", {}, "Therapist"), h("dd", {}, booking.therapist_name),
-      studio && h("dt", {}, "Where"), studio && h("dd", {}, studio.address),
+      h("dt", {}, t("common.date")), h("dd", {}, longDate.format(new Date(`${booking.date}T12:00:00Z`))),
+      h("dt", {}, t("common.time")), h("dd", {}, `${t("common.at_time", { time: booking.time })} (${formatMinutes(booking.total_minutes)})`),
+      h("dt", {}, t("common.therapist")), h("dd", {}, booking.therapist_name),
+      studio && h("dt", {}, t("common.where")), studio && h("dd", {}, studio.address),
     ),
     h("table", { class: "lines" },
       booking.items.map((item) =>
@@ -68,19 +66,19 @@ function render(booking) {
           h("td", {}, formatEuro(item.line_total)),
         ),
       ),
-      h("tr", { class: "total" }, h("td", {}, "Total"), h("td", {}, formatEuro(booking.total_price))),
+      h("tr", { class: "total" }, h("td", {}, t("common.total")), h("td", {}, formatEuro(booking.total_price))),
     ),
     booking.receipt_number
-      ? h("p", { class: "success-note" }, `Receipt ${booking.receipt_number} `, h("a", { href: `/receipt.html?token=${encodeURIComponent(token)}` }, "View or print receipt"))
-      : h("p", { class: "pay-note" }, "Pay at the studio"),
+      ? h("p", { class: "success-note" }, `${t("manage.receipt", { number: booking.receipt_number })} `, h("a", { href: `/receipt.html?token=${encodeURIComponent(token)}` }, t("manage.view_receipt")))
+      : h("p", { class: "pay-note" }, t("common.pay")),
     booking.status === "cancelled" && h("p", { class: "muted" },
-      booking.late_cancellation ? "This booking was cancelled late." : "This booking was cancelled."),
-    booking.status === "expired" && h("p", { class: "muted" }, "This booking request wasn't confirmed in time, so the time was released."),
+      t(booking.late_cancellation ? "manage.was_cancelled_late" : "manage.was_cancelled")),
+    booking.status === "expired" && h("p", { class: "muted" }, t("manage.expired_note")),
     h("div", { class: "actions" },
-      booking.awaiting_email_confirmation && h("button", { class: "btn btn-block", type: "button", onclick: () => act("verify") }, "Confirm my booking"),
-      booking.can_confirm && h("button", { class: "btn btn-block", type: "button", onclick: () => act("confirm") }, "Confirm I'm coming"),
+      booking.awaiting_email_confirmation && h("button", { class: "btn btn-block", type: "button", onclick: () => act("verify") }, t("manage.verify")),
+      booking.can_confirm && h("button", { class: "btn btn-block", type: "button", onclick: () => act("confirm") }, t("manage.coming")),
       cancelBlock,
-      h("a", { class: "btn btn-ghost btn-block", href: "/book.html" }, "Book again"),
+      h("a", { class: "btn btn-ghost btn-block", href: "/book.html" }, t("nav.book_again")),
     ),
     policy,
   );
@@ -91,10 +89,10 @@ async function act(kind) {
   try {
     const booking = await api(`${bookingUrl()}/${kind}`, { method: "POST" });
     message = kind === "verify"
-      ? { text: "Thank you! Your booking is confirmed, and we've emailed you the details.", kind: "ok" }
+      ? { text: t("manage.msg_verify"), kind: "ok" }
       : kind === "confirm"
-      ? { text: "Thank you! Your booking is confirmed. See you soon.", kind: "ok" }
-      : { text: booking.late_cancellation ? "Your booking is cancelled (late cancellation)." : "Your booking is cancelled.", kind: "ok" };
+      ? { text: t("manage.msg_confirm"), kind: "ok" }
+      : { text: t(booking.late_cancellation ? "manage.msg_cancel_late" : "manage.msg_cancel"), kind: "ok" };
     askingToCancel = false;
     render(booking);
   } catch (error) {
@@ -105,7 +103,7 @@ async function act(kind) {
 
 async function load() {
   if (!token) {
-    showError("This link is incomplete. Please use the link in your confirmation email.");
+    showError(t("manage.incomplete"));
     return;
   }
   try {

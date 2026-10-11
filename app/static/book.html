@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-i18n-title="book.title">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,72 +10,72 @@
   <header class="topbar">
     <div class="container wide">
       <a class="logo" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#33C375" d="M20 3C10 3 4 8.5 4 15.5c0 1.6.4 3 1 4.2C6.8 13 11 9.6 16 8c-4.3 2.6-7.4 6.6-8.6 12 1.2.6 2.6 1 4.1 1C18.6 21 21 14 20 3z"/></svg><span data-studio-name>Slotwise</span></a>
-      <a class="btn btn-ghost btn-small" href="/">Back to menu</a>
+      <div class="topbar-actions"><span data-lang-switch></span><a class="btn btn-ghost btn-small" href="/" data-i18n="nav.back_menu">Back to menu</a></div>
     </div>
   </header>
 
   <main class="container wide book-layout">
     <header>
-      <h1>Book a treatment</h1>
-      <p class="muted">Choose your treatment, a therapist and a free time. You pay at the studio.</p>
+      <h1 data-i18n="book.h1">Book a treatment</h1>
+      <p class="muted" data-i18n="book.lead">Choose your treatment, a therapist and a free time. You pay at the studio.</p>
     </header>
 
     <form id="book-form" novalidate>
       <section class="step" aria-labelledby="step-services">
-        <h2 id="step-services"><span class="step-number">1</span>Treatments</h2>
-        <div id="services"><p class="notice">Loading the menu…</p></div>
+        <h2 id="step-services"><span class="step-number">1</span><span data-i18n="book.treatments">Treatments</span></h2>
+        <div id="services"><p class="notice" data-i18n="home.loading_menu">Loading the menu…</p></div>
       </section>
 
       <section class="step" id="addons-step" aria-labelledby="step-addons" hidden>
-        <h2 id="step-addons"><span class="step-number">2</span>Add-ons <span class="optional">(optional)</span></h2>
+        <h2 id="step-addons"><span class="step-number">2</span><span data-i18n="book.addons">Add-ons</span> <span class="optional" data-i18n="common.optional">(optional)</span></h2>
         <div id="addons"></div>
       </section>
 
       <section class="step" id="therapist-step" aria-labelledby="step-therapist" hidden>
-        <h2 id="step-therapist"><span class="step-number">3</span>Therapist</h2>
+        <h2 id="step-therapist"><span class="step-number">3</span><span data-i18n="book.therapist">Therapist</span></h2>
         <div class="chips" id="therapists" role="radiogroup" aria-labelledby="step-therapist"></div>
         <p class="field-error" id="therapist-error" hidden></p>
       </section>
 
       <section class="step" id="date-step" aria-labelledby="step-date" hidden>
-        <h2 id="step-date"><span class="step-number">4</span>Day</h2>
+        <h2 id="step-date"><span class="step-number">4</span><span data-i18n="book.day">Day</span></h2>
         <div class="chips scroll" id="days"></div>
         <div class="date-other">
-          <label for="date-input">Another day</label>
+          <label for="date-input" data-i18n="book.another_day">Another day</label>
           <input type="date" id="date-input">
         </div>
       </section>
 
       <section class="step" id="time-step" aria-labelledby="step-time" hidden>
-        <h2 id="step-time"><span class="step-number">5</span>Time</h2>
+        <h2 id="step-time"><span class="step-number">5</span><span data-i18n="book.time">Time</span></h2>
         <div id="times" aria-live="polite"></div>
       </section>
 
       <section class="step" id="details-step" aria-labelledby="step-details" hidden>
-        <h2 id="step-details"><span class="step-number">6</span>Your details</h2>
+        <h2 id="step-details"><span class="step-number">6</span><span data-i18n="book.details">Your details</span></h2>
         <div class="form-grid">
-          <div class="field"><label for="first_name">First name</label>
+          <div class="field"><label for="first_name" data-i18n="book.first">First name</label>
             <input id="first_name" name="first_name" autocomplete="given-name" required></div>
-          <div class="field"><label for="last_name">Last name</label>
+          <div class="field"><label for="last_name" data-i18n="book.last">Last name</label>
             <input id="last_name" name="last_name" autocomplete="family-name" required></div>
-          <div class="field"><label for="email">Email</label>
+          <div class="field"><label for="email" data-i18n="book.email">Email</label>
             <input id="email" name="email" type="email" autocomplete="email" required></div>
-          <div class="field"><label for="phone">Phone</label>
+          <div class="field"><label for="phone" data-i18n="book.phone">Phone</label>
             <input id="phone" name="phone" type="tel" autocomplete="tel" required></div>
-          <div class="field full"><label for="note">Note for your therapist <span class="optional">(optional)</span></label>
+          <div class="field full"><label for="note"><span data-i18n="book.note">Note for your therapist</span> <span class="optional" data-i18n="common.optional">(optional)</span></label>
             <textarea id="note" name="note" maxlength="300"></textarea>
-            <p class="field-hint">Please don't enter medical details. Max 300 characters.</p></div>
+            <p class="field-hint" data-i18n="book.note_hint">Please don't enter medical details. Max 300 characters.</p></div>
         </div>
       </section>
     </form>
 
     <aside class="summary" aria-labelledby="summary-title">
-      <h2 id="summary-title">Your booking</h2>
-      <p class="summary-when" id="summary-when">Choose a treatment to start.</p>
+      <h2 id="summary-title" data-i18n="book.summary">Your booking</h2>
+      <p class="summary-when" id="summary-when" data-i18n="book.start">Choose a treatment to start.</p>
       <table class="lines" id="summary-lines"></table>
-      <p class="pay-note">Pay at the studio</p>
+      <p class="pay-note" data-i18n="common.pay">Pay at the studio</p>
       <div class="alert" id="book-error" role="alert" hidden></div>
-      <button class="btn btn-block" type="submit" form="book-form" id="confirm" disabled>Confirm booking</button>
+      <button class="btn btn-block" type="submit" form="book-form" id="confirm" disabled data-i18n="book.confirm">Confirm booking</button>
     </aside>
   </main>
 

@@ -49,7 +49,8 @@ class ServiceOut(ORMModel):
 
 
 class CategoryOut(BaseModel):
-    name: str
+    name: str  # stable key (English)
+    label: str = ""  # shown to the customer, in their language
     services: list[ServiceOut]
 
 
@@ -304,6 +305,7 @@ class AddOnAdminOut(ORMModel):
     id: int
     service_id: int
     name: str
+    name_de: str | None = None
     extra_minutes: int
     price: MoneyStr
     active: bool
@@ -314,6 +316,8 @@ class ServiceAdminOut(ORMModel):
     category: str
     name: str
     description: str | None
+    name_de: str | None = None
+    description_de: str | None = None
     duration_minutes: int
     price: MoneyStr
     buffer_minutes: int
@@ -325,6 +329,8 @@ class ServiceIn(BaseModel):
     category: str = Field(max_length=40)
     name: str = Field(max_length=120)
     description: str | None = Field(default=None, max_length=500)
+    name_de: str | None = Field(default=None, max_length=120)
+    description_de: str | None = Field(default=None, max_length=500)
     duration_minutes: int
     price: Decimal
     buffer_minutes: int = 10
@@ -334,6 +340,7 @@ class ServiceIn(BaseModel):
 class AddOnIn(BaseModel):
     service_id: int
     name: str = Field(max_length=120)
+    name_de: str | None = Field(default=None, max_length=120)
     extra_minutes: int = 0
     price: Decimal
     active: bool = True
@@ -349,6 +356,7 @@ class TherapistAdminOut(BaseModel):
     id: int
     display_name: str
     short_bio: str | None
+    short_bio_de: str | None = None
     active: bool
     service_ids: list[int]
     hours: list[HoursOut]
@@ -356,7 +364,8 @@ class TherapistAdminOut(BaseModel):
     @classmethod
     def from_therapist(cls, t) -> "TherapistAdminOut":
         return cls(
-            id=t.id, display_name=t.display_name, short_bio=t.short_bio, active=t.active,
+            id=t.id, display_name=t.display_name, short_bio=t.short_bio,
+            short_bio_de=t.short_bio_de, active=t.active,
             service_ids=sorted(s.id for s in t.services),
             hours=[
                 HoursOut(weekday=h.weekday, start_time=h.start_time.strftime("%H:%M"),
@@ -369,6 +378,7 @@ class TherapistAdminOut(BaseModel):
 class TherapistIn(BaseModel):
     display_name: str = Field(max_length=80)
     short_bio: str | None = Field(default=None, max_length=500)
+    short_bio_de: str | None = Field(default=None, max_length=500)
     active: bool = True
     service_ids: list[int] = Field(default_factory=list, max_length=50)
 
@@ -472,6 +482,7 @@ class StudioSettings(ORMModel):
     phone: str = Field(max_length=40)
     email: str = Field(max_length=255)
     opening_hours_text: str = Field(default="", max_length=255)
+    opening_hours_text_de: str | None = Field(default=None, max_length=255)
     min_notice_hours: int
     free_cancellation_hours: int
     booking_window_days: int
