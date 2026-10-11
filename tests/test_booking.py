@@ -137,12 +137,16 @@ def test_returning_customer_is_matched_by_email(empty_calendar, db):
     assert len(customers[0].bookings) == 2
 
 
-def test_a_stranger_cannot_change_a_customers_saved_details(empty_calendar, db):
-    """Security review finding: unauthenticated bookings must not overwrite PII."""
+def test_a_stranger_cannot_change_or_learn_a_customers_saved_details(empty_calendar, db):
+    """Security review findings: unauthenticated bookings must not overwrite PII, and
+    the response must not reveal the saved name behind an email address."""
     client = empty_calendar
     book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia")
-    book(client, ["Express facial"], TUESDAY, "12:00", "Sofia",
-         first_name="Mallory", last_name="X", phone="+49 999 999 999")
+    response = book(client, ["Express facial"], TUESDAY, "12:00", "Sofia",
+                    first_name="Mallory", last_name="X", phone="+49 999 999 999")
+    assert response.json()["customer_first_name"] == "Mallory"
+    assert CUSTOMER["first_name"] not in response.text
+    assert CUSTOMER["last_name"] not in response.text
     customer = db.scalar(select(Customer).where(Customer.email == CUSTOMER["email"]))
     assert (customer.first_name, customer.last_name, customer.phone) == (
         CUSTOMER["first_name"], CUSTOMER["last_name"], CUSTOMER["phone"])

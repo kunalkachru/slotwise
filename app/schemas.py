@@ -129,7 +129,9 @@ class BookingOut(BaseModel):
     items: list[BookingItemOut]
 
     @classmethod
-    def from_booking(cls, booking) -> "BookingOut":
+    def from_booking(cls, booking, first_name: str) -> "BookingOut":
+        """`first_name` is the name submitted with this booking. Never echo the saved
+        customer's name: the booker may not be that customer (security review)."""
         local_start = booking.start_at.astimezone(BERLIN)
         return cls(
             id=booking.id,
@@ -143,7 +145,7 @@ class BookingOut(BaseModel):
             total_minutes=sum(i.minutes_snapshot * i.quantity for i in booking.items),
             total_price=booking.total_price,
             therapist_name=booking.therapist.display_name,
-            customer_first_name=booking.customer.first_name,
+            customer_first_name=first_name,
             items=[
                 BookingItemOut(
                     item_type=i.item_type,

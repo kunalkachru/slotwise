@@ -108,4 +108,4 @@ def book(body: BookingIn, db: Session = Depends(get_db)):
         body.therapist_id,
         CustomerDetails(body.first_name, body.last_name, body.email, body.phone, body.note),
     )
-    return BookingOut.from_booking(booking)
+    return BookingOut.from_booking(booking, first_name=body.first_name.strip())
