@@ -1,4 +1,4 @@
-import { api, formatEuro, h } from "/js/api.js";
+import { api, fill, formatEuro, h } from "/js/api.js";
 
 const longDate = new Intl.DateTimeFormat("en-GB", {
   weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
@@ -17,7 +17,7 @@ async function render() {
   const target = document.getElementById("confirmation");
   const booking = readBooking();
   if (!booking) {
-    target.replaceChildren(
+    fill(target, 
       h("h1", {}, "Booking details not available"),
       h("p", { class: "muted" }, "Your booking may still have gone through. Please check with the studio if you're unsure."),
       h("a", { class: "btn btn-block", href: "/" }, "Back to home"),
@@ -29,7 +29,7 @@ async function render() {
 
   const icon = h("div", { class: "confirm-icon" });
   icon.innerHTML = CHECK; // static markup, no data
-  target.replaceChildren(
+  fill(target, 
     icon,
     h("h1", {}, `You're booked, ${booking.customer_first_name}!`),
     h("dl", { class: "facts" },
@@ -48,6 +48,7 @@ async function render() {
       h("tr", { class: "total" }, h("td", {}, "Total"), h("td", {}, formatEuro(booking.total_price))),
     ),
     h("p", { class: "pay-note" }, "Pay at the studio"),
+    h("p", { class: "success-note" }, "A confirmation has been emailed to you. Use the link in your email to confirm, cancel or view your receipt."),
     h("a", { class: "btn btn-block", href: "/" }, "Back to home"),
   );
 }

@@ -1,13 +1,25 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.errors import AppError
+from app.emails import confirmation_email
+from app.errors import TOO_MANY_BOOKINGS, AppError
 from app.logic.availability import check_date_in_range, free_slots
-from app.logic.booking import CustomerDetails, create_booking
+from app.logic.availability import get_studio as load_studio
+from app.logic.booking import (
+    CustomerDetails,
+    can_cancel,
+    can_confirm,
+    cancel_booking,
+    confirm_booking,
+    create_booking,
+    free_cancellation_until,
+    get_by_token,
+    mailbox_key,
+)
 from app.logic.selection import parse_ids, require_therapists, resolve_selection
 from app.models import CATEGORIES, Service, Studio
 from app.schemas import (
@@ -16,13 +28,21 @@ from app.schemas import (
     BookingIn,
     BookingOut,
     CategoryOut,
+    ManageOut,
     ServiceOut,
     SlotOut,
     StudioOut,
     TherapistOut,
+    booking_fields,
 )
+from app.security import client_ip
 
 router = APIRouter(prefix="/public", tags=["public"])
+
+# Booking needs no login and sends an email, so cap how often one visitor or one email
+# address can book (security review, slice 3): limits inbox flooding and calendar filling.
+BOOKINGS_PER_IP_PER_HOUR = 10
+BOOKINGS_PER_EMAIL_PER_DAY = 5
 
 
 @router.get("/studio", response_model=StudioOut)
@@ -98,14 +118,63 @@ def availability(
 
 
 @router.post("/bookings", response_model=BookingOut)
-def book(body: BookingIn, db: Session = Depends(get_db)):
-    selection = resolve_selection(db, body.service_ids, body.add_on_ids)
-    booking = create_booking(
-        db,
-        selection,
-        body.date,
-        body.start_time,
-        body.therapist_id,
-        CustomerDetails(body.first_name, body.last_name, body.email, body.phone, body.note),
+def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
+    limiter = request.app.state.booking_limiter
+    ip_key = "ip:" + client_ip(
+        request.client.host if request.client else None, request.headers.get("x-forwarded-for")
     )
+    # Validate first, so the limit key comes from the same canonical address the
+    # confirmation email is sent to.
+    details = CustomerDetails(
+        body.first_name, body.last_name, body.email, body.phone, body.note
+    ).cleaned()
+    email_key = "email:" + mailbox_key(details.email)
+    # Reserve a place under both limits before booking; give it back if booking fails.
+    if not limiter.try_acquire([
+        (ip_key, BOOKINGS_PER_IP_PER_HOUR, 3600),
+        (email_key, BOOKINGS_PER_EMAIL_PER_DAY, 86400),
+    ]):
+        raise AppError(429, TOO_MANY_BOOKINGS)
+    try:
+        selection = resolve_selection(db, body.service_ids, body.add_on_ids)
+        booking = create_booking(
+            db,
+            selection,
+            body.date,
+            body.start_time,
+            body.therapist_id,
+            details,
+        )
+    except Exception:
+        limiter.release([ip_key, email_key])
+        raise
+    settings = request.app.state.settings
+    request.app.state.mailer.send(confirmation_email(booking, load_studio(db), settings.public_url))
     return BookingOut.from_booking(booking, first_name=body.first_name.strip())
+
+
+def _manage_view(db: Session, booking) -> ManageOut:
+    return ManageOut(
+        **booking_fields(booking),
+        free_cancellation_until=free_cancellation_until(db, booking),
+        late_cancellation=booking.late_cancellation,
+        can_confirm=can_confirm(booking) and booking.status == "booked",
+        can_cancel=can_cancel(booking),
+        confirmed_at=booking.confirmed_at,
+        cancelled_at=booking.cancelled_at,
+    )
+
+
+@router.get("/bookings/{token}", response_model=ManageOut)
+def view_booking(token: str, db: Session = Depends(get_db)):
+    return _manage_view(db, get_by_token(db, token))
+
+
+@router.post("/bookings/{token}/confirm", response_model=ManageOut)
+def confirm(token: str, db: Session = Depends(get_db)):
+    return _manage_view(db, confirm_booking(db, get_by_token(db, token)))
+
+
+@router.post("/bookings/{token}/cancel", response_model=ManageOut)
+def cancel(token: str, db: Session = Depends(get_db)):
+    return _manage_view(db, cancel_booking(db, get_by_token(db, token)))

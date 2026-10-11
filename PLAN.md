@@ -213,6 +213,12 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - an itemized confirmation email with the manage link
   - `GET /public/bookings/{token}`, `POST …/confirm`, `POST …/cancel` (sets `late_cancellation` inside 24 hours; 400 if already cancelled or finished)
   - the reminder-email builder, ready for slice 5
+  - Email links are built from `PUBLIC_URL`, or Render's automatic `RENDER_EXTERNAL_URL`. Resend's sender is `EMAIL_FROM` **[decision]**.
+  - The manage view returns no customer details, because the link holder may not own the email.
+  - Security review:
+    - Names may only contain letters, spaces, `-`, `'`, and a `.` before a space or at the end ("Jr."), because they appear in emails we send. No domains like `evil.com`.
+    - Booking is limited to 10 per IP per hour and 5 per inbox per day (429), against inbox flooding and calendar filling. The inbox key drops `+tags` and Gmail dots. Email addresses are ASCII only, with one canonical form for validation, storage, sending and limits, and no Unicode/IDNA remapping (which could turn `straße.de` into someone else's `strasse.de`). The limit is reserved atomically before booking and released if the booking fails.
+    - A log filter hides manage/offer tokens in every log line, including uvicorn's access log. Logged emails mask the recipient.
 - **Front end:** Manage booking (details, Confirm I'm coming, Cancel with an "Are you sure?" prompt, Book again).
 - **Tests:**
   - **Cancellation deadline**: 24h + 1min → not late, 23h59 → late

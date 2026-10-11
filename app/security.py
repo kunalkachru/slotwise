@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import ipaddress
 import secrets
+import threading
 import time
 from collections import deque
 
@@ -180,3 +181,50 @@ class LoginLimiter:
         ongoing attack a fresh allowance.
         """
         self._failures.pop(self._keys(email, ip)[0], None)
+
+
+class RateLimiter:
+    """Counts events per key in a sliding window (in memory, one Render instance).
+
+    `try_acquire` checks every limit and records the event in one locked step, so
+    simultaneous requests can't all pass a check before any of them is counted.
+    """
+
+    def __init__(self, clock=time.monotonic):
+        self.clock = clock
+        self._events: dict[str, deque[float]] = {}
+        self._lock = threading.Lock()
+
+    def try_acquire(self, limits: list[tuple[str, int, int]]) -> bool:
+        """limits: (key, max_events, window_seconds). Records all keys or none."""
+        with self._lock:
+            if any(self.count(key, window) >= limit for key, limit, window in limits):
+                return False
+            for key, _, _ in limits:
+                self.record(key)
+            return True
+
+    def release(self, keys: list[str]) -> None:
+        """Undo the most recent acquire for these keys (the action failed)."""
+        with self._lock:
+            for key in keys:
+                events = self._events.get(key)
+                if events:
+                    events.pop()
+                    if not events:
+                        del self._events[key]
+
+    def count(self, key: str, window_seconds: int) -> int:
+        events = self._events.get(key)
+        if events is None:
+            return 0
+        cutoff = self.clock() - window_seconds
+        while events and events[0] < cutoff:
+            events.popleft()
+        if not events:
+            del self._events[key]
+            return 0
+        return len(events)
+
+    def record(self, key: str) -> None:
+        self._events.setdefault(key, deque()).append(self.clock())

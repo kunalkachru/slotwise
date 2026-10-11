@@ -29,6 +29,13 @@ MISSING_PHONE = "Please enter your phone number."
 MISSING_FIRST_NAME = "Please enter your first name."
 MISSING_LAST_NAME = "Please enter your last name."
 NOTE_TOO_LONG = "Please keep the note under 300 characters."
+NAME_CHARACTERS = "Please use only letters in your name."
+TOO_MANY_BOOKINGS = "Too many bookings in a short time. Please call the studio."
+
+# Manage link (slice 3)
+BOOKING_NOT_FOUND = "Booking not found. Please check the link in your email."
+CANNOT_CONFIRM = "This booking can no longer be confirmed."
+ALREADY_CANCELLED_OR_FINISHED = "This booking is already cancelled or finished."
 
 
 class AppError(Exception):

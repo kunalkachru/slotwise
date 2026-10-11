@@ -8,11 +8,16 @@ from datetime import date, datetime, time, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.errors import (
+    ALREADY_CANCELLED_OR_FINISHED,
+    BOOKING_NOT_FOUND,
+    CANNOT_CONFIRM,
     INVALID_EMAIL,
     MISSING_FIRST_NAME,
     MISSING_LAST_NAME,
     MISSING_PHONE,
+    NAME_CHARACTERS,
     NOT_AN_OFFERED_TIME,
     NOTE_TOO_LONG,
     OUTSIDE_BOOKING_WINDOW,
@@ -23,6 +28,7 @@ from app.logic.availability import (
     booking_limits,
     bookings_per_therapist,
     free_slots_by_therapist,
+    get_studio,
     local_to_utc,
     pick_therapist,
 )
@@ -30,7 +36,50 @@ from app.logic.selection import Selection, require_therapists
 from app.models import Booking, Customer, Therapist
 from app.security import new_token
 
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+LOCAL_PART_RE = re.compile(r"^[a-z0-9_%+-]+(?:\.[a-z0-9_%+-]+)*$")
+DOMAIN_RE = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$")
+
+
+def canonical_email(raw: str) -> str | None:
+    """The one form of an address used everywhere: validation, storage, sending and
+    rate limiting, so no two spellings of an inbox can be treated differently.
+
+    ASCII only, and the only change made is trimming and lower-casing ASCII letters.
+    No Unicode mapping of any kind: Python's IDNA 2003 codec turns "straße.de" into
+    "strasse.de" (possibly someone else's domain), and str.lower() turns some
+    non-ASCII characters into ASCII (Kelvin sign -> "k"). Internationalised domains
+    can be entered in their xn-- form (security reviews, slice 3)."""
+    raw = raw.strip()
+    if not raw.isascii() or len(raw) > 254:
+        return None
+    local, at, domain = raw.lower().partition("@")
+    if not at or not LOCAL_PART_RE.match(local) or not DOMAIN_RE.match(domain):
+        return None
+    return f"{local}@{domain}"
+NAME_PUNCTUATION = set(" -'’.")
+
+
+DOT_INSIDE_WORD = re.compile(r"\.\S")
+
+
+def _is_plain_name(name: str) -> bool:
+    """Letters (any alphabet), spaces, hyphens, apostrophes, and dots only before a space
+    or at the end ("Jr.", "J. R."). Names end up in emails we send, so no URLs, domains
+    like "evil.com", digits, @ or markup (security reviews, slice 3)."""
+    return all(ch.isalpha() or ch in NAME_PUNCTUATION for ch in name) and not (
+        DOT_INSIDE_WORD.search(name)
+    )
+
+
+def mailbox_key(email: str) -> str:
+    """One key per real inbox, for rate limiting. Takes a canonical_email() result and
+    also drops +tags and, for Gmail, dots (anna+1@x and a.nna@gmail.com reach the
+    same person)."""
+    local, _, domain = email.partition("@")
+    local = local.split("+", 1)[0]
+    if domain in ("gmail.com", "googlemail.com"):
+        local, domain = local.replace(".", ""), "gmail.com"
+    return f"{local}@{domain}"
 
 # One Render instance: a process-wide lock makes "check the slot is free, then insert"
 # atomic even on SQLite. On PostgreSQL the therapist rows are also locked FOR UPDATE.
@@ -48,14 +97,18 @@ class CustomerDetails:
     def cleaned(self) -> "CustomerDetails":
         first = self.first_name.strip()
         last = self.last_name.strip()
-        email = self.email.strip().lower()
+        email = canonical_email(self.email)
         phone = self.phone.strip()
         note = (self.note or "").strip() or None
         if not first:
             raise AppError(422, MISSING_FIRST_NAME, field="first_name")
         if not last:
             raise AppError(422, MISSING_LAST_NAME, field="last_name")
-        if not EMAIL_RE.match(email) or len(email) > 255:
+        if not _is_plain_name(first):
+            raise AppError(422, NAME_CHARACTERS, field="first_name")
+        if not _is_plain_name(last):
+            raise AppError(422, NAME_CHARACTERS, field="last_name")
+        if email is None:
             raise AppError(422, INVALID_EMAIL, field="email")
         if sum(ch.isdigit() for ch in phone) < 6 or len(phone) > 40:
             raise AppError(422, MISSING_PHONE, field="phone")
@@ -151,4 +204,48 @@ def create_booking(
         db.add(booking)
         db.commit()
     db.refresh(booking)
+    return booking
+
+
+# ---------- Manage link (slice 3) ----------
+
+
+def get_by_token(db: Session, token: str) -> Booking:
+    booking = db.scalar(select(Booking).where(Booking.manage_token == token)) if token else None
+    if booking is None:
+        raise AppError(404, BOOKING_NOT_FOUND)
+    return booking
+
+
+def free_cancellation_until(db: Session, booking: Booking) -> datetime:
+    return booking.start_at - timedelta(hours=get_studio(db).free_cancellation_hours)
+
+
+def can_confirm(booking: Booking) -> bool:
+    return booking.status in ("booked", "confirmed") and booking.start_at > clock.now()
+
+
+def can_cancel(booking: Booking) -> bool:
+    return booking.status in ("booked", "confirmed") and booking.start_at > clock.now()
+
+
+def confirm_booking(db: Session, booking: Booking) -> Booking:
+    if not can_confirm(booking):
+        raise AppError(400, CANNOT_CONFIRM)
+    if booking.status == "booked":  # confirming twice is harmless
+        booking.status = "confirmed"
+        booking.confirmed_at = clock.now()
+        db.commit()
+    return booking
+
+
+def cancel_booking(db: Session, booking: Booking) -> Booking:
+    """Free up to `free_cancellation_hours` before the start; later is allowed but flagged."""
+    if not can_cancel(booking):
+        raise AppError(400, ALREADY_CANCELLED_OR_FINISHED)
+    now = clock.now()
+    booking.status = "cancelled"
+    booking.cancelled_at = now
+    booking.late_cancellation = now > free_cancellation_until(db, booking)
+    db.commit()
     return booking
