@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Receipt · Slotwise</title>
+  <meta name="robots" content="noindex">
+  <meta name="referrer" content="no-referrer">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="no-print">
+    <button class="btn btn-ghost btn-small" type="button" onclick="history.length > 1 ? history.back() : location.assign('/')">Back</button>
+    <button class="btn btn-small" type="button" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+  <main class="receipt" id="receipt" aria-live="polite"><p class="notice">Loading receipt…</p></main>
+  <script type="module" src="/js/receipt.js"></script>
+</body>
+</html>

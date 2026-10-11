@@ -176,3 +176,18 @@ def reminder_email(booking, studio, public_url: str) -> Email:
         html=_html_page("See you tomorrow", intro, booking, links, footer),
         reply_to=studio.email,
     )
+
+
+def receipt_email(booking, studio, public_url: str) -> Email:
+    intro = (f"Hello {booking.customer.first_name}, thank you for your visit to {studio.name}. "
+             f"Here is your receipt {booking.receipt_number}.")
+    footer = f"Paid at the studio. {studio.name} · {studio.address} · {studio.phone}"
+    links = [("View or print your receipt",
+              f"{public_url}/receipt.html?token={booking.manage_token}")]
+    return Email(
+        to=booking.customer.email,
+        subject=f"Receipt {booking.receipt_number} · {studio.name}",
+        text=_text_body(intro, booking, links, footer),
+        html=_html_page(f"Receipt {booking.receipt_number}", intro, booking, links, footer),
+        reply_to=studio.email,
+    )

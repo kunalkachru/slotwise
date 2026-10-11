@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bookings · Slotwise</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="owner-layout" id="owner-layout" hidden>
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="owner-main">
+      <div class="page-head">
+        <h1>Bookings</h1>
+        <div class="row">
+          <a class="btn btn-ghost btn-small" id="export" href="#">Export CSV</a>
+          <button class="btn btn-small" type="button" id="add-booking">Add booking</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="segmented" role="group" aria-label="View">
+          <button type="button" data-view="day">Day</button>
+          <button type="button" data-view="week">Week</button>
+          <button type="button" data-view="list">List</button>
+        </div>
+        <button class="btn btn-ghost btn-small" type="button" id="prev" aria-label="Previous">‹</button>
+        <button class="btn btn-ghost btn-small" type="button" id="today">Today</button>
+        <button class="btn btn-ghost btn-small" type="button" id="next" aria-label="Next">›</button>
+        <span class="range-label" id="range-label"></span>
+      </div>
+      <div class="toolbar">
+        <select id="filter-therapist" aria-label="Therapist"><option value="">All therapists</option></select>
+        <select id="filter-status" aria-label="Status">
+          <option value="">All statuses</option>
+          <option value="booked">Booked</option><option value="confirmed">Confirmed</option>
+          <option value="done">Done</option><option value="no_show">No-show</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <input type="search" id="search" placeholder="Search name, email or phone" aria-label="Search">
+      </div>
+      <div id="bookings" aria-live="polite"><p class="notice">Loading…</p></div>
+    </main>
+  </div>
+
+  <dialog class="panel" id="detail" aria-labelledby="detail-title">
+    <div class="panel-head"><h2 id="detail-title">Booking</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close">×</button></div>
+    <div class="panel-body" id="detail-body"></div>
+  </dialog>
+
+  <dialog class="panel" id="new-booking" aria-labelledby="new-title">
+    <div class="panel-head"><h2 id="new-title">Add phone booking</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close">×</button></div>
+    <form class="panel-body" id="new-form" novalidate></form>
+  </dialog>
+
+  <script type="module" src="/js/owner-bookings.js"></script>
+</body>
+</html>

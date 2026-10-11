@@ -68,11 +68,13 @@ class BookingLimits:
         )
 
 
-def booking_limits(db: Session) -> BookingLimits:
+def booking_limits(db: Session, for_owner: bool = False) -> BookingLimits:
+    """Customers need `min_notice_hours`; the owner (phone bookings) only needs a future
+    start time [decision]. Both are limited to the booking window."""
     studio = get_studio(db)
     now = clock.now()
     return BookingLimits(
-        earliest=now + timedelta(hours=studio.min_notice_hours),
+        earliest=now if for_owner else now + timedelta(hours=studio.min_notice_hours),
         latest_day=now.date() + timedelta(days=studio.booking_window_days),
     )
 
@@ -116,13 +118,14 @@ def _candidate_starts(therapist: Therapist, day: date, total_minutes: int):
 
 
 def free_slots_by_therapist(
-    db: Session, day: date, selection: Selection, therapists: list[Therapist]
+    db: Session, day: date, selection: Selection, therapists: list[Therapist],
+    for_owner: bool = False,
 ) -> dict[int, list[datetime]]:
     studio_closed, off = _closed_therapist_ids(db, day)
     if studio_closed:
         return {t.id: [] for t in therapists}
     busy = _busy_ranges(db, [t.id for t in therapists], day)
-    limits = booking_limits(db)
+    limits = booking_limits(db, for_owner)
     blocked = timedelta(minutes=selection.blocked_minutes)
     result: dict[int, list[datetime]] = {}
     for therapist in therapists:
@@ -164,11 +167,12 @@ def pick_therapist(candidates: list[Therapist], counts: dict[int, int]) -> Thera
 
 
 def free_slots(
-    db: Session, day: date, selection: Selection, therapists: list[Therapist]
+    db: Session, day: date, selection: Selection, therapists: list[Therapist],
+    for_owner: bool = False,
 ) -> list[Slot]:
     """One slot per start time. With several therapists ("no preference") each time is
     listed once, with the therapist `pick_therapist` would assign."""
-    by_therapist = free_slots_by_therapist(db, day, selection, therapists)
+    by_therapist = free_slots_by_therapist(db, day, selection, therapists, for_owner)
     counts = bookings_per_therapist(db, [t.id for t in therapists], day)
     by_id = {t.id: t for t in therapists}
     free_at: dict[datetime, list[Therapist]] = {}

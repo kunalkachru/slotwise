@@ -238,6 +238,12 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - `GET /owner/bookings/export.csv`
   - owner CRUD for services, add-ons and therapists (`GET/POST/PUT /owner/services`, `/owner/add-ons`, `/owner/therapists`), `PUT /owner/therapists/{id}/hours`, and `GET/POST/DELETE /owner/days-off` (the GET is missing from the blueprint)
 - **Front end:** Bookings (day/week view per therapist and a list view, filters, add booking, status dropdown, items editor, send receipt, export), a printable `receipt.html`, Services & add-ons, and Therapists & hours.
+- **Decisions made while building:**
+  - Owner phone bookings skip the 2-hour notice (any future time) **[decision]**.
+  - Adjusting final items changes the total and receipt, not the calendar times **[decision]**.
+  - Owner changes (non-GET) are refused when the `Origin` header is another site. This sits on top of the SameSite=Lax cookie.
+  - CSV cells that start with `= + - @` are prefixed with `'` (formula injection).
+  - The weekly-hours form edits one window per day. Split shifts are possible through the API only, for now.
 - **Tests:**
   - status timing rules
   - a receipt only for done bookings

@@ -64,6 +64,8 @@ The jobs must be idempotent, because a call can come late or twice.
   - `GET /health` returns `status`, and `version` = `RENDER_GIT_COMMIT` (`"dev"` when it isn't set). The deploy workflow compares this version with the commit it deployed, so don't change its shape.
   - `GET /public/studio` returns the studio header data.
 
+**Owner pages:** every page in `app/static/owner/` uses `js/owner-shell.js` (session check, side menu, log out) and `ownerApi()` (redirects to login on 401). Management dialogs share `js/owner-forms.js`. Front-end code builds DOM with `h()` and `fill()` from `js/api.js`; never use `innerHTML` with data.
+
 **Seed:** runs on startup only when the `studio` table is empty. It always creates the studio and the owner. Demo data (menu, Lena and Sofia, about 20 bookings) is added only when `SEED_DEMO_DATA=true`, in production too. Every seeded customer must have a fake `@example.com` email address.
 
 **Data model:** the main tables are Studio, Owners, Therapists, Services, AddOns, TherapistServices, WorkingHours, DaysOff, Customers, Bookings, BookingItems and WaitlistEntries.

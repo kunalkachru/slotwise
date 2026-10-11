@@ -9,17 +9,7 @@
 </head>
 <body>
   <div class="owner-layout" id="owner-layout" hidden>
-    <aside class="sidebar">
-      <a class="logo" href="/owner/dashboard.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#33C375" d="M20 3C10 3 4 8.5 4 15.5c0 1.6.4 3 1 4.2C6.8 13 11 9.6 16 8c-4.3 2.6-7.4 6.6-8.6 12 1.2.6 2.6 1 4.1 1C18.6 21 21 14 20 3z"/></svg> Slotwise</a>
-      <nav aria-label="Owner menu">
-        <a href="/owner/dashboard.html" aria-current="page">Dashboard</a>
-        <a class="soon" aria-disabled="true">Bookings <span class="badge">soon</span></a>
-        <a class="soon" aria-disabled="true">Services &amp; add-ons <span class="badge">soon</span></a>
-        <a class="soon" aria-disabled="true">Therapists &amp; hours <span class="badge">soon</span></a>
-        <a class="soon" aria-disabled="true">Waitlist <span class="badge">soon</span></a>
-        <button type="button" id="logout">Log out</button>
-      </nav>
-    </aside>
+    <aside class="sidebar" id="sidebar"></aside>
     <main class="owner-main">
       <header>
         <h1 id="welcome">Dashboard</h1>
@@ -31,7 +21,7 @@
         <div class="tile"><div class="tile-label">No-show rate (30 days)</div><div class="tile-value">–</div></div>
         <div class="tile"><div class="tile-label">Refilled from waitlist (30 days)</div><div class="tile-value">–</div></div>
       </section>
-      <p class="muted">Key numbers and today's appointments will appear here soon.</p>
+      <p class="muted">Key numbers and today's appointments will appear here soon. Meanwhile, see <a href="/owner/bookings.html">Bookings</a>.</p>
     </main>
   </div>
   <script type="module" src="/js/owner-dashboard.js"></script>

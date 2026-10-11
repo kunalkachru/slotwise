@@ -1,15 +1,241 @@
-from fastapi import APIRouter, Depends
+from datetime import date, timedelta
+
+from fastapi import APIRouter, Depends, Query, Request, Response
+from sqlalchemy.orm import Session
 
 from app import clock
-from app.models import Owner
-from app.routers.auth import current_owner
-from app.schemas import DashboardOut
+from app.db import get_db
+from app.emails import confirmation_email, receipt_email
+from app.logic import catalog
+from app.logic.availability import check_date_in_range, free_slots, get_studio
+from app.logic.booking import CustomerDetails, create_booking
+from app.logic.owner_bookings import (
+    REPEAT_NO_SHOW_THRESHOLD,
+    ItemInput,
+    assign_receipt_number,
+    bookings_csv,
+    change_status,
+    get_booking,
+    has_started,
+    list_bookings,
+    replace_items,
+)
+from app.logic.selection import parse_ids, require_therapists, resolve_selection
+from app.models import Owner, Therapist
+from app.routers.auth import current_owner, same_origin
+from app.schemas import (
+    AddOnAdminOut,
+    AddOnIn,
+    AvailabilityOut,
+    BookingIn,
+    DashboardOut,
+    DayOffIn,
+    DayOffOut,
+    HoursListIn,
+    ItemsIn,
+    OwnerBookingOut,
+    ServiceAdminOut,
+    ServiceIn,
+    SlotOut,
+    StatusIn,
+    TherapistAdminOut,
+    TherapistIn,
+)
 
-# Every route here requires the owner session.
-router = APIRouter(prefix="/owner", tags=["owner"], dependencies=[Depends(current_owner)])
+# Every route here requires the owner session; changes must come from this site.
+router = APIRouter(
+    prefix="/owner", tags=["owner"], dependencies=[Depends(current_owner), Depends(same_origin)]
+)
+
+MAX_RANGE_DAYS = 92
 
 
 @router.get("/dashboard", response_model=DashboardOut)
 def dashboard(owner: Owner = Depends(current_owner)):
     # Key numbers and charts arrive in slice 6.
     return DashboardOut(date=clock.now().date().isoformat(), owner_name=owner.full_name)
+
+
+# ---------- Bookings ----------
+
+
+def _out(booking) -> OwnerBookingOut:
+    return OwnerBookingOut.from_booking(booking, has_started(booking), REPEAT_NO_SHOW_THRESHOLD)
+
+
+def _range(from_: date | None, to: date | None) -> tuple[date, date]:
+    start = from_ or clock.now().date()
+    end = to or start + timedelta(days=6)
+    if end < start or (end - start).days > MAX_RANGE_DAYS:
+        from app.errors import AppError
+
+        raise AppError(422, "Please choose a range of up to 3 months.", field="to")
+    return start, end
+
+
+@router.get("/bookings", response_model=list[OwnerBookingOut])
+def bookings(
+    from_: date | None = Query(None, alias="from"),
+    to: date | None = None,
+    therapist_id: int | None = None,
+    status: str | None = None,
+    q: str | None = Query(None, max_length=100),
+    db: Session = Depends(get_db),
+):
+    start, end = _range(from_, to)
+    return [_out(b) for b in list_bookings(db, start, end, therapist_id, status, q)]
+
+
+@router.get("/bookings/export.csv")
+def export_csv(
+    from_: date | None = Query(None, alias="from"),
+    to: date | None = None,
+    therapist_id: int | None = None,
+    status: str | None = None,
+    q: str | None = Query(None, max_length=100),
+    db: Session = Depends(get_db),
+):
+    start, end = _range(from_, to)
+    body = bookings_csv(list_bookings(db, start, end, therapist_id, status, q))
+    return Response(
+        content="﻿" + body,  # BOM so Excel reads UTF-8 names correctly
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="bookings-{start}-to-{end}.csv"',
+                 "Cache-Control": "no-store"},
+    )
+
+
+@router.get("/bookings/{booking_id}", response_model=OwnerBookingOut)
+def booking_detail(booking_id: int, db: Session = Depends(get_db)):
+    return _out(get_booking(db, booking_id))
+
+
+@router.get("/availability", response_model=AvailabilityOut)
+def owner_availability(
+    date: date,
+    service_ids: str = Query(""),
+    add_on_ids: str = Query(""),
+    therapist_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Like the public endpoint, but without the 2-hour notice (phone bookings)."""
+    check_date_in_range(db, date)
+    selection = resolve_selection(db, parse_ids(service_ids), parse_ids(add_on_ids))
+    therapists = require_therapists(db, selection)
+    if therapist_id is not None:
+        therapists = [t for t in therapists if t.id == therapist_id]
+    slots = free_slots(db, date, selection, therapists, for_owner=True)
+    return AvailabilityOut(
+        date=date, total_minutes=selection.total_minutes,
+        slots=[SlotOut(time=s.local_time, start_at=s.start_at, therapist_id=s.therapist.id,
+                       therapist_name=s.therapist.display_name) for s in slots],
+    )
+
+
+@router.post("/bookings", response_model=OwnerBookingOut)
+def phone_booking(body: BookingIn, request: Request, db: Session = Depends(get_db)):
+    selection = resolve_selection(db, body.service_ids, body.add_on_ids)
+    booking = create_booking(
+        db, selection, body.date, body.start_time, body.therapist_id,
+        CustomerDetails(body.first_name, body.last_name, body.email, body.phone, body.note),
+        source="phone",
+    )
+    settings = request.app.state.settings
+    request.app.state.mailer.send(confirmation_email(booking, get_studio(db), settings.public_url))
+    return _out(get_booking(db, booking.id))
+
+
+@router.put("/bookings/{booking_id}/status", response_model=OwnerBookingOut)
+def set_status(booking_id: int, body: StatusIn, db: Session = Depends(get_db)):
+    return _out(change_status(db, get_booking(db, booking_id), body.status))
+
+
+@router.put("/bookings/{booking_id}/items", response_model=OwnerBookingOut)
+def set_items(booking_id: int, body: ItemsIn, db: Session = Depends(get_db)):
+    items = [ItemInput(**i.model_dump()) for i in body.items]
+    return _out(replace_items(db, get_booking(db, booking_id), items))
+
+
+@router.post("/bookings/{booking_id}/receipt", response_model=OwnerBookingOut)
+def send_receipt(booking_id: int, request: Request, db: Session = Depends(get_db)):
+    booking = assign_receipt_number(db, get_booking(db, booking_id))
+    settings = request.app.state.settings
+    request.app.state.mailer.send(receipt_email(booking, get_studio(db), settings.public_url))
+    return _out(booking)
+
+
+# ---------- Services & add-ons ----------
+
+
+@router.get("/services", response_model=list[ServiceAdminOut])
+def services(db: Session = Depends(get_db)):
+    return catalog.list_services(db)
+
+
+@router.post("/services", response_model=ServiceAdminOut)
+def create_service(body: ServiceIn, db: Session = Depends(get_db)):
+    return catalog.save_service(db, catalog.ServiceInput(**body.model_dump()))
+
+
+@router.put("/services/{service_id}", response_model=ServiceAdminOut)
+def update_service(service_id: int, body: ServiceIn, db: Session = Depends(get_db)):
+    return catalog.save_service(db, catalog.ServiceInput(**body.model_dump()), service_id)
+
+
+@router.post("/add-ons", response_model=AddOnAdminOut)
+def create_add_on(body: AddOnIn, db: Session = Depends(get_db)):
+    return catalog.save_add_on(db, catalog.AddOnInput(**body.model_dump()))
+
+
+@router.put("/add-ons/{add_on_id}", response_model=AddOnAdminOut)
+def update_add_on(add_on_id: int, body: AddOnIn, db: Session = Depends(get_db)):
+    return catalog.save_add_on(db, catalog.AddOnInput(**body.model_dump()), add_on_id)
+
+
+# ---------- Therapists, hours, days off ----------
+
+
+@router.get("/therapists", response_model=list[TherapistAdminOut])
+def therapists(db: Session = Depends(get_db)):
+    return [TherapistAdminOut.from_therapist(t) for t in catalog.list_therapists(db)]
+
+
+@router.post("/therapists", response_model=TherapistAdminOut)
+def create_therapist(body: TherapistIn, db: Session = Depends(get_db)):
+    return TherapistAdminOut.from_therapist(
+        catalog.save_therapist(db, catalog.TherapistInput(**body.model_dump())))
+
+
+@router.put("/therapists/{therapist_id}", response_model=TherapistAdminOut)
+def update_therapist(therapist_id: int, body: TherapistIn, db: Session = Depends(get_db)):
+    return TherapistAdminOut.from_therapist(
+        catalog.save_therapist(db, catalog.TherapistInput(**body.model_dump()), therapist_id))
+
+
+@router.put("/therapists/{therapist_id}/hours", response_model=TherapistAdminOut)
+def set_hours(therapist_id: int, body: HoursListIn, db: Session = Depends(get_db)):
+    hours = [catalog.HoursInput(**h.model_dump()) for h in body.hours]
+    return TherapistAdminOut.from_therapist(catalog.replace_hours(db, therapist_id, hours))
+
+
+def _day_off_out(db: Session, d) -> DayOffOut:
+    therapist = db.get(Therapist, d.therapist_id) if d.therapist_id else None
+    return DayOffOut(id=d.id, therapist_id=d.therapist_id,
+                     therapist_name=therapist.display_name if therapist else None,
+                     date=d.date, reason=d.reason)
+
+
+@router.get("/days-off", response_model=list[DayOffOut])
+def days_off(from_: date | None = Query(None, alias="from"), db: Session = Depends(get_db)):
+    return [_day_off_out(db, d) for d in catalog.list_days_off(db, from_ or clock.now().date())]
+
+
+@router.post("/days-off", response_model=DayOffOut)
+def add_day_off(body: DayOffIn, db: Session = Depends(get_db)):
+    return _day_off_out(db, catalog.add_day_off(db, body.therapist_id, body.date, body.reason))
+
+
+@router.delete("/days-off/{day_off_id}", status_code=204)
+def delete_day_off(day_off_id: int, db: Session = Depends(get_db)) -> Response:
+    catalog.delete_day_off(db, day_off_id)
+    return Response(status_code=204)
