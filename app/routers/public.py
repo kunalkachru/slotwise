@@ -1,13 +1,24 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
+from app.emails import confirmation_email
 from app.errors import AppError
 from app.logic.availability import check_date_in_range, free_slots
-from app.logic.booking import CustomerDetails, create_booking
+from app.logic.availability import get_studio as load_studio
+from app.logic.booking import (
+    CustomerDetails,
+    can_cancel,
+    can_confirm,
+    cancel_booking,
+    confirm_booking,
+    create_booking,
+    free_cancellation_until,
+    get_by_token,
+)
 from app.logic.selection import parse_ids, require_therapists, resolve_selection
 from app.models import CATEGORIES, Service, Studio
 from app.schemas import (
@@ -16,10 +27,12 @@ from app.schemas import (
     BookingIn,
     BookingOut,
     CategoryOut,
+    ManageOut,
     ServiceOut,
     SlotOut,
     StudioOut,
     TherapistOut,
+    booking_fields,
 )
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -98,7 +111,7 @@ def availability(
 
 
 @router.post("/bookings", response_model=BookingOut)
-def book(body: BookingIn, db: Session = Depends(get_db)):
+def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
     selection = resolve_selection(db, body.service_ids, body.add_on_ids)
     booking = create_booking(
         db,
@@ -108,4 +121,33 @@ def book(body: BookingIn, db: Session = Depends(get_db)):
         body.therapist_id,
         CustomerDetails(body.first_name, body.last_name, body.email, body.phone, body.note),
     )
+    settings = request.app.state.settings
+    request.app.state.mailer.send(confirmation_email(booking, load_studio(db), settings.public_url))
     return BookingOut.from_booking(booking, first_name=body.first_name.strip())
+
+
+def _manage_view(db: Session, booking) -> ManageOut:
+    return ManageOut(
+        **booking_fields(booking),
+        free_cancellation_until=free_cancellation_until(db, booking),
+        late_cancellation=booking.late_cancellation,
+        can_confirm=can_confirm(booking) and booking.status == "booked",
+        can_cancel=can_cancel(booking),
+        confirmed_at=booking.confirmed_at,
+        cancelled_at=booking.cancelled_at,
+    )
+
+
+@router.get("/bookings/{token}", response_model=ManageOut)
+def view_booking(token: str, db: Session = Depends(get_db)):
+    return _manage_view(db, get_by_token(db, token))
+
+
+@router.post("/bookings/{token}/confirm", response_model=ManageOut)
+def confirm(token: str, db: Session = Depends(get_db)):
+    return _manage_view(db, confirm_booking(db, get_by_token(db, token)))
+
+
+@router.post("/bookings/{token}/cancel", response_model=ManageOut)
+def cancel(token: str, db: Session = Depends(get_db)):
+    return _manage_view(db, cancel_booking(db, get_by_token(db, token)))

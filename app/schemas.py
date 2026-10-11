@@ -113,7 +113,35 @@ class BookingItemOut(ORMModel):
     line_total: MoneyStr
 
 
+def booking_fields(booking) -> dict:
+    local_start = booking.start_at.astimezone(BERLIN)
+    return dict(
+        status=booking.status,
+        source=booking.source,
+        start_at=booking.start_at,
+        end_at=booking.end_at,
+        date=local_start.date(),
+        time=local_start.strftime("%H:%M"),
+        total_minutes=sum(i.minutes_snapshot * i.quantity for i in booking.items),
+        total_price=booking.total_price,
+        therapist_name=booking.therapist.display_name,
+        items=[
+            BookingItemOut(
+                item_type=i.item_type,
+                name=i.name_snapshot,
+                minutes=i.minutes_snapshot,
+                unit_price=i.unit_price_snapshot,
+                quantity=i.quantity,
+                line_total=i.unit_price_snapshot * i.quantity,
+            )
+            for i in booking.items
+        ],
+    )
+
+
 class BookingOut(BaseModel):
+    """Returned right after booking."""
+
     id: int
     manage_token: str
     status: str
@@ -132,29 +160,31 @@ class BookingOut(BaseModel):
     def from_booking(cls, booking, first_name: str) -> "BookingOut":
         """`first_name` is the name submitted with this booking. Never echo the saved
         customer's name: the booker may not be that customer (security review)."""
-        local_start = booking.start_at.astimezone(BERLIN)
         return cls(
             id=booking.id,
             manage_token=booking.manage_token,
-            status=booking.status,
-            source=booking.source,
-            start_at=booking.start_at,
-            end_at=booking.end_at,
-            date=local_start.date(),
-            time=local_start.strftime("%H:%M"),
-            total_minutes=sum(i.minutes_snapshot * i.quantity for i in booking.items),
-            total_price=booking.total_price,
-            therapist_name=booking.therapist.display_name,
             customer_first_name=first_name,
-            items=[
-                BookingItemOut(
-                    item_type=i.item_type,
-                    name=i.name_snapshot,
-                    minutes=i.minutes_snapshot,
-                    unit_price=i.unit_price_snapshot,
-                    quantity=i.quantity,
-                    line_total=i.unit_price_snapshot * i.quantity,
-                )
-                for i in booking.items
-            ],
+            **booking_fields(booking),
         )
+
+
+class ManageOut(BaseModel):
+    """What the secret manage link shows. Deliberately no customer details: the link
+    holder is not necessarily the person whose email the booking uses."""
+
+    status: str
+    source: str
+    start_at: datetime
+    end_at: datetime
+    date: date
+    time: str
+    total_minutes: int
+    total_price: MoneyStr
+    therapist_name: str
+    items: list[BookingItemOut]
+    free_cancellation_until: datetime
+    late_cancellation: bool
+    can_confirm: bool
+    can_cancel: bool
+    confirmed_at: datetime | None
+    cancelled_at: datetime | None

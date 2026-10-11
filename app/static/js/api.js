@@ -54,6 +54,11 @@ export function h(tag, attrs = {}, ...children) {
   return el;
 }
 
+// Replace an element's children, skipping false/null/undefined (from `cond && h(...)`).
+export function fill(target, ...children) {
+  target.replaceChildren(...children.flat().filter((c) => c != null && c !== false));
+}
+
 const euroWhole = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", minimumFractionDigits: 0 });
 const euroCents = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
 

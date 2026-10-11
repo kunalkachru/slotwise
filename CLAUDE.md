@@ -24,6 +24,7 @@ Slotwise is a booking app for one small appointment-based studio. The demo studi
   - `DATABASE_URL`, `SECRET_KEY`, `JOBS_SECRET`, `EMAIL_API_KEY`
   - `OWNER_EMAIL`, `OWNER_PASSWORD`: used only by the seed
   - `SEED_DEMO_DATA`
+  - `EMAIL_FROM` (Resend sender) and `PUBLIC_URL` (base for email links; on Render `RENDER_EXTERNAL_URL` is used automatically)
   - `RENDER_GIT_COMMIT` is set by Render, so it is not listed in `.env.example`.
 
 ## Commands
@@ -51,7 +52,7 @@ docker build -t slotwise . && docker run --rm -p 8000:8000 --env-file .env slotw
 
 The jobs must be idempotent, because a call can come late or twice.
 
-**Email:** all emails go through one `send_email()` function. By default it prints to the log. It calls an email API such as Resend only when `EMAIL_API_KEY` is set.
+**Email:** all emails go through `Mailer.send()` (`app/emails.py`, on `app.state.mailer`). By default it prints to the log. With `EMAIL_API_KEY` it posts to Resend via the standard library. A failed send is logged and never fails the request. `mailer.outbox` keeps the last 50 messages, which is what tests assert on.
 
 **Two kinds of access:**
 - `/public/*`: customers, with no accounts. A customer reaches their own booking only through a secret `manage_token`, and a waitlist offer through an `offer_token`. Generate both with `secrets`. A token must never expose another customer's data.

@@ -465,3 +465,38 @@ textarea {
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; margin: 1rem 0 1.25rem; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; font-weight: 600; }
+
+/* ---------- Manage booking (slice 3) ---------- */
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  background: var(--line);
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+.status-badge.booked { background: #fff4e0; color: #8a5300; }
+.status-badge.confirmed, .status-badge.done { background: var(--accent-soft); color: var(--green-dark); }
+.status-badge.cancelled, .status-badge.no_show { background: var(--danger-soft); color: var(--danger); }
+.actions { display: grid; gap: 0.6rem; margin-top: 1rem; }
+.btn-danger-ghost { background: transparent; color: var(--danger); border-color: #f1c6c1; }
+.btn-danger-ghost:hover { background: var(--danger-soft); color: var(--danger); }
+.confirm-cancel {
+  border: 1px solid #f1c6c1;
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+}
+.confirm-cancel p { margin: 0 0 0.6rem; }
+.confirm-cancel .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.success-note {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--green-dark);
+  margin-bottom: 1rem;
+}
+.policy-note { font-size: 0.92rem; color: var(--muted); margin: 0.75rem 0 0; }
+.policy-note.late { color: #8a5300; }

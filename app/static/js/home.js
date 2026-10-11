@@ -1,4 +1,4 @@
-import { api, formatEuro, formatMinutes, h } from "/js/api.js";
+import { api, fill, formatEuro, formatMinutes, h } from "/js/api.js";
 
 async function loadStudio() {
   try {
@@ -10,7 +10,7 @@ async function loadStudio() {
     phone.textContent = studio.phone;
     phone.href = `tel:${studio.phone.replace(/\s+/g, "")}`;
     // "Mon 10:00–19:00 · Tue–Fri …" reads best as one line per part on small screens.
-    document.getElementById("studio-hours").replaceChildren(
+    fill(document.getElementById("studio-hours"), 
       ...studio.opening_hours_text.split(" · ").map((part) => h("span", { class: "hours-part" }, part)),
     );
     const policy = document.getElementById("studio-policy");
@@ -51,10 +51,10 @@ async function loadMenu() {
   try {
     const categories = await api("/public/services");
     if (categories.length === 0) {
-      target.replaceChildren(h("p", { class: "state" }, "The menu is being prepared. Please call us to book."));
+      fill(target, h("p", { class: "state" }, "The menu is being prepared. Please call us to book."));
       return;
     }
-    target.replaceChildren(
+    fill(target, 
       ...categories.map((category) =>
         h("section", { class: "menu-category", "aria-label": category.name },
           h("h2", {}, category.name),
@@ -63,7 +63,7 @@ async function loadMenu() {
       ),
     );
   } catch {
-    target.replaceChildren(h("p", { class: "state" }, "Could not load the menu. Please refresh."));
+    fill(target, h("p", { class: "state" }, "Could not load the menu. Please refresh."));
   }
 }
 

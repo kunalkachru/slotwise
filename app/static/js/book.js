@@ -1,4 +1,4 @@
-import { api, ApiError, formatEuro, h } from "/js/api.js";
+import { api, fill, ApiError, formatEuro, h } from "/js/api.js";
 
 // ---------- State ----------
 const state = {
@@ -35,7 +35,7 @@ const todayBerlin = () => isoDay.format(new Date());
 // ---------- Step 1: services ----------
 function renderServices(menu) {
   const target = $("services");
-  target.replaceChildren(
+  fill(target, 
     ...menu.flatMap((category) => [
       h("p", { class: "choice-group-title" }, category.name),
       ...category.services.map((service) =>
@@ -74,7 +74,7 @@ function renderAddOns() {
     state.services.get(id).add_ons.map((a) => ({ ...a, serviceName: state.services.get(id).name })),
   );
   $("addons-step").hidden = available.length === 0;
-  $("addons").replaceChildren(
+  fill($("addons"), 
     ...available.map((addOn) =>
       h("label", { class: "choice" },
         h("input", {
@@ -121,7 +121,7 @@ function renderTherapists() {
   const options = state.therapists.length > 1
     ? [{ id: null, display_name: "No preference" }, ...state.therapists]
     : state.therapists;
-  $("therapists").replaceChildren(
+  fill($("therapists"), 
     ...options.map((t) =>
       h("button", {
         type: "button", class: "chip", role: "radio",
@@ -147,7 +147,7 @@ function renderDays() {
   dateInput.min = today;
   dateInput.max = addDays(today, state.windowDays);
   dateInput.value = state.date || "";
-  $("days").replaceChildren(
+  fill($("days"), 
     ...Array.from({ length: 14 }, (_, i) => addDays(today, i)).map((day) =>
       h("button", {
         type: "button", class: "chip day", "aria-pressed": String(day === state.date),
@@ -176,11 +176,11 @@ function selectDate(day) {
 async function loadTimes() {
   const target = $("times");
   if (!state.date || state.selectedServices.length === 0 || state.therapists.length === 0) {
-    target.replaceChildren(h("p", { class: "notice" }, state.date ? "" : "Pick a day to see free times."));
+    fill(target, h("p", { class: "notice" }, state.date ? "" : "Pick a day to see free times."));
     return;
   }
   const request = ++state.timesRequest; // ignore answers to outdated requests
-  target.replaceChildren(h("p", { class: "notice" }, "Looking for free times…"));
+  fill(target, h("p", { class: "notice" }, "Looking for free times…"));
   const params = new URLSearchParams({
     date: state.date,
     service_ids: state.selectedServices.join(","),
@@ -193,18 +193,18 @@ async function loadTimes() {
     renderTimes(result.slots);
   } catch (e) {
     if (request !== state.timesRequest) return;
-    target.replaceChildren(h("p", { class: "field-error" }, e.message));
+    fill(target, h("p", { class: "field-error" }, e.message));
   }
 }
 
 function renderTimes(slots) {
   const target = $("times");
   if (slots.length === 0) {
-    target.replaceChildren(h("p", { class: "notice" }, "No free times on this day. Please try another day."));
+    fill(target, h("p", { class: "notice" }, "No free times on this day. Please try another day."));
     return;
   }
   const showName = state.therapistId === null && state.therapists.length > 1;
-  target.replaceChildren(
+  fill(target, 
     h("div", { class: "times" },
       slots.map((slot) =>
         h("button", {
@@ -244,7 +244,7 @@ function renderSummary() {
   else if (state.date) when.textContent = `${longDate.format(asDate(state.date))}, pick a time`;
   else when.textContent = "Pick a day and time";
 
-  $("summary-lines").replaceChildren(
+  fill($("summary-lines"), 
     ...lines.map((l) => h("tr", {}, h("td", { class: l.addOn ? "sub" : "" }, l.addOn ? `+ ${l.name}` : l.name), h("td", {}, euros(l.price)))),
     lines.length > 0 && h("tr", {}, h("td", { class: "sub" }, "Total time"), h("td", { class: "sub" }, `${minutes} min`)),
     lines.length > 0 && h("tr", { class: "total" }, h("td", {}, "Total"), h("td", {}, euros(total))),
@@ -340,7 +340,7 @@ async function init() {
     if (state.selectedServices.length) toggleService(state.selectedServices[0], true);
     renderSummary();
   } catch {
-    $("services").replaceChildren(h("p", { class: "field-error" }, "Could not load services."));
+    fill($("services"), h("p", { class: "field-error" }, "Could not load services."));
   }
 }
 

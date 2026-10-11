@@ -24,6 +24,9 @@ class Settings:
     owner_password: str | None = None
     seed_demo_data: bool = False
     version: str = "dev"
+    # Base for links in emails. Render sets RENDER_EXTERNAL_URL automatically.
+    public_url: str = "http://localhost:8000"
+    email_from: str = "Slotwise <onboarding@resend.dev>"
 
     @property
     def is_sqlite(self) -> bool:
@@ -40,6 +43,10 @@ class Settings:
             owner_password=env.get("OWNER_PASSWORD") or None,
             seed_demo_data=_flag(env.get("SEED_DEMO_DATA")),
             version=env.get("RENDER_GIT_COMMIT") or "dev",
+            public_url=(
+                env.get("PUBLIC_URL") or env.get("RENDER_EXTERNAL_URL") or cls.public_url
+            ).rstrip("/"),
+            email_from=env.get("EMAIL_FROM") or cls.email_from,
         )
         if settings.secret_key == DEV_SECRET_KEY:
             if not settings.is_sqlite:

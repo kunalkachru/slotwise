@@ -8,7 +8,11 @@ from datetime import date, datetime, time, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.errors import (
+    ALREADY_CANCELLED_OR_FINISHED,
+    BOOKING_NOT_FOUND,
+    CANNOT_CONFIRM,
     INVALID_EMAIL,
     MISSING_FIRST_NAME,
     MISSING_LAST_NAME,
@@ -23,6 +27,7 @@ from app.logic.availability import (
     booking_limits,
     bookings_per_therapist,
     free_slots_by_therapist,
+    get_studio,
     local_to_utc,
     pick_therapist,
 )
@@ -151,4 +156,48 @@ def create_booking(
         db.add(booking)
         db.commit()
     db.refresh(booking)
+    return booking
+
+
+# ---------- Manage link (slice 3) ----------
+
+
+def get_by_token(db: Session, token: str) -> Booking:
+    booking = db.scalar(select(Booking).where(Booking.manage_token == token)) if token else None
+    if booking is None:
+        raise AppError(404, BOOKING_NOT_FOUND)
+    return booking
+
+
+def free_cancellation_until(db: Session, booking: Booking) -> datetime:
+    return booking.start_at - timedelta(hours=get_studio(db).free_cancellation_hours)
+
+
+def can_confirm(booking: Booking) -> bool:
+    return booking.status in ("booked", "confirmed") and booking.start_at > clock.now()
+
+
+def can_cancel(booking: Booking) -> bool:
+    return booking.status in ("booked", "confirmed") and booking.start_at > clock.now()
+
+
+def confirm_booking(db: Session, booking: Booking) -> Booking:
+    if not can_confirm(booking):
+        raise AppError(400, CANNOT_CONFIRM)
+    if booking.status == "booked":  # confirming twice is harmless
+        booking.status = "confirmed"
+        booking.confirmed_at = clock.now()
+        db.commit()
+    return booking
+
+
+def cancel_booking(db: Session, booking: Booking) -> Booking:
+    """Free up to `free_cancellation_hours` before the start; later is allowed but flagged."""
+    if not can_cancel(booking):
+        raise AppError(400, ALREADY_CANCELLED_OR_FINISHED)
+    now = clock.now()
+    booking.status = "cancelled"
+    booking.cancelled_at = now
+    booking.late_cancellation = now > free_cancellation_until(db, booking)
+    db.commit()
     return booking

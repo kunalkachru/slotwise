@@ -213,6 +213,8 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - an itemized confirmation email with the manage link
   - `GET /public/bookings/{token}`, `POST …/confirm`, `POST …/cancel` (sets `late_cancellation` inside 24 hours; 400 if already cancelled or finished)
   - the reminder-email builder, ready for slice 5
+  - Email links are built from `PUBLIC_URL`, or Render's automatic `RENDER_EXTERNAL_URL`. Resend's sender is `EMAIL_FROM` **[decision]**.
+  - The manage view returns no customer details, because the link holder may not own the email.
 - **Front end:** Manage booking (details, Confirm I'm coming, Cancel with an "Are you sure?" prompt, Book again).
 - **Tests:**
   - **Cancellation deadline**: 24h + 1min → not late, 23h59 → late
