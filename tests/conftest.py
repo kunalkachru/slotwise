@@ -110,7 +110,17 @@ CUSTOMER = {
 }
 
 
-def book(client, services, day, start, therapist=None, add_ons=(), **customer):
+def manage_token(client, booking_id: int) -> str:
+    """The secret manage link token. The API never returns it (it only travels by email)."""
+    from app.models import Booking
+
+    with client.app.state.session_factory() as session:
+        return session.get(Booking, booking_id).manage_token
+
+
+def book(client, services, day, start, therapist=None, add_ons=(), confirm=True, **customer):
+    """Book online. By default also clicks the "confirm your booking" email link, as a
+    real customer would; pass confirm=False to leave the booking pending."""
     ids = menu_ids(client)
     body = {
         "service_ids": [ids[s] for s in services],
@@ -121,7 +131,11 @@ def book(client, services, day, start, therapist=None, add_ons=(), **customer):
         **CUSTOMER,
         **customer,
     }
-    return client.post("/public/bookings", json=body)
+    response = client.post("/public/bookings", json=body)
+    if confirm and response.status_code == 200:
+        token = manage_token(client, response.json()["id"])
+        assert client.post(f"/public/bookings/{token}/verify").status_code == 200
+    return response
 
 
 def slots(client, services, day, therapist=None, add_ons=()):

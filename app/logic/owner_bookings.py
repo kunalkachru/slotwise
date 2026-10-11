@@ -98,8 +98,12 @@ def change_status(db: Session, booking: Booking, new_status: str) -> Booking:
         return booking
     if booking.receipt_sent_at is not None:
         raise AppError(400, RECEIPT_ALREADY_SENT)
-    if old == "cancelled":
+    if old in ("cancelled", "expired"):
         raise AppError(400, CANCELLED_CANT_CHANGE)
+    if new_status in ("pending", "expired"):
+        raise AppError(400, STATUS_NOT_ALLOWED)  # set by the system, not by hand
+    if old == "pending" and new_status in ("done", "no_show"):
+        raise AppError(400, STATUS_NOT_ALLOWED)  # confirm it first
 
     if new_status == "cancelled":
         return cancel_booking(db, booking)  # same 24 h late-cancellation rule
@@ -137,7 +141,7 @@ class ItemInput:
 def replace_items(db: Session, booking: Booking, items: list[ItemInput]) -> Booking:
     """Final itemized lines for what happened on the day. Changes the total and the
     receipt, not the calendar times [decision]."""
-    if booking.status == "cancelled":
+    if booking.status in ("cancelled", "expired"):
         raise AppError(400, CANCELLED_CANT_CHANGE)
     if booking.receipt_sent_at is not None:
         raise AppError(400, RECEIPT_ALREADY_SENT)

@@ -7,7 +7,7 @@ const longDay = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeri
 const shortDay = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const asDate = (iso) => new Date(`${iso}T12:00:00Z`);
 const percent = (rate) => (rate === null || rate === undefined ? "–" : `${Math.round(rate * 1000) / 10}%`);
-const STATUS = { booked: "Booked", confirmed: "Confirmed", done: "Done", no_show: "No-show", cancelled: "Cancelled" };
+const STATUS = { pending: "Awaiting email", expired: "Not confirmed", booked: "Booked", confirmed: "Confirmed", done: "Done", no_show: "No-show", cancelled: "Cancelled" };
 const SERIES = [
   { key: "no_shows", label: "No-shows", cls: "s1", color: "#2a78d6" },
   { key: "late_cancellations", label: "Late cancellations", cls: "s2", color: "#eb6834" },

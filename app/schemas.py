@@ -171,7 +171,6 @@ class BookingOut(BaseModel):
     """Returned right after booking."""
 
     id: int
-    manage_token: str
     status: str
     source: str
     start_at: datetime
@@ -183,15 +182,18 @@ class BookingOut(BaseModel):
     therapist_name: str
     customer_first_name: str
     items: list[BookingItemOut]
+    hold_until: datetime | None = None  # set while the booking awaits email confirmation
 
     @classmethod
-    def from_booking(cls, booking, first_name: str) -> "BookingOut":
+    def from_booking(cls, booking, first_name: str, hold_until=None) -> "BookingOut":
         """`first_name` is the name submitted with this booking. Never echo the saved
-        customer's name: the booker may not be that customer (security review)."""
+        customer's name: the booker may not be that customer (security review).
+        The manage token is deliberately absent: it only travels by email, which is
+        what proves the booker owns the address."""
         return cls(
             id=booking.id,
-            manage_token=booking.manage_token,
             customer_first_name=first_name,
+            hold_until=hold_until,
             **booking_fields(booking),
         )
 
@@ -218,6 +220,8 @@ class ManageOut(BaseModel):
     cancelled_at: datetime | None
     receipt_number: str | None = None
     receipt_sent_at: datetime | None = None
+    awaiting_email_confirmation: bool = False
+    hold_until: datetime | None = None
 
 
 # ---------- Slice 4: owner area ----------
@@ -415,6 +419,12 @@ class WaitlistJoinOut(BaseModel):
 
     status: str  # always "received"
     preferred_date: date
+
+
+class WaitlistConfirmOut(BaseModel):
+    status: str
+    preferred_date: date
+    position: int | None
 
 
 class OfferLineOut(BaseModel):

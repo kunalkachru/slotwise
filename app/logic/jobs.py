@@ -59,6 +59,32 @@ def expire_offers(db: Session, mailer: Mailer, public_url: str) -> tuple[int, in
     return len(overdue), offered
 
 
+def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[int, int]:
+    """Online bookings not confirmed within the hold, and waitlist requests not confirmed
+    within a day, expire. A released booking slot goes to the waitlist.
+    Returns (bookings expired, waitlist requests expired)."""
+    from app.logic.availability import BOOKING_HOLD_MINUTES
+    from app.logic.waitlist import WAITLIST_CONFIRM_HOURS, offer_slot
+
+    now = clock.now()
+    stale = db.scalars(select(Booking).where(
+        Booking.status == "pending",
+        Booking.created_at <= now - timedelta(minutes=BOOKING_HOLD_MINUTES),
+    )).all()
+    for booking in stale:
+        booking.status = "expired"
+        db.commit()
+        offer_slot(db, mailer, public_url, booking.therapist_id, booking.start_at)
+    requests = db.scalars(select(WaitlistEntry).where(
+        WaitlistEntry.status == "pending",
+        WaitlistEntry.created_at <= now - timedelta(hours=WAITLIST_CONFIRM_HOURS),
+    )).all()
+    for entry in requests:
+        entry.status = "expired"
+    db.commit()
+    return len(stale), len(requests)
+
+
 def anonymize_customer(db: Session, customer: Customer) -> None:
     """Remove personal details but keep bookings and receipts (amounts, dates).
     Reusable for "delete a customer on request" later (PLAN.md, nice to have)."""
@@ -70,7 +96,7 @@ def anonymize_customer(db: Session, customer: Customer) -> None:
     for booking in customer.bookings:
         booking.customer_note = None
     for entry in db.scalars(select(WaitlistEntry).where(WaitlistEntry.customer_id == customer.id)):
-        if entry.status in ("waiting", "offered"):
+        if entry.status in ("pending", "waiting", "offered"):
             entry.status = "removed"
 
 
@@ -94,8 +120,11 @@ def run_jobs(db: Session, mailer: Mailer, public_url: str) -> dict:
     if not _run_lock.acquire(blocking=False):
         return {"skipped": "another run is in progress"}
     try:
+        unconfirmed_bookings, unconfirmed_requests = expire_unconfirmed(db, mailer, public_url)
         expired, offered = expire_offers(db, mailer, public_url)
         return {
+            "unconfirmed_bookings_expired": unconfirmed_bookings,
+            "unconfirmed_waitlist_expired": unconfirmed_requests,
             "reminders_sent": send_due_reminders(db, mailer, public_url),
             "offers_expired": expired,
             "offers_passed_on": offered,

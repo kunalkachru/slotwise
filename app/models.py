@@ -24,10 +24,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db import Base, UTCDateTime
 
 CATEGORIES = ("Massages", "Facials", "Reflexology")
-BOOKING_STATUSES = ("booked", "confirmed", "done", "no_show", "cancelled")
+# pending: online booking waiting for the customer's email confirmation (holds the slot
+# for BOOKING_HOLD_MINUTES); expired: never confirmed, or withdrawn while pending.
+BOOKING_STATUSES = ("pending", "booked", "confirmed", "done", "no_show", "cancelled", "expired")
 BOOKING_SOURCES = ("online", "phone", "waitlist")
 ITEM_TYPES = ("service", "add_on", "extra")
-WAITLIST_STATUSES = ("waiting", "offered", "booked", "expired", "removed")
+# pending: joined, waiting for the email confirmation (double opt-in)
+WAITLIST_STATUSES = ("pending", "waiting", "offered", "booked", "expired", "removed")
 
 Money = Numeric(10, 2)
 
@@ -254,6 +257,7 @@ class WaitlistEntry(Timestamped, Base):
     earliest_time: Mapped[time] = mapped_column(Time)
     latest_time: Mapped[time] = mapped_column(Time)
     status: Mapped[str] = mapped_column(String(20), default="waiting")
+    confirm_token: Mapped[str | None] = mapped_column(String(64), unique=True)  # opt-in link
     offer_token: Mapped[str | None] = mapped_column(String(64), unique=True)
     offer_start_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     offer_therapist_id: Mapped[int | None] = mapped_column(ForeignKey("therapists.id"))

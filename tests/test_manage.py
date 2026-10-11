@@ -8,7 +8,7 @@ import pytest
 from app import clock
 from app.emails import Mailer, reminder_email
 from app.models import Booking, Studio
-from tests.conftest import book, slots
+from tests.conftest import book, manage_token, slots
 
 TUESDAY = "2026-10-13"
 
@@ -17,8 +17,8 @@ def outbox(client):
     return list(client.app.state.mailer.outbox)
 
 
-def token_of(response):
-    return response.json()["manage_token"]
+def emails(client, subject_start):
+    return [e for e in client.app.state.mailer.outbox if e.subject.startswith(subject_start)]
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def booked(empty_calendar):
     response = book(empty_calendar, ["Deep tissue massage"], TUESDAY, "17:00", "Lena",
                     add_ons=[("Deep tissue massage", "Hot stones")])
     assert response.status_code == 200
-    return empty_calendar, token_of(response)
+    return empty_calendar, manage_token(empty_calendar, response.json()["id"])
 
 
 def at(monkeypatch, year, month, day, hour, minute=0):
@@ -37,7 +37,7 @@ def at(monkeypatch, year, month, day, hour, minute=0):
 
 def test_booking_sends_an_itemized_confirmation_email(booked):
     client, token = booked
-    [email] = outbox(client)
+    [email] = emails(client, "Booking confirmed")
     assert email.to == "anna.mueller@example.com"
     assert email.subject.startswith("Booking confirmed: Tuesday 13 October 2026, 17:00")
     for text in (email.text, email.html):
@@ -51,7 +51,7 @@ def test_booking_sends_an_itemized_confirmation_email(booked):
 
 def test_email_html_escapes_customer_input(empty_calendar):
     book(empty_calendar, ["Classic facial"], TUESDAY, "10:00", "Sofia", first_name="O'Neil")
-    [email] = outbox(empty_calendar)
+    [email] = emails(empty_calendar, "Booking confirmed")
     assert "Hello O&#x27;Neil" in email.html
     assert "O'Neil" not in email.html
 
@@ -147,8 +147,8 @@ def test_cancelling_twice_or_after_the_start_is_rejected(booked, monkeypatch, em
     assert confirm.status_code == 400
     assert confirm.json()["detail"] == "This booking can no longer be confirmed."
 
-    other = token_of(book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia",
-                          email="tom.becker@example.com"))
+    other = manage_token(client, book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia",
+                                      email="tom.becker@example.com").json()["id"])
     at(monkeypatch, 2026, 10, 13, 10, 30)  # appointment already started
     assert client.post(f"/public/bookings/{other}/cancel").status_code == 400
     assert client.post(f"/public/bookings/{other}/confirm").status_code == 400

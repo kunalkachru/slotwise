@@ -72,6 +72,8 @@ The jobs must be idempotent, because a call can come late or twice.
 
 **Owner pages:** every page in `app/static/owner/` uses `js/owner-shell.js` (session check, side menu, log out) and `ownerApi()` (redirects to login on 401). Management dialogs share `js/owner-forms.js`. Front-end code builds DOM with `h()` and `fill()` from `js/api.js`; never use `innerHTML` with data.
 
+**Email confirmation:** online bookings start `pending` and only become `booked` via the emailed link (`POST /public/bookings/{token}/verify`); waitlist joins start `pending` until `POST /public/waitlist/confirm/{token}`. "Occupies a slot" is defined once in `availability.occupies_slot()` (pending only during its 30-minute hold). The manage token must never appear in an API response: email is what proves the address.
+
 **Seed:** runs on startup only when the `studio` table is empty. It always creates the studio and the owner. Demo data (menu, Lena and Sofia, about 20 bookings) is added only when `SEED_DEMO_DATA=true`, in production too. Every seeded customer must have a fake `@example.com` email address.
 
 **Data model:** the main tables are Studio, Owners, Therapists, Services, AddOns, TherapistServices, WorkingHours, DaysOff, Customers, Bookings, BookingItems and WaitlistEntries.

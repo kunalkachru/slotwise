@@ -273,3 +273,48 @@ def waitlist_limit_email(customer, day, studio, limit: int) -> Email:
         ),
         reply_to=studio.email,
     )
+
+
+def booking_verification_email(booking, studio, public_url: str, hold_until) -> Email:
+    """First email after an online booking: only a click proves the address is theirs."""
+    until = hold_until.astimezone(BERLIN).strftime("%H:%M")
+    intro = (f"Hello {booking.customer.first_name}, please confirm your booking at "
+             f"{studio.name}. We're holding the time for you until {until}.")
+    footer = (f"If you didn't make this booking, ignore this email and the time will be "
+              f"released. {studio.name} · {studio.address} · {studio.phone}")
+    links = [("Confirm my booking", manage_link(public_url, booking, "verify"))]
+    return Email(
+        to=booking.customer.email,
+        subject=f"Please confirm your booking: {_when(booking)} · {studio.name}",
+        text=_text_body(intro, booking, links, footer),
+        html=_html_page("One more step", intro, booking, links, footer),
+        reply_to=studio.email,
+    )
+
+
+def waitlist_confirm_email(entry, studio, public_url: str) -> Email:
+    """Double opt-in: the entry only counts once the address owner clicks."""
+    day = entry.preferred_date.strftime("%A %-d %B")
+    window = f"{entry.earliest_time:%H:%M}–{entry.latest_time:%H:%M}"
+    link = f"{public_url}/waitlist-confirm.html?token={entry.confirm_token}"
+    intro = (f"Hello {entry.customer.first_name}, please confirm that you want to join the "
+             f"waitlist at {studio.name} for {day} ({window}).")
+    detail = ("The request counts once you confirm, and expires after 24 hours. If you "
+              "didn't ask for this, ignore this email.")
+    footer = f"{studio.name} · {studio.address} · {studio.phone}"
+    esc = html.escape
+    return Email(
+        to=entry.customer.email,
+        subject=f"Please confirm: waitlist for {day} · {studio.name}",
+        text=f"{intro}\n\n{detail}\n\nConfirm: {link}\n\n{footer}",
+        html=(
+            '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
+            f'max-width:520px;color:#1d2a24"><h2 style="color:#1F8756">One more step</h2>'
+            f"<p>{esc(intro)}</p><p>{esc(detail)}</p>"
+            f'<p><a href="{esc(link)}" style="display:inline-block;padding:10px 16px;'
+            f'border-radius:8px;background:#1F8756;color:#fff;text-decoration:none;'
+            f'font-weight:600">Confirm my waitlist request</a></p>'
+            f'<p style="color:#5d6b64;font-size:14px">{esc(footer)}</p></div>'
+        ),
+        reply_to=studio.email,
+    )

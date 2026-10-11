@@ -16,7 +16,7 @@ Rules:
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app import clock
@@ -25,6 +25,17 @@ from app.logic.selection import Selection
 from app.models import Booking, DayOff, Studio, Therapist
 
 STEP = timedelta(minutes=15)
+BOOKING_HOLD_MINUTES = 30  # an unconfirmed online booking holds its slot this long [decision]
+
+
+def occupies_slot():
+    """SQL condition: the booking blocks its time. Cancelled and expired bookings don't;
+    a pending (unconfirmed) one does only while its hold lasts."""
+    hold_start = clock.now() - timedelta(minutes=BOOKING_HOLD_MINUTES)
+    return and_(
+        Booking.status.notin_(("cancelled", "expired")),
+        or_(Booking.status != "pending", Booking.created_at > hold_start),
+    )
 
 
 @dataclass(frozen=True)
@@ -91,7 +102,7 @@ def _busy_ranges(db: Session, therapist_ids: list[int], day: date):
     rows = db.execute(
         select(Booking.therapist_id, Booking.start_at, Booking.blocked_until).where(
             Booking.therapist_id.in_(therapist_ids),
-            Booking.status != "cancelled",
+            occupies_slot(),
             Booking.start_at < end + timedelta(hours=12),
             Booking.blocked_until > start - timedelta(hours=12),
         )
@@ -150,7 +161,7 @@ def bookings_per_therapist(db: Session, therapist_ids: list[int], day: date) -> 
         select(Booking.therapist_id, func.count())
         .where(
             Booking.therapist_id.in_(therapist_ids),
-            Booking.status != "cancelled",
+            occupies_slot(),
             Booking.start_at >= start,
             Booking.start_at < end,
         )

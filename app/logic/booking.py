@@ -12,6 +12,7 @@ from app import clock
 from app.errors import (
     ALREADY_CANCELLED_OR_FINISHED,
     BOOKING_NOT_FOUND,
+    BOOKING_REQUEST_EXPIRED,
     CANNOT_CONFIRM,
     INVALID_EMAIL,
     MISSING_FIRST_NAME,
@@ -25,6 +26,7 @@ from app.errors import (
     outside_booking_window,
 )
 from app.logic.availability import (
+    BOOKING_HOLD_MINUTES,
     booking_limits,
     bookings_per_therapist,
     free_slots_by_therapist,
@@ -199,7 +201,9 @@ def create_booking(
             start_at=start_at,
             end_at=end_at,
             blocked_until=end_at + timedelta(minutes=selection.buffer_minutes),
-            status="booked",
+            # Online bookings wait for the email confirmation; phone (owner) and waitlist
+            # (offer link came by email) bookings are confirmed already.
+            status="pending" if source == "online" else "booked",
             total_price=selection.total_price,
             source=source,
             manage_token=new_token(),
@@ -226,12 +230,32 @@ def free_cancellation_until(db: Session, booking: Booking) -> datetime:
     return booking.start_at - timedelta(hours=get_studio(db).free_cancellation_hours)
 
 
+def hold_until(booking: Booking) -> datetime:
+    return booking.created_at + timedelta(minutes=BOOKING_HOLD_MINUTES)
+
+
+def verify_booking(db: Session, booking: Booking) -> Booking:
+    """The customer clicked the link in the "please confirm" email: the address is theirs.
+    Returns the booking; raises 410 when the 30-minute hold has run out."""
+    if booking.status != "pending":
+        if booking.status == "expired":
+            raise AppError(410, BOOKING_REQUEST_EXPIRED)
+        return booking  # already confirmed (or later): clicking twice is harmless
+    if clock.now() >= hold_until(booking):
+        booking.status = "expired"
+        db.commit()
+        raise AppError(410, BOOKING_REQUEST_EXPIRED)
+    booking.status = "booked"
+    db.commit()
+    return booking
+
+
 def can_confirm(booking: Booking) -> bool:
     return booking.status in ("booked", "confirmed") and booking.start_at > clock.now()
 
 
 def can_cancel(booking: Booking) -> bool:
-    return booking.status in ("booked", "confirmed") and booking.start_at > clock.now()
+    return booking.status in ("pending", "booked", "confirmed") and booking.start_at > clock.now()
 
 
 def confirm_booking(db: Session, booking: Booking) -> Booking:
@@ -249,6 +273,12 @@ def cancel_booking(db: Session, booking: Booking) -> Booking:
     if not can_cancel(booking):
         raise AppError(400, ALREADY_CANCELLED_OR_FINISHED)
     now = clock.now()
+    if booking.status == "pending":
+        # Never confirmed: withdrawn, not a cancellation (keeps the dashboard honest).
+        booking.status = "expired"
+        booking.cancelled_at = now
+        db.commit()
+        return booking
     booking.status = "cancelled"
     booking.cancelled_at = now
     booking.late_cancellation = now > free_cancellation_until(db, booking)

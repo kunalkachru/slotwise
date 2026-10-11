@@ -480,6 +480,10 @@ textarea {
 .status-badge.booked { background: #fff4e0; color: #8a5300; }
 .status-badge.confirmed, .status-badge.done { background: var(--accent-soft); color: var(--green-dark); }
 .status-badge.cancelled, .status-badge.no_show { background: var(--danger-soft); color: var(--danger); }
+.status-badge.pending { background: #eef3fb; color: #2c5aa0; }
+.status-badge.expired { background: var(--line); color: var(--muted); }
+.cal-card.pending { border-left-color: #2a78d6; border-left-style: dashed; }
+.cal-card.expired { opacity: 0.55; border-left-color: #b8c2bd; }
 .actions { display: grid; gap: 0.6rem; margin-top: 1rem; }
 .btn-danger-ghost { background: transparent; color: var(--danger); border-color: #f1c6c1; }
 .btn-danger-ghost:hover { background: var(--danger-soft); color: var(--danger); }

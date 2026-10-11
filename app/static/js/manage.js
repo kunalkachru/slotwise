@@ -2,7 +2,7 @@ import { api, fill, formatEuro, h } from "/js/api.js";
 
 const params = new URLSearchParams(location.search);
 const token = params.get("token") || "";
-const action = params.get("action"); // "confirm" | "cancel" from the reminder email
+const action = params.get("action"); // "verify" (booking email) | "confirm" | "cancel" (reminder)
 const target = document.getElementById("manage");
 
 const BERLIN = "Europe/Berlin";
@@ -13,6 +13,7 @@ const shortDateTime = new Intl.DateTimeFormat("en-GB", {
   weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: BERLIN,
 });
 const STATUS_LABELS = {
+  pending: "Awaiting your confirmation", expired: "Not confirmed",
   booked: "Booked", confirmed: "Confirmed", done: "Completed", no_show: "Missed", cancelled: "Cancelled",
 };
 
@@ -74,7 +75,9 @@ function render(booking) {
       : h("p", { class: "pay-note" }, "Pay at the studio"),
     booking.status === "cancelled" && h("p", { class: "muted" },
       booking.late_cancellation ? "This booking was cancelled late." : "This booking was cancelled."),
+    booking.status === "expired" && h("p", { class: "muted" }, "This booking request wasn't confirmed in time, so the time was released."),
     h("div", { class: "actions" },
+      booking.awaiting_email_confirmation && h("button", { class: "btn btn-block", type: "button", onclick: () => act("verify") }, "Confirm my booking"),
       booking.can_confirm && h("button", { class: "btn btn-block", type: "button", onclick: () => act("confirm") }, "Confirm I'm coming"),
       cancelBlock,
       h("a", { class: "btn btn-ghost btn-block", href: "/book.html" }, "Book again"),
@@ -87,7 +90,9 @@ async function act(kind) {
   target.querySelectorAll("button").forEach((b) => (b.disabled = true));
   try {
     const booking = await api(`${bookingUrl()}/${kind}`, { method: "POST" });
-    message = kind === "confirm"
+    message = kind === "verify"
+      ? { text: "Thank you! Your booking is confirmed, and we've emailed you the details.", kind: "ok" }
+      : kind === "confirm"
       ? { text: "Thank you! Your booking is confirmed. See you soon.", kind: "ok" }
       : { text: booking.late_cancellation ? "Your booking is cancelled (late cancellation)." : "Your booking is cancelled.", kind: "ok" };
     askingToCancel = false;
@@ -119,6 +124,7 @@ async function init() {
   // Drop ?action= from the address bar so a reload doesn't repeat it.
   if (action) history.replaceState(null, "", `${location.pathname}?token=${encodeURIComponent(token)}`);
   const booking = await load();
+  if (booking && action === "verify" && booking.awaiting_email_confirmation) act("verify");
   if (booking && action === "confirm" && booking.can_confirm) act("confirm");
 }
 
