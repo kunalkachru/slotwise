@@ -200,7 +200,9 @@ async function loadTimes() {
 function renderTimes(slots) {
   const target = $("times");
   if (slots.length === 0) {
-    fill(target, h("p", { class: "notice" }, "No free times on this day. Please try another day."));
+    fill(target,
+      h("p", { class: "notice" }, "No free times on this day. Try another day, or join the waitlist below."),
+      waitlistBox());
     return;
   }
   const showName = state.therapistId === null && state.therapists.length > 1;
@@ -218,6 +220,62 @@ function renderTimes(slots) {
         }, slot.time, showName && h("small", {}, slot.therapist_name)),
       ),
     ),
+  );
+}
+
+// ---------- Waitlist (when a day is full) ----------
+function timeOptions(selected) {
+  const options = [];
+  for (let minutes = 7 * 60; minutes <= 21 * 60; minutes += 30) {
+    const value = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    options.push(h("option", { value, selected: value === selected }, value));
+  }
+  return options;
+}
+
+function waitlistBox() {
+  const earliest = h("select", { id: "wl-earliest", "aria-label": "Earliest start" }, timeOptions("09:00"));
+  const latest = h("select", { id: "wl-latest", "aria-label": "Latest start" }, timeOptions("18:00"));
+  const message = h("p", { role: "status" });
+  const join = async (event) => {
+    const button = event.currentTarget;
+    const form = $("book-form");
+    clearFieldErrors();
+    message.className = "";
+    message.textContent = "";
+    if (!form.first_name.value || !form.email.value || !form.phone.value) {
+      $("details-step").scrollIntoView({ behavior: "smooth" });
+      message.className = "field-error";
+      message.textContent = "Please fill in your details below first.";
+      return;
+    }
+    button.disabled = true;
+    try {
+      const result = await api("/public/waitlist", { method: "POST", body: {
+        service_ids: state.selectedServices, add_on_ids: [...state.selectedAddOns],
+        therapist_id: state.therapistId, preferred_date: state.date,
+        earliest_time: earliest.value, latest_time: latest.value,
+        first_name: form.first_name.value, last_name: form.last_name.value,
+        email: form.email.value, phone: form.phone.value,
+      } });
+      message.className = "success-note";
+      message.textContent = `Thanks! We've emailed ${form.email.value.trim()} your place on the waitlist for this day. If a time frees up, we'll email you a link to claim it.`;
+    } catch (e) {
+      const field = e instanceof ApiError && e.body?.fields?.[0]?.field;
+      if (!(field && showFieldError(field, e.message))) {
+        message.className = "field-error";
+        message.textContent = e.message;
+      }
+      button.disabled = false;
+    }
+  };
+  return h("div", { class: "waitlist-box" },
+    h("h3", {}, "Join the waitlist"),
+    h("p", { class: "step-hint" }, "Tell us when you could come. If someone cancels, the first person on the list gets an email and can claim the time."),
+    h("div", { class: "row" }, h("label", { for: "wl-earliest" }, "Between"), earliest, h("label", { for: "wl-latest" }, "and"), latest),
+    h("p", { class: "field-hint" }, "Uses your details from step 6."),
+    h("button", { class: "btn", type: "button", onclick: join }, "Join the waitlist"),
+    message,
   );
 }
 

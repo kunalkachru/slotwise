@@ -5,8 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.emails import confirmation_email
+from app.emails import confirmation_email, waitlist_joined_email, waitlist_limit_email
 from app.errors import TOO_MANY_BOOKINGS, AppError
+from app.logic import waitlist
 from app.logic.availability import check_date_in_range, free_slots
 from app.logic.availability import get_studio as load_studio
 from app.logic.booking import (
@@ -21,7 +22,7 @@ from app.logic.booking import (
     mailbox_key,
 )
 from app.logic.selection import parse_ids, require_therapists, resolve_selection
-from app.models import CATEGORIES, Service, Studio
+from app.models import CATEGORIES, Service, Studio, Therapist
 from app.schemas import (
     AddOnOut,
     AvailabilityOut,
@@ -29,10 +30,14 @@ from app.schemas import (
     BookingOut,
     CategoryOut,
     ManageOut,
+    OfferLineOut,
+    OfferOut,
     ServiceOut,
     SlotOut,
     StudioOut,
     TherapistOut,
+    WaitlistIn,
+    WaitlistJoinOut,
     booking_fields,
 )
 from app.security import client_ip
@@ -179,5 +184,96 @@ def confirm(token: str, db: Session = Depends(get_db)):
 
 
 @router.post("/bookings/{token}/cancel", response_model=ManageOut)
-def cancel(token: str, db: Session = Depends(get_db)):
-    return _manage_view(db, cancel_booking(db, get_by_token(db, token)))
+def cancel(token: str, request: Request, db: Session = Depends(get_db)):
+    booking = cancel_booking(db, get_by_token(db, token))
+    # The freed slot goes to the first fitting person on the waitlist.
+    waitlist.offer_slot(db, request.app.state.mailer, request.app.state.settings.public_url,
+                        booking.therapist_id, booking.start_at)
+    return _manage_view(db, booking)
+
+
+# ---------- Waitlist (slice 5) ----------
+
+WAITLIST_JOINS_PER_IP_PER_HOUR = 10
+WAITLIST_JOINS_PER_EMAIL_PER_DAY = 3
+
+
+@router.post("/waitlist", response_model=WaitlistJoinOut)
+def join_waitlist(body: WaitlistIn, request: Request, db: Session = Depends(get_db)):
+    details = CustomerDetails(body.first_name, body.last_name, body.email, body.phone).cleaned()
+    limiter = request.app.state.booking_limiter
+    ip_key = "waitlist-ip:" + client_ip(
+        request.client.host if request.client else None, request.headers.get("x-forwarded-for")
+    )
+    email_key = "waitlist-email:" + mailbox_key(details.email)
+    # Per IP and per inbox, so nobody can sign a stranger up for many days of emails.
+    if not limiter.try_acquire([
+        (ip_key, WAITLIST_JOINS_PER_IP_PER_HOUR, 3600),
+        (email_key, WAITLIST_JOINS_PER_EMAIL_PER_DAY, 86400),
+    ]):
+        raise AppError(429, TOO_MANY_BOOKINGS)
+    try:
+        result = waitlist.join(db, waitlist.JoinRequest(
+            service_ids=body.service_ids, add_on_ids=body.add_on_ids,
+            therapist_id=body.therapist_id, preferred_date=body.preferred_date,
+            earliest_time=body.earliest_time, latest_time=body.latest_time, details=details,
+        ))
+    except Exception:
+        limiter.release([ip_key, email_key])
+        raise
+    studio = load_studio(db)
+    # Every outcome emails the address owner; the response is the same for all of them.
+    if result.outcome == "limit":
+        request.app.state.mailer.send(waitlist_limit_email(
+            result.customer, body.preferred_date, studio, waitlist.MAX_OPEN_ENTRIES_PER_CUSTOMER))
+    else:
+        request.app.state.mailer.send(waitlist_joined_email(
+            result.entry, result.position, studio, already=not result.created))
+    return WaitlistJoinOut(status="received", preferred_date=body.preferred_date)
+
+
+def _offer_view(db: Session, entry) -> OfferOut:
+    from app import clock
+    from app.logic.selection import resolve_selection
+
+    try:
+        selection = resolve_selection(db, list(entry.service_ids), list(entry.add_on_ids))
+        lines = [OfferLineOut(name=s.name, price=s.price) for s in selection.services]
+        lines += [OfferLineOut(name=f"+ {a.name}", price=a.price) for a in selection.add_ons]
+        minutes, total = selection.total_minutes, selection.total_price
+    except AppError:
+        lines, minutes, total = [], 0, 0
+    local = entry.offer_start_at.astimezone(clock.BERLIN)
+    status = "claimed" if entry.status == "booked" else (
+        "expired" if waitlist.is_expired(entry) else "open")
+    return OfferOut(
+        status=status, date=local.date(), time=local.strftime("%H:%M"),
+        therapist_name=db.get(Therapist, entry.offer_therapist_id).display_name,
+        total_minutes=minutes, total_price=total, lines=lines,
+        expires_at=entry.offer_expires_at,
+    )
+
+
+@router.get("/waitlist/offers/{token}", response_model=OfferOut)
+def view_offer(token: str, db: Session = Depends(get_db)):
+    entry = waitlist.get_offer(db, token)
+    view = _offer_view(db, entry)
+    if view.status == "expired":
+        raise AppError(410, "Sorry, this offer has expired.")
+    return view
+
+
+@router.post("/waitlist/offers/{token}/claim", response_model=BookingOut)
+def claim_offer(token: str, request: Request, db: Session = Depends(get_db)):
+    settings = request.app.state.settings
+    entry, booking = waitlist.claim(db, request.app.state.mailer, settings.public_url, token)
+    request.app.state.mailer.send(confirmation_email(booking, load_studio(db), settings.public_url))
+    return BookingOut.from_booking(booking, first_name=entry.customer.first_name)
+
+
+@router.post("/waitlist/offers/{token}/decline", status_code=204)
+def decline_offer(token: str, request: Request, db: Session = Depends(get_db)):
+    from fastapi import Response
+
+    waitlist.decline(db, request.app.state.mailer, request.app.state.settings.public_url, token)
+    return Response(status_code=204)

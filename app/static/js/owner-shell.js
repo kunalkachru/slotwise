@@ -8,7 +8,7 @@ const PAGES = [
   { key: "bookings", label: "Bookings", href: "/owner/bookings.html" },
   { key: "services", label: "Services & add-ons", href: "/owner/services.html" },
   { key: "therapists", label: "Therapists & hours", href: "/owner/therapists.html" },
-  { key: "waitlist", label: "Waitlist", href: null }, // slice 5
+  { key: "waitlist", label: "Waitlist", href: "/owner/waitlist.html" },
 ];
 
 export async function startOwnerPage(active) {

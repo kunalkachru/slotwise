@@ -608,3 +608,12 @@ dialog.panel::backdrop { background: rgba(16, 40, 28, 0.35); }
 }
 
 table.data .btn { white-space: nowrap; }
+
+/* ---------- Waitlist (slice 5) ---------- */
+.waitlist-box { margin-top: 0.75rem; padding: 1rem; border: 1px dashed #b9cfc2; border-radius: var(--radius-sm); background: #fbfdfc; }
+.waitlist-box h3 { margin: 0 0 0.4rem; font-size: 1rem; }
+.waitlist-box .row label { margin: 0; font-weight: 500; }
+.waitlist-box select { width: auto; }
+.waitlist-box .btn { margin-top: 0.5rem; }
+.countdown { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--green-dark); }
+.countdown.urgent { color: var(--danger); }

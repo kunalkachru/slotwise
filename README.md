@@ -57,7 +57,10 @@ See [.env.example](.env.example). `RENDER_GIT_COMMIT` is set by Render and retur
   3. Waits up to 10 minutes for the live `/health` to report the commit, and fails otherwise.
   - Can also be started by hand from the Actions tab.
 
+- **`jobs.yml`:** every 15 minutes (and on demand) POSTs `/internal/run-jobs`, which sends due reminders, expires waitlist offers and passes them on, and anonymizes old customer data.
+
 Setup for deploys (GitHub → Settings → Secrets and variables → Actions):
 - **Secret `RENDER_DEPLOY_HOOK_URL`:** from Render → your service → Settings → Deploy Hook.
 - **Variable `APP_URL`:** the live URL, e.g. `https://slotwise.onrender.com`.
+- **Secret `JOBS_SECRET`:** the same value as `JOBS_SECRET` in the Render environment (used by `jobs.yml`).
 - **Render:** turn **Auto-Deploy off**, so only the workflow deploys.
