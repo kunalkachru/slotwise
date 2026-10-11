@@ -500,3 +500,111 @@ textarea {
 }
 .policy-note { font-size: 0.92rem; color: var(--muted); margin: 0.75rem 0 0; }
 .policy-note.late { color: #8a5300; }
+
+/* ---------- Owner pages (slice 4) ---------- */
+.page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
+.page-head h1 { margin: 0; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.toolbar select, .toolbar input[type="search"], .toolbar input[type="date"] { width: auto; min-height: 40px; }
+.toolbar input[type="search"] { min-width: 12rem; flex: 1 1 12rem; }
+select {
+  min-height: 44px;
+  padding: 0.45rem 0.6rem;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #cbd5cf;
+  border-radius: var(--radius-sm);
+}
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+.segmented button { border: 0; background: #fff; padding: 0.5rem 0.85rem; font: inherit; cursor: pointer; min-height: 40px; }
+.segmented button[aria-pressed="true"] { background: var(--green); color: #fff; }
+.range-label { font-weight: 650; min-width: 10rem; }
+
+.table-wrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+table.data { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+table.data th, table.data td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.data th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 650; background: #fbfdfc; }
+table.data tr:last-child td { border-bottom: 0; }
+table.data tbody tr.clickable { cursor: pointer; }
+table.data tbody tr.clickable:hover { background: var(--accent-soft); }
+table.data td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.data tr.inactive td { color: var(--muted); }
+
+.cal { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.cal-col { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.6rem; min-height: 6rem; }
+.cal-col h3 { font-size: 0.9rem; margin: 0.1rem 0.25rem 0.6rem; }
+.cal-col.today h3 { color: var(--green); }
+.cal-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--green);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 0.45rem 0.55rem;
+  margin-bottom: 0.45rem;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  line-height: 1.3;
+}
+.cal-card:hover { background: var(--accent-soft); }
+.cal-card strong { font-variant-numeric: tabular-nums; }
+.cal-card small { display: block; color: var(--muted); }
+.cal-card.booked { border-left-color: #e0a100; }
+.cal-card.cancelled, .cal-card.no_show { border-left-color: var(--danger); opacity: 0.7; }
+.cal-card.done { border-left-color: #8aa598; }
+.cal-empty { color: var(--muted); font-size: 0.88rem; padding: 0.25rem; }
+.flag { color: var(--danger); font-weight: 650; }
+
+dialog.panel {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0;
+  box-shadow: 0 20px 60px rgba(16, 40, 28, 0.25);
+}
+dialog.panel::backdrop { background: rgba(16, 40, 28, 0.35); }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: #fff; z-index: 1; }
+.panel-head h2 { margin: 0; font-size: 1.15rem; }
+.panel-body { padding: 1rem 1.25rem 1.25rem; }
+.panel-body section + section { margin-top: 1.25rem; }
+.panel-body h3 { font-size: 0.95rem; margin: 0 0 0.5rem; }
+.icon-btn { border: 0; background: none; font-size: 1.4rem; line-height: 1; cursor: pointer; color: var(--muted); padding: 0.25rem 0.5rem; }
+.row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 0.75rem; }
+.items-editor { width: 100%; border-collapse: collapse; }
+.items-editor td { padding: 0.25rem 0.2rem; }
+.items-editor input, .items-editor select { min-height: 38px; padding: 0.3rem 0.45rem; }
+.items-editor .w-name { width: 100%; }
+.items-editor input.w-num { width: 5.5rem; }
+.items-editor input.w-qty { width: 3.5rem; }
+.check { display: flex; align-items: center; gap: 0.5rem; font-weight: 400; }
+.check input { width: 1.1rem; height: 1.1rem; min-height: 0; accent-color: var(--green); }
+.hours-grid { display: grid; grid-template-columns: 4rem 1fr 1fr auto; gap: 0.4rem 0.6rem; align-items: center; }
+.hours-grid input { min-height: 38px; padding: 0.3rem 0.45rem; }
+.toast {
+  position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: #fff; padding: 0.65rem 1rem; border-radius: var(--radius-sm);
+  box-shadow: var(--shadow); z-index: 100; max-width: calc(100vw - 32px);
+}
+.btn.danger { background: var(--danger); }
+@media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* ---------- Printable receipt ---------- */
+.receipt { max-width: 640px; margin: 2rem auto; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 2rem; }
+.receipt header { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-bottom: 2px solid var(--green); padding-bottom: 1rem; margin-bottom: 1rem; }
+.receipt .studio { color: var(--muted); font-size: 0.92rem; }
+.receipt .meta { text-align: right; }
+.receipt .meta strong { display: block; font-size: 1.2rem; }
+.no-print { margin: 1rem auto; max-width: 640px; display: flex; gap: 0.5rem; justify-content: flex-end; padding: 0 16px; }
+@media print {
+  body { background: #fff; }
+  .no-print, .topbar { display: none !important; }
+  .receipt { border: 0; margin: 0; padding: 0; max-width: none; }
+}
+
+table.data .btn { white-space: nowrap; }

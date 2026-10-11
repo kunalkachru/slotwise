@@ -162,6 +162,9 @@ def _manage_view(db: Session, booking) -> ManageOut:
         can_cancel=can_cancel(booking),
         confirmed_at=booking.confirmed_at,
         cancelled_at=booking.cancelled_at,
+        # The receipt shows only once the owner has sent it.
+        receipt_number=booking.receipt_number if booking.receipt_sent_at else None,
+        receipt_sent_at=booking.receipt_sent_at,
     )
 
 

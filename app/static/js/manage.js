@@ -69,7 +69,9 @@ function render(booking) {
       ),
       h("tr", { class: "total" }, h("td", {}, "Total"), h("td", {}, formatEuro(booking.total_price))),
     ),
-    h("p", { class: "pay-note" }, "Pay at the studio"),
+    booking.receipt_number
+      ? h("p", { class: "success-note" }, `Receipt ${booking.receipt_number} `, h("a", { href: `/receipt.html?token=${encodeURIComponent(token)}` }, "View or print receipt"))
+      : h("p", { class: "pay-note" }, "Pay at the studio"),
     booking.status === "cancelled" && h("p", { class: "muted" },
       booking.late_cancellation ? "This booking was cancelled late." : "This booking was cancelled."),
     h("div", { class: "actions" },

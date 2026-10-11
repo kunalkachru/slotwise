@@ -164,9 +164,10 @@ def create_booking(
     details: CustomerDetails,
     source: str = "online",
 ) -> Booking:
+    for_owner = source == "phone"  # owner-entered bookings skip the notice period
     details = details.cleaned()
     start_at = parse_start(day, start_time)
-    if not booking_limits(db).allows(start_at):
+    if not booking_limits(db, for_owner).allows(start_at):
         raise AppError(422, OUTSIDE_BOOKING_WINDOW, field="start_time")
 
     candidates = require_therapists(db, selection)
@@ -178,7 +179,7 @@ def create_booking(
     with _booking_lock:
         _lock_therapists(db, [t.id for t in candidates])
         # Re-check inside the lock with the same rules the availability endpoint uses.
-        free = free_slots_by_therapist(db, day, selection, candidates)
+        free = free_slots_by_therapist(db, day, selection, candidates, for_owner)
         free_now = [t for t in candidates if start_at in free[t.id]]
         if not free_now:
             db.rollback()

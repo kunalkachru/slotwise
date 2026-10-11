@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Annotated
 
@@ -188,3 +188,178 @@ class ManageOut(BaseModel):
     can_cancel: bool
     confirmed_at: datetime | None
     cancelled_at: datetime | None
+    receipt_number: str | None = None
+    receipt_sent_at: datetime | None = None
+
+
+# ---------- Slice 4: owner area ----------
+
+
+class OwnerCustomerOut(ORMModel):
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+    phone: str
+    no_show_count: int
+    repeat_no_show: bool
+
+
+class OwnerBookingOut(BaseModel):
+    id: int
+    status: str
+    source: str
+    start_at: datetime
+    end_at: datetime
+    date: date
+    time: str
+    total_minutes: int
+    total_price: MoneyStr
+    therapist_id: int
+    therapist_name: str
+    items: list[BookingItemOut]
+    customer: OwnerCustomerOut
+    customer_note: str | None
+    late_cancellation: bool
+    confirmed_at: datetime | None
+    cancelled_at: datetime | None
+    receipt_number: str | None
+    receipt_sent_at: datetime | None
+    has_started: bool
+    manage_token: str | None = None
+
+    @classmethod
+    def from_booking(cls, booking, has_started: bool, threshold: int) -> "OwnerBookingOut":
+        c = booking.customer
+        return cls(
+            id=booking.id,
+            therapist_id=booking.therapist_id,
+            customer=OwnerCustomerOut(
+                id=c.id, first_name=c.first_name, last_name=c.last_name, email=c.email,
+                phone=c.phone, no_show_count=c.no_show_count,
+                repeat_no_show=c.no_show_count >= threshold,
+            ),
+            customer_note=booking.customer_note,
+            late_cancellation=booking.late_cancellation,
+            confirmed_at=booking.confirmed_at,
+            cancelled_at=booking.cancelled_at,
+            receipt_number=booking.receipt_number,
+            receipt_sent_at=booking.receipt_sent_at,
+            has_started=has_started,
+            **booking_fields(booking),
+        )
+
+
+class StatusIn(BaseModel):
+    status: str = Field(max_length=20)
+
+
+class ItemIn(BaseModel):
+    item_type: str = Field(max_length=10)
+    name: str = Field(max_length=120)
+    minutes: int = 0
+    unit_price: Decimal
+    quantity: int = 1
+    service_id: int | None = None
+    add_on_id: int | None = None
+
+
+class ItemsIn(BaseModel):
+    items: list[ItemIn] = Field(min_length=1, max_length=30)
+
+
+class AddOnAdminOut(ORMModel):
+    id: int
+    service_id: int
+    name: str
+    extra_minutes: int
+    price: MoneyStr
+    active: bool
+
+
+class ServiceAdminOut(ORMModel):
+    id: int
+    category: str
+    name: str
+    description: str | None
+    duration_minutes: int
+    price: MoneyStr
+    buffer_minutes: int
+    active: bool
+    add_ons: list[AddOnAdminOut]
+
+
+class ServiceIn(BaseModel):
+    category: str = Field(max_length=40)
+    name: str = Field(max_length=120)
+    description: str | None = Field(default=None, max_length=500)
+    duration_minutes: int
+    price: Decimal
+    buffer_minutes: int = 10
+    active: bool = True
+
+
+class AddOnIn(BaseModel):
+    service_id: int
+    name: str = Field(max_length=120)
+    extra_minutes: int = 0
+    price: Decimal
+    active: bool = True
+
+
+class HoursOut(BaseModel):
+    weekday: int
+    start_time: str
+    end_time: str
+
+
+class TherapistAdminOut(BaseModel):
+    id: int
+    display_name: str
+    short_bio: str | None
+    active: bool
+    service_ids: list[int]
+    hours: list[HoursOut]
+
+    @classmethod
+    def from_therapist(cls, t) -> "TherapistAdminOut":
+        return cls(
+            id=t.id, display_name=t.display_name, short_bio=t.short_bio, active=t.active,
+            service_ids=sorted(s.id for s in t.services),
+            hours=[
+                HoursOut(weekday=h.weekday, start_time=h.start_time.strftime("%H:%M"),
+                         end_time=h.end_time.strftime("%H:%M"))
+                for h in sorted(t.working_hours, key=lambda h: (h.weekday, h.start_time))
+            ],
+        )
+
+
+class TherapistIn(BaseModel):
+    display_name: str = Field(max_length=80)
+    short_bio: str | None = Field(default=None, max_length=500)
+    active: bool = True
+    service_ids: list[int] = Field(default_factory=list, max_length=50)
+
+
+class HoursIn(BaseModel):
+    weekday: int
+    start_time: time
+    end_time: time
+
+
+class HoursListIn(BaseModel):
+    hours: list[HoursIn] = Field(max_length=21)
+
+
+class DayOffIn(BaseModel):
+    therapist_id: int | None = None
+    date: date
+    reason: str | None = Field(default=None, max_length=120)
+
+
+class DayOffOut(BaseModel):
+    id: int
+    therapist_id: int | None
+    therapist_name: str | None
+    date: date
+    reason: str | None

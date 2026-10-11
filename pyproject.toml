@@ -22,4 +22,4 @@ filterwarnings = [
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's dependency injection pattern
-extend-immutable-calls = ["fastapi.Depends"]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]

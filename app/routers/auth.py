@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import select
@@ -22,7 +23,16 @@ from app.security import (
 )
 
 log = logging.getLogger(__name__)
-router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def same_origin(request: Request) -> None:
+    """Refuse state-changing owner requests sent from another site. The SameSite=Lax
+    cookie already stops most of these; this is a second layer."""
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    origin = request.headers.get("origin")
+    if origin is not None and urlsplit(origin).netloc != request.headers.get("host"):
+        raise AppError(403, "Cross-site request blocked.")
 
 
 def current_owner(request: Request, db: Session = Depends(get_db)) -> Owner:
@@ -33,6 +43,9 @@ def current_owner(request: Request, db: Session = Depends(get_db)) -> Owner:
     if owner is None:
         raise AppError(401, NOT_LOGGED_IN)
     return owner
+
+
+router = APIRouter(prefix="/auth", tags=["auth"], dependencies=[Depends(same_origin)])
 
 
 @router.post("/login", response_model=OwnerOut)
