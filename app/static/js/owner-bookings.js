@@ -6,7 +6,7 @@ const BERLIN = "Europe/Berlin";
 const isoDay = new Intl.DateTimeFormat("en-CA", { timeZone: BERLIN });
 const dayLabel = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const longDay = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-const STATUS = { booked: "Booked", confirmed: "Confirmed", done: "Done", no_show: "No-show", cancelled: "Cancelled" };
+const STATUS = { pending: "Awaiting email", expired: "Not confirmed", booked: "Booked", confirmed: "Confirmed", done: "Done", no_show: "No-show", cancelled: "Cancelled" };
 
 const state = {
   view: readPref("view", "day"),

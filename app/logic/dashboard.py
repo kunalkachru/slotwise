@@ -1,5 +1,6 @@
 """Owner dashboard numbers (slice 6). Definitions (PLAN.md slice 6):
 
+- pending (awaiting email confirmation) and expired requests are left out everywhere.
 - today: non-cancelled bookings starting on the chosen day; expected revenue is their
   total; confirmation rate is the share whose customer confirmed.
 - last 30 days = the 30 local days ending on the chosen day, by appointment start:
@@ -79,6 +80,8 @@ def build(db: Session, day: date) -> Dashboard:
     first_week = day - timedelta(days=day.weekday()) - timedelta(weeks=CHART_WEEKS - 1)
     bookings = _bookings_between(db, min(window_start, first_week), day)
 
+    # Unconfirmed (pending) and never-confirmed (expired) requests aren't bookings yet.
+    bookings = [b for b in bookings if b.status not in ("pending", "expired")]
     today = [b for b in bookings if _local_day(b) == day]
     today_active = [b for b in today if b.status != "cancelled"]
 

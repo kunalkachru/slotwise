@@ -259,7 +259,7 @@ function waitlistBox() {
         email: form.email.value, phone: form.phone.value,
       } });
       message.className = "success-note";
-      message.textContent = `Thanks! We've emailed ${form.email.value.trim()} your place on the waitlist for this day. If a time frees up, we'll email you a link to claim it.`;
+      message.textContent = `Almost done! We've emailed ${form.email.value.trim()} a link. Click it to confirm your place on the waitlist for this day.`;
     } catch (e) {
       const field = e instanceof ApiError && e.body?.fields?.[0]?.field;
       if (!(field && showFieldError(field, e.message))) {

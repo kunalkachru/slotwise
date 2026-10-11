@@ -171,9 +171,9 @@ def phone_booking(body: BookingIn, request: Request, db: Session = Depends(get_d
 @router.put("/bookings/{booking_id}/status", response_model=OwnerBookingOut)
 def set_status(booking_id: int, body: StatusIn, request: Request, db: Session = Depends(get_db)):
     booking = get_booking(db, booking_id)
-    was_cancelled = booking.status == "cancelled"
+    was_freed = booking.status in ("cancelled", "expired")
     booking = change_status(db, booking, body.status)
-    if booking.status == "cancelled" and not was_cancelled:
+    if booking.status in ("cancelled", "expired") and not was_freed:
         waitlist.offer_slot(db, request.app.state.mailer,
                             request.app.state.settings.public_url,
                             booking.therapist_id, booking.start_at)

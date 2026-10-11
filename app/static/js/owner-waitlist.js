@@ -4,8 +4,8 @@ import { ownerApi, startOwnerPage } from "/js/owner-shell.js";
 
 const dayLabel = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const timeLabel = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
-const STATUS = { waiting: "Waiting", offered: "Offered", booked: "Booked", expired: "Offer expired", removed: "Removed / declined" };
-const BADGE = { waiting: "booked", offered: "confirmed", booked: "done", expired: "cancelled", removed: "cancelled" };
+const STATUS = { pending: "Awaiting email", waiting: "Waiting", offered: "Offered", booked: "Booked", expired: "Offer expired", removed: "Removed / declined" };
+const BADGE = { pending: "pending", waiting: "booked", offered: "confirmed", booked: "done", expired: "cancelled", removed: "cancelled" };
 
 async function load() {
   const day = document.getElementById("wl-date").value;
@@ -25,7 +25,7 @@ async function load() {
         e.offer_time && h("div", { class: "field-hint" }, `Offered ${e.offer_time}`),
         e.status === "offered" && e.offer_expires_at && h("div", { class: "field-hint" }, `until ${timeLabel.format(new Date(e.offer_expires_at))}`),
         e.booking_id && h("div", {}, h("a", { href: `/owner/bookings.html?booking=${e.booking_id}` }, "View booking"))),
-      h("td", {}, (e.status === "waiting" || e.status === "offered") &&
+      h("td", {}, ["pending", "waiting", "offered"].includes(e.status) &&
         h("button", { class: "btn btn-ghost btn-small", type: "button", onclick: () => remove(e) }, "Remove")),
     ))),
   )));

@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.conftest import book, login, slots
+from tests.conftest import book, login, manage_token, slots
 
 TUESDAY = "2026-10-13"
 
@@ -56,7 +56,8 @@ def test_receipt_prefix_and_free_cancellation_are_used(owner, monkeypatch):
     from app import clock
 
     settings(owner, receipt_prefix="iws", free_cancellation_hours=48)
-    token = book(owner, ["Classic facial"], TUESDAY, "10:00", "Sofia").json()["manage_token"]
+    booking = book(owner, ["Classic facial"], TUESDAY, "10:00", "Sofia").json()
+    token = manage_token(owner, booking["id"])
     assert "Free cancellation until Sun 11 Oct, 10:00" in owner.app.state.mailer.outbox[-1].text
     moment = datetime(2026, 10, 12, 9, 0, tzinfo=clock.BERLIN)  # 25 h before: now late
     monkeypatch.setattr(clock, "now", lambda: moment)

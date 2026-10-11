@@ -9,7 +9,9 @@ uvicorn's access log (security review, slice 3).
 import logging
 import re
 
-_PATH_TOKEN = re.compile(r"(/public/(?:bookings|waitlist/offers)/)([A-Za-z0-9_-]{16,})")
+_PATH_TOKEN = re.compile(
+    r"(/public/(?:bookings|waitlist/offers|waitlist/confirm)/)([A-Za-z0-9_-]{16,})"
+)
 _QUERY_TOKEN = re.compile(r"(token=)([A-Za-z0-9_-]{16,})")
 
 

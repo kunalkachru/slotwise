@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app import clock
 from app.models import Booking, Customer, WaitlistEntry
-from tests.conftest import book, login, menu_ids, slots, therapist_id
+from tests.conftest import book, login, manage_token, menu_ids, slots, therapist_id
 
 TUESDAY = "2026-10-13"
 JOBS = {"X-Jobs-Secret": "test-jobs-secret"}
@@ -18,15 +18,27 @@ def at(monkeypatch, *args):
     monkeypatch.setattr(clock, "now", lambda: moment)
 
 
+def confirm_waitlist(client, name):
+    """Click the double opt-in link for this person's newest waitlist request."""
+    with client.app.state.session_factory() as session:
+        customer = session.scalar(select(Customer).where(Customer.first_name == name))
+        token = session.scalar(select(WaitlistEntry.confirm_token).where(
+            WaitlistEntry.customer_id == customer.id).order_by(WaitlistEntry.id.desc()))
+    return client.post(f"/public/waitlist/confirm/{token}")
+
+
 def join(client, name, services=("Foot reflexology",), day=TUESDAY, earliest="09:00",
-         latest="18:00", therapist=None, add_ons=()):
+         latest="18:00", therapist=None, add_ons=(), confirm=True):
     ids = menu_ids(client)
-    return client.post("/public/waitlist", json={
+    response = client.post("/public/waitlist", json={
         "service_ids": [ids[s] for s in services], "add_on_ids": [ids[a] for a in add_ons],
         "therapist_id": therapist_id(client, therapist) if therapist else None,
         "preferred_date": day, "earliest_time": earliest, "latest_time": latest,
         "first_name": name, "last_name": "Waiting", "email": f"{name.lower()}@example.com",
         "phone": "+49 151 0000 0100"})
+    if confirm and response.status_code == 200:
+        confirm_waitlist(client, name)
+    return response
 
 
 def offers_sent(client):
@@ -52,7 +64,7 @@ def lena_booked(empty_calendar):
     response = book(empty_calendar, ["Foot reflexology"], TUESDAY, "15:00", "Lena",
                     first_name="Priya", email="priya.shah@example.com")
     assert response.status_code == 200
-    return empty_calendar, response.json()["manage_token"]
+    return empty_calendar, manage_token(empty_calendar, response.json()["id"])
 
 
 # ---------- joining ----------

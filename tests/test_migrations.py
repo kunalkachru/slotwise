@@ -1,5 +1,6 @@
 """Alembic: the migrations must produce exactly the schema the models describe."""
 
+from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
@@ -40,7 +41,10 @@ def test_fresh_database_matches_the_models(tmp_path):
 def test_database_made_by_create_all_is_stamped_and_keeps_its_data(tmp_path):
     """The live Neon database was created with create_all before Alembic existed."""
     engine = make_engine(f"sqlite:///{tmp_path / 'legacy.db'}")
-    Base.metadata.create_all(engine)
+    # Same schema as the slice-1 create_all: the baseline, without migration history.
+    with engine.begin() as connection:
+        command.upgrade(alembic_config(connection), BASELINE)
+        connection.execute(text("DROP TABLE alembic_version"))
     with engine.begin() as connection:
         connection.execute(text(
             "INSERT INTO studio (name, address, phone, email, opening_hours_text, "
@@ -68,3 +72,14 @@ def test_migrating_twice_changes_nothing(tmp_path):
 def test_the_baseline_is_the_first_revision():
     script = ScriptDirectory.from_config(alembic_config())
     assert script.get_revision(BASELINE).down_revision is None
+
+
+def test_every_migration_downgrades_and_upgrades_again(tmp_path):
+    engine = make_engine(f"sqlite:///{tmp_path / 'roundtrip.db'}")
+    migrate(engine)
+    with engine.begin() as connection:
+        command.downgrade(alembic_config(connection), BASELINE)
+    assert current_revision(engine) == BASELINE
+    migrate(engine)
+    assert current_revision(engine) == head()
+    assert schema_drift(engine) == []

@@ -50,6 +50,12 @@ INVALID_TIME_WINDOW = "Please choose an earliest time before the latest time."
 BOOKING_NOT_FOUND = "Booking not found. Please check the link in your email."
 CANNOT_CONFIRM = "This booking can no longer be confirmed."
 ALREADY_CANCELLED_OR_FINISHED = "This booking is already cancelled or finished."
+BOOKING_REQUEST_EXPIRED = (
+    "This booking request has expired because it wasn't confirmed in time. Please book again."
+)
+WAITLIST_REQUEST_EXPIRED = (
+    "This waitlist request has expired because it wasn't confirmed in time. Please join again."
+)
 
 
 class AppError(Exception):

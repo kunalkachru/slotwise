@@ -271,7 +271,7 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - Reminders go out once, within 24 h of the start, and only for bookings made more than 24 h ahead **[decision]**.
   - Joining is refused for days when no qualified therapist works. It's limited to 10 joins per IP per hour, **3 per inbox per day**, and at most 5 open entries per customer.
   - **Every join outcome emails the address owner:** added, already on the list, or the 5-entry limit reached. Nothing fails silently.
-  - **Accepted risk (2026-10-11):** without verifying email ownership, a stranger can use someone's address to take up their waitlist places (at most 3 joins per day, 5 open entries). The owner of the address is emailed each time, and the studio owner can remove entries. **Proper fix later:** double opt-in, where an entry only counts once the address owner clicks a confirmation link. That needs a new waitlist status, so it waits until a migration tool (Alembic) is adopted.
+  - ~~Accepted risk: a stranger can take up someone's waitlist places.~~ **Closed** by the waitlist double opt-in (to-do item 2): unconfirmed requests don't count toward the cap and get no offers.
   - **Join responses reveal nothing (security review):** the API always answers "received", for new and duplicate joins alike. The queue position, or "already on the list", is **emailed** to the address instead. This replaces the blueprint's 409 and on-screen position **[decision]**.
   - When the owner removes an entry with an open offer, the offer is withdrawn, not passed on.
   - The offer page shows the slot, not the customer's details.
@@ -340,10 +340,15 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
      4. Run `alembic upgrade head` locally (`alembic downgrade -1` to undo).
      5. Commit, then PR, CI, merge, deploy. Deployed migrations are never edited; add a new one instead.
    - A ready brief exists as the session card "Adopt Alembic and add waitlist double opt-in".
-2. **Email confirmation instead of customer passwords** (the "someone else's email" problem). This is chosen over customer login accounts **[decision]**: accounts add friction (against the ≥ 60 % online goal), plus password storage and reset flows.
+2. ✅ **Done (PR `feature-email-confirmation`, migration `0002`): Email confirmation instead of customer passwords** (the "someone else's email" problem). This is chosen over customer login accounts **[decision]**: accounts add friction (against the ≥ 60 % online goal), plus password storage and reset flows.
    - **Bookings:** a new booking is held as "pending" for about 30 minutes, and only a click on "Confirm your booking" in the email makes it count.
    - **Waitlist double opt-in:** entries only count once confirmed. This closes the accepted risk in slice 5.
-   - Needs new statuses, so it waits for item 1.
+   - Built as designed:
+    - Online bookings are `pending` and hold the slot for 30 min; the "please confirm" email link (`?action=verify`) makes them `booked`. Unconfirmed holds become `expired`: the slot frees even before run-jobs, then run-jobs expires them and offers the slot to the waitlist.
+    - Withdrawing a pending booking marks it `expired`, not a cancellation, so the dashboard stays honest.
+    - Phone and waitlist bookings need no click.
+    - The booking API response no longer contains the manage token (it only travels by email).
+    - Waitlist requests are `pending` until confirmed (24 h) and don't count toward the cap or get offers.
 3. **German translation (DE / EN).**
    - All page texts in a German and an English word list, with a DE/EN switch in the top bar. Default to German for German browsers. German dates and prices ("Montag, 12. Oktober", "70,00 €").
    - The server returns error codes, and the page shows the text in the chosen language.

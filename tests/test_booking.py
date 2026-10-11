@@ -25,8 +25,10 @@ def test_booking_snapshots_items_and_totals(empty_calendar, db):
     assert (body["date"], body["time"], body["therapist_name"]) == (TUESDAY, "17:00", "Lena")
     assert [(i["name"], i["unit_price"]) for i in body["items"]] == [
         ("Deep tissue massage", "70.00"), ("Hot stones", "12.00")]
-    assert body["status"] == "booked" and body["source"] == "online"
-    assert len(body["manage_token"]) >= 40
+    # Online bookings wait for the email confirmation, and the secret manage link is
+    # never in the response (it only travels by email).
+    assert body["status"] == "pending" and body["source"] == "online"
+    assert "manage_token" not in body and body["hold_until"]
 
     booking = db.get(Booking, body["id"])
     assert booking.end_at - booking.start_at == timedelta(minutes=75)
@@ -283,5 +285,4 @@ def test_one_canonical_form_per_inbox():
 def test_confirmation_goes_to_the_canonical_address(empty_calendar):
     client = empty_calendar
     book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", email=" Anna@Example.COM ")
-    [email] = list(client.app.state.mailer.outbox)
-    assert email.to == "anna@example.com"
+    assert {e.to for e in client.app.state.mailer.outbox} == {"anna@example.com"}

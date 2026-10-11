@@ -23,6 +23,7 @@ from app.errors import (
     OFFER_ALREADY_CLAIMED,
     OFFER_EXPIRED,
     OFFER_NOT_FOUND,
+    WAITLIST_REQUEST_EXPIRED,
     AppError,
     date_out_of_range,
 )
@@ -60,9 +61,14 @@ class JoinRequest:
 MAX_OPEN_ENTRIES_PER_CUSTOMER = 5
 
 
+WAITLIST_CONFIRM_HOURS = 24  # unconfirmed waitlist requests expire after this [decision]
+
+
 @dataclass
 class JoinResult:
-    outcome: str  # "created" | "already" (waiting that day) | "limit" (cap reached)
+    # "created" (pending; confirmation email) | "unconfirmed" (pending already; resend it)
+    # | "already" (waiting/offered that day) | "limit" (cap of confirmed entries reached)
+    outcome: str
     customer: Customer
     entry: WaitlistEntry | None = None
     position: int | None = None
@@ -98,9 +104,12 @@ def join(db: Session, request: JoinRequest) -> JoinResult:
     existing = db.scalar(select(WaitlistEntry).where(
         WaitlistEntry.customer_id == customer.id,
         WaitlistEntry.preferred_date == request.preferred_date,
-        WaitlistEntry.status.in_(OPEN),
-    ))
-    if existing is not None:
+        WaitlistEntry.status.in_(OPEN + ("pending",)),
+    ).order_by(WaitlistEntry.id.desc()))
+    if existing is not None and existing.status == "pending" and not _confirm_expired(existing):
+        db.commit()
+        return JoinResult("unconfirmed", customer, existing)
+    if existing is not None and existing.status in OPEN:
         db.commit()
         return JoinResult("already", customer, existing, queue_position(db, existing))
     open_entries = db.scalar(select(func.count()).select_from(WaitlistEntry).where(
@@ -116,11 +125,41 @@ def join(db: Session, request: JoinRequest) -> JoinResult:
         preferred_date=request.preferred_date,
         earliest_time=request.earliest_time,
         latest_time=request.latest_time,
-        status="waiting",
+        status="pending",  # counts only after the email confirmation (double opt-in)
+        confirm_token=new_token(),
     )
     db.add(entry)
     db.commit()
-    return JoinResult("created", customer, entry, queue_position(db, entry))
+    return JoinResult("created", customer, entry)
+
+
+def get_entry_by_confirm_token(db: Session, token: str) -> WaitlistEntry | None:
+    if not token:
+        return None
+    return db.scalar(select(WaitlistEntry).where(WaitlistEntry.confirm_token == token))
+
+
+def _confirm_expired(entry: WaitlistEntry) -> bool:
+    return clock.now() >= entry.created_at + timedelta(hours=WAITLIST_CONFIRM_HOURS)
+
+
+def confirm_entry(db: Session, token: str) -> tuple[WaitlistEntry, int | None]:
+    """Double opt-in link. Returns the entry and its queue position once waiting."""
+    entry = db.scalar(select(WaitlistEntry).where(WaitlistEntry.confirm_token == token)) \
+        if token else None
+    if entry is None:
+        raise AppError(404, "Waitlist request not found. Please check the link in your email.")
+    if entry.status == "pending":
+        if _confirm_expired(entry):
+            entry.status = "expired"
+            db.commit()
+            raise AppError(410, WAITLIST_REQUEST_EXPIRED)
+        entry.status = "waiting"
+        db.commit()
+    elif entry.status in ("expired", "removed"):
+        raise AppError(410, WAITLIST_REQUEST_EXPIRED)
+    position = queue_position(db, entry) if entry.status in OPEN else None
+    return entry, position
 
 
 def queue_position(db: Session, entry: WaitlistEntry) -> int:
@@ -258,7 +297,7 @@ def remove_entry(db: Session, entry_id: int) -> None:
     entry = db.get(WaitlistEntry, entry_id)
     if entry is None:
         raise AppError(404, "Not found.")
-    if entry.status in OPEN:
+    if entry.status in OPEN + ("pending",):
         entry.status = "removed"
         db.commit()
 

@@ -5,7 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.emails import confirmation_email, waitlist_joined_email, waitlist_limit_email
+from app.emails import (
+    booking_verification_email,
+    confirmation_email,
+    waitlist_confirm_email,
+    waitlist_joined_email,
+    waitlist_limit_email,
+)
 from app.errors import TOO_MANY_BOOKINGS, AppError
 from app.logic import waitlist
 from app.logic.availability import check_date_in_range, free_slots
@@ -19,7 +25,9 @@ from app.logic.booking import (
     create_booking,
     free_cancellation_until,
     get_by_token,
+    hold_until,
     mailbox_key,
+    verify_booking,
 )
 from app.logic.selection import parse_ids, require_therapists, resolve_selection
 from app.models import CATEGORIES, Service, Studio, Therapist
@@ -36,6 +44,7 @@ from app.schemas import (
     SlotOut,
     StudioOut,
     TherapistOut,
+    WaitlistConfirmOut,
     WaitlistIn,
     WaitlistJoinOut,
     booking_fields,
@@ -154,8 +163,10 @@ def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
         limiter.release([ip_key, email_key])
         raise
     settings = request.app.state.settings
-    request.app.state.mailer.send(confirmation_email(booking, load_studio(db), settings.public_url))
-    return BookingOut.from_booking(booking, first_name=body.first_name.strip())
+    until = hold_until(booking)
+    request.app.state.mailer.send(
+        booking_verification_email(booking, load_studio(db), settings.public_url, until))
+    return BookingOut.from_booking(booking, first_name=body.first_name.strip(), hold_until=until)
 
 
 def _manage_view(db: Session, booking) -> ManageOut:
@@ -170,7 +181,22 @@ def _manage_view(db: Session, booking) -> ManageOut:
         # The receipt shows only once the owner has sent it.
         receipt_number=booking.receipt_number if booking.receipt_sent_at else None,
         receipt_sent_at=booking.receipt_sent_at,
+        awaiting_email_confirmation=booking.status == "pending",
+        hold_until=hold_until(booking) if booking.status == "pending" else None,
     )
+
+
+@router.post("/bookings/{token}/verify", response_model=ManageOut)
+def verify(token: str, request: Request, db: Session = Depends(get_db)):
+    """The link in the "please confirm your booking" email."""
+    booking = get_by_token(db, token)
+    was_pending = booking.status == "pending"
+    booking = verify_booking(db, booking)
+    if was_pending:
+        settings = request.app.state.settings
+        request.app.state.mailer.send(
+            confirmation_email(booking, load_studio(db), settings.public_url))
+    return _manage_view(db, booking)
 
 
 @router.get("/bookings/{token}", response_model=ManageOut)
@@ -222,14 +248,29 @@ def join_waitlist(body: WaitlistIn, request: Request, db: Session = Depends(get_
         limiter.release([ip_key, email_key])
         raise
     studio = load_studio(db)
+    mailer, public_url = request.app.state.mailer, request.app.state.settings.public_url
     # Every outcome emails the address owner; the response is the same for all of them.
     if result.outcome == "limit":
-        request.app.state.mailer.send(waitlist_limit_email(
+        mailer.send(waitlist_limit_email(
             result.customer, body.preferred_date, studio, waitlist.MAX_OPEN_ENTRIES_PER_CUSTOMER))
+    elif result.outcome in ("created", "unconfirmed"):
+        mailer.send(waitlist_confirm_email(result.entry, studio, public_url))
     else:
-        request.app.state.mailer.send(waitlist_joined_email(
-            result.entry, result.position, studio, already=not result.created))
+        mailer.send(waitlist_joined_email(result.entry, result.position, studio, already=True))
     return WaitlistJoinOut(status="received", preferred_date=body.preferred_date)
+
+
+@router.post("/waitlist/confirm/{token}", response_model=WaitlistConfirmOut)
+def confirm_waitlist(token: str, request: Request, db: Session = Depends(get_db)):
+    """Double opt-in link from the "please confirm" email."""
+    entry = waitlist.get_entry_by_confirm_token(db, token)
+    was_pending = entry is not None and entry.status == "pending"
+    entry, position = waitlist.confirm_entry(db, token)
+    if was_pending and position is not None:
+        request.app.state.mailer.send(
+            waitlist_joined_email(entry, position, load_studio(db), already=False))
+    return WaitlistConfirmOut(status=entry.status, preferred_date=entry.preferred_date,
+                              position=position)
 
 
 def _offer_view(db: Session, entry) -> OfferOut:
