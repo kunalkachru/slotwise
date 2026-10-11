@@ -298,6 +298,11 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - no-shows and late cancellations per week for the last 8 weeks
 - **Front end:** a Dashboard with key-number tiles, today's appointments (a row opens Bookings) and CSS bar charts. No Chart.js unless the bars aren't enough.
 - **Tests:** each metric against a hand-computed seed scenario, and the empty-data case (no division by zero).
+- **Decisions made while building:**
+  - The "last 30 days" are the 30 local days ending on the chosen day, by appointment start. The dashboard takes `?date=`, so past days can be checked.
+  - Confirmation rate = the share of that day's bookings whose customer confirmed. Refill rate is capped at 100%.
+  - Tiles show the blueprint goals (no-shows < 5%, refills ≥ 50%, online ≥ 60%) with an icon and a label, never colour alone.
+  - The weekly chart uses grouped columns on one axis, two validated categorical colours (not the brand green), a legend, a hover/focus tooltip and a table view. It's light theme only, like the rest of the app (blueprint: light background).
 - **Done when:** the three success numbers (no-show rate, waitlist refill share, online share) are visible on the live dashboard.
 
 ## 5. Resolved questions (2026-10-10)

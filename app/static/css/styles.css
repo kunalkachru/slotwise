@@ -617,3 +617,38 @@ table.data .btn { white-space: nowrap; }
 .waitlist-box .btn { margin-top: 0.5rem; }
 .countdown { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--green-dark); }
 .countdown.urgent { color: var(--danger); }
+
+/* ---------- Dashboard (slice 6) ---------- */
+.dash-section { margin-top: 1.75rem; }
+.dash-section > h2 { font-size: 1.1rem; margin-bottom: 0.25rem; }
+.dash-section > .muted { margin: 0 0 0.75rem; font-size: 0.92rem; }
+.tile-value.live { color: var(--ink); font-variant-numeric: tabular-nums; }
+.tile-note { font-size: 0.82rem; color: var(--muted); margin-top: 0.15rem; }
+.target { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; font-weight: 650; margin-top: 0.35rem; padding: 0.1rem 0.5rem; border-radius: 999px; }
+.target.good { background: var(--accent-soft); color: var(--green-dark); }
+.target.warn { background: #fff4e0; color: #8a5300; }
+.target.none { background: var(--line); color: var(--muted); }
+
+/* Weekly chart: grouped columns, one axis (dataviz: <=24px bars, 4px rounded tops,
+   2px gap between touching bars, recessive grid, legend + tooltip + table view). */
+.chart-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.1rem 0.75rem; overflow: hidden; }
+.chart-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.88rem; color: var(--muted); margin-bottom: 0.5rem; }
+.chart-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.chart { --series-1: #2a78d6; --series-2: #eb6834; position: relative; display: grid; grid-template-columns: 2rem 1fr; gap: 0 0.4rem; }
+.chart-y { position: relative; height: 180px; font-size: 0.75rem; color: var(--muted); text-align: right; }
+.chart-y span { position: absolute; right: 0; transform: translateY(50%); font-variant-numeric: tabular-nums; }
+.chart-plot { position: relative; height: 180px; border-bottom: 1px solid #cbd5cf; display: grid; grid-template-columns: repeat(8, 1fr); align-items: end; }
+.chart-grid { position: absolute; left: 0; right: 0; border-top: 1px solid #edf1ee; pointer-events: none; }
+.chart-week { position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
+.chart-bar { width: min(24px, 40%); border-radius: 4px 4px 0 0; min-height: 0; cursor: default; }
+.chart-bar.s1 { background: var(--series-1); }
+.chart-bar.s2 { background: var(--series-2); }
+.chart-bar.zero { height: 2px !important; background: #dfe6e2; border-radius: 1px; }
+.chart-hit { position: absolute; inset: 0; }
+.chart-x { grid-column: 2; display: grid; grid-template-columns: repeat(8, 1fr); font-size: 0.75rem; color: var(--muted); text-align: center; margin-top: 0.35rem; }
+.chart-tooltip { position: absolute; z-index: 5; pointer-events: none; background: var(--ink); color: #fff; font-size: 0.82rem; padding: 0.45rem 0.6rem; border-radius: var(--radius-sm); white-space: nowrap; box-shadow: var(--shadow); transform: translate(-50%, calc(-100% - 8px)); }
+.chart-tooltip .swatch { margin-right: 0.35rem; vertical-align: -1px; }
+details.table-view { margin-top: 0.75rem; font-size: 0.9rem; }
+details.table-view summary { cursor: pointer; color: var(--green); font-weight: 600; }
+details.table-view table { margin-top: 0.5rem; }

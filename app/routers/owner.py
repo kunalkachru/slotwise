@@ -7,6 +7,7 @@ from app import clock
 from app.db import get_db
 from app.emails import confirmation_email, receipt_email
 from app.logic import catalog, waitlist
+from app.logic import dashboard as dashboard_logic
 from app.logic.availability import check_date_in_range, free_slots, get_studio
 from app.logic.booking import CustomerDetails, create_booking
 from app.logic.owner_bookings import (
@@ -52,9 +53,29 @@ MAX_RANGE_DAYS = 92
 
 
 @router.get("/dashboard", response_model=DashboardOut)
-def dashboard(owner: Owner = Depends(current_owner)):
-    # Key numbers and charts arrive in slice 6.
-    return DashboardOut(date=clock.now().date().isoformat(), owner_name=owner.full_name)
+def dashboard(
+    date: date | None = None,
+    owner: Owner = Depends(current_owner),
+    db: Session = Depends(get_db),
+):
+    day = date or clock.now().date()
+    d = dashboard_logic.build(db, day)
+    return DashboardOut(
+        date=day.isoformat(),
+        owner_name=owner.full_name,
+        window_start=d.window_start,
+        today_bookings=d.today_bookings,
+        expected_revenue_today=d.expected_revenue_today,
+        confirmation_rate_today=d.confirmation_rate_today,
+        no_show_rate=d.no_show_rate,
+        refill_rate=d.refill_rate,
+        revenue_recovered=d.revenue_recovered,
+        online_share=d.online_share,
+        targets=dashboard_logic.TARGETS,
+        weeks=[{"week_start": w.week_start, "no_shows": w.no_shows,
+                "late_cancellations": w.late_cancellations} for w in d.weeks],
+        appointments=dashboard_logic.appointment_rows(d),
+    )
 
 
 # ---------- Bookings ----------

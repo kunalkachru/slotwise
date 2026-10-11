@@ -11,17 +11,17 @@
   <div class="owner-layout" id="owner-layout" hidden>
     <aside class="sidebar" id="sidebar"></aside>
     <main class="owner-main">
-      <header>
-        <h1 id="welcome">Dashboard</h1>
-        <p class="muted" id="today"></p>
-      </header>
-      <section class="tiles" aria-label="Key numbers">
-        <div class="tile"><div class="tile-label">Today's bookings</div><div class="tile-value">–</div></div>
-        <div class="tile"><div class="tile-label">Expected revenue today</div><div class="tile-value">–</div></div>
-        <div class="tile"><div class="tile-label">No-show rate (30 days)</div><div class="tile-value">–</div></div>
-        <div class="tile"><div class="tile-label">Refilled from waitlist (30 days)</div><div class="tile-value">–</div></div>
-      </section>
-      <p class="muted">Key numbers and today's appointments will appear here soon. Meanwhile, see <a href="/owner/bookings.html">Bookings</a>.</p>
+      <div class="page-head">
+        <div>
+          <h1 id="welcome">Dashboard</h1>
+          <p class="muted" id="today"></p>
+        </div>
+        <div class="row">
+          <label class="check" for="dash-date">Day</label>
+          <input type="date" id="dash-date" aria-label="Dashboard day">
+        </div>
+      </div>
+      <div id="dashboard" aria-live="polite"><p class="notice">Loading…</p></div>
     </main>
   </div>
   <script type="module" src="/js/owner-dashboard.js"></script>
