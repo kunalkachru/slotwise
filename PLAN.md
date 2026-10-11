@@ -215,6 +215,10 @@ Each slice is one PR. It must pass `ci.yml`, merge to `main`, deploy through `de
   - the reminder-email builder, ready for slice 5
   - Email links are built from `PUBLIC_URL`, or Render's automatic `RENDER_EXTERNAL_URL`. Resend's sender is `EMAIL_FROM` **[decision]**.
   - The manage view returns no customer details, because the link holder may not own the email.
+  - Security review:
+    - Names may only contain letters, spaces, `-`, `'` and `.`, because they appear in emails we send.
+    - Booking is limited to 10 per IP per hour and 5 per email per day (429), against inbox flooding and calendar filling.
+    - A log filter hides manage/offer tokens in every log line, including uvicorn's access log. Logged emails mask the recipient.
 - **Front end:** Manage booking (details, Confirm I'm coming, Cancel with an "Are you sure?" prompt, Book again).
 - **Tests:**
   - **Cancellation deadline**: 24h + 1min → not late, 23h59 → late

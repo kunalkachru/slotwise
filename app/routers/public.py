@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
 from app.emails import confirmation_email
-from app.errors import AppError
+from app.errors import TOO_MANY_BOOKINGS, AppError
 from app.logic.availability import check_date_in_range, free_slots
 from app.logic.availability import get_studio as load_studio
 from app.logic.booking import (
@@ -34,8 +34,14 @@ from app.schemas import (
     TherapistOut,
     booking_fields,
 )
+from app.security import client_ip
 
 router = APIRouter(prefix="/public", tags=["public"])
+
+# Booking needs no login and sends an email, so cap how often one visitor or one email
+# address can book (security review, slice 3): limits inbox flooding and calendar filling.
+BOOKINGS_PER_IP_PER_HOUR = 10
+BOOKINGS_PER_EMAIL_PER_DAY = 5
 
 
 @router.get("/studio", response_model=StudioOut)
@@ -112,6 +118,16 @@ def availability(
 
 @router.post("/bookings", response_model=BookingOut)
 def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
+    limiter = request.app.state.booking_limiter
+    ip_key = "ip:" + client_ip(
+        request.client.host if request.client else None, request.headers.get("x-forwarded-for")
+    )
+    email_key = "email:" + body.email.strip().lower()
+    if (
+        limiter.count(ip_key, 3600) >= BOOKINGS_PER_IP_PER_HOUR
+        or limiter.count(email_key, 86400) >= BOOKINGS_PER_EMAIL_PER_DAY
+    ):
+        raise AppError(429, TOO_MANY_BOOKINGS)
     selection = resolve_selection(db, body.service_ids, body.add_on_ids)
     booking = create_booking(
         db,
@@ -121,6 +137,8 @@ def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
         body.therapist_id,
         CustomerDetails(body.first_name, body.last_name, body.email, body.phone, body.note),
     )
+    limiter.record(ip_key)
+    limiter.record(email_key)
     settings = request.app.state.settings
     request.app.state.mailer.send(confirmation_email(booking, load_studio(db), settings.public_url))
     return BookingOut.from_booking(booking, first_name=body.first_name.strip())

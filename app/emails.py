@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from app.clock import BERLIN
+from app.logs import mask_email, redact
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +40,9 @@ class Mailer:
     def send(self, email: Email) -> bool:
         self.outbox.append(email)
         if not self.api_key:
-            log.info("EMAIL (log only) to=%s subject=%s\n%s", email.to, email.subject, email.text)
+            # Log mode: masked recipient and no secret links (security review, slice 3).
+            log.info("EMAIL (log only, not sent) to=%s subject=%s\n%s",
+                     mask_email(email.to), email.subject, redact(email.text))
             return True
         payload = {
             "from": self.sender,
@@ -64,7 +67,7 @@ class Mailer:
             with urllib.request.urlopen(request, timeout=10) as response:
                 return 200 <= response.status < 300
         except (urllib.error.URLError, TimeoutError, OSError):
-            log.exception("Could not send email '%s' to %s", email.subject, email.to)
+            log.exception("Could not send email '%s' to %s", email.subject, mask_email(email.to))
             return False
 
 

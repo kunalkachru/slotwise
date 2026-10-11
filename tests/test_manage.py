@@ -50,11 +50,32 @@ def test_booking_sends_an_itemized_confirmation_email(booked):
 
 
 def test_email_html_escapes_customer_input(empty_calendar):
-    book(empty_calendar, ["Classic facial"], TUESDAY, "10:00", "Sofia",
-         first_name="<script>alert(1)</script>")
+    book(empty_calendar, ["Classic facial"], TUESDAY, "10:00", "Sofia", first_name="O'Neil")
     [email] = outbox(empty_calendar)
-    assert "<script>" not in email.html
-    assert "&lt;script&gt;" in email.html
+    assert "Hello O&#x27;Neil" in email.html
+    assert "O'Neil" not in email.html
+
+
+def test_logs_never_contain_tokens_or_full_addresses(booked, caplog):
+    import logging
+
+    from app.logs import RedactTokens, redact
+
+    client, token = booked
+    assert token not in redact(f"GET /public/bookings/{token}/cancel and ?token={token}&x=1")
+    access = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 1,
+                               '%s - "%s %s HTTP/%s" %d',
+                               ("10.0.0.1:1", "GET", f"/public/bookings/{token}", "1.1", 200),
+                               None)
+    RedactTokens().filter(access)
+    assert token not in access.getMessage() and "/public/bookings/<token>" in access.getMessage()
+
+    with caplog.at_level(logging.INFO, logger="app.emails"):
+        book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", email="tom.becker@example.com")
+    logged = caplog.text
+    assert "EMAIL (log only, not sent) to=to***@example.com" in logged
+    assert "tom.becker@example.com" not in logged
+    assert "token=<redacted>" in logged
 
 
 def test_manage_link_shows_the_booking_without_customer_details(booked):

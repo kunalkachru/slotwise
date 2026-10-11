@@ -180,3 +180,26 @@ class LoginLimiter:
         ongoing attack a fresh allowance.
         """
         self._failures.pop(self._keys(email, ip)[0], None)
+
+
+class RateLimiter:
+    """Counts events per key in a sliding window (in memory, one Render instance)."""
+
+    def __init__(self, clock=time.monotonic):
+        self.clock = clock
+        self._events: dict[str, deque[float]] = {}
+
+    def count(self, key: str, window_seconds: int) -> int:
+        events = self._events.get(key)
+        if events is None:
+            return 0
+        cutoff = self.clock() - window_seconds
+        while events and events[0] < cutoff:
+            events.popleft()
+        if not events:
+            del self._events[key]
+            return 0
+        return len(events)
+
+    def record(self, key: str) -> None:
+        self._events.setdefault(key, deque()).append(self.clock())

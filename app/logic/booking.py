@@ -17,6 +17,7 @@ from app.errors import (
     MISSING_FIRST_NAME,
     MISSING_LAST_NAME,
     MISSING_PHONE,
+    NAME_CHARACTERS,
     NOT_AN_OFFERED_TIME,
     NOTE_TOO_LONG,
     OUTSIDE_BOOKING_WINDOW,
@@ -36,6 +37,13 @@ from app.models import Booking, Customer, Therapist
 from app.security import new_token
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+NAME_PUNCTUATION = set(" -'’.")
+
+
+def _is_plain_name(name: str) -> bool:
+    """Letters (any alphabet), spaces, hyphens, apostrophes and dots. Names end up in
+    emails we send, so no URLs, digits, @ or markup (security review, slice 3)."""
+    return all(ch.isalpha() or ch in NAME_PUNCTUATION for ch in name)
 
 # One Render instance: a process-wide lock makes "check the slot is free, then insert"
 # atomic even on SQLite. On PostgreSQL the therapist rows are also locked FOR UPDATE.
@@ -60,6 +68,10 @@ class CustomerDetails:
             raise AppError(422, MISSING_FIRST_NAME, field="first_name")
         if not last:
             raise AppError(422, MISSING_LAST_NAME, field="last_name")
+        if not _is_plain_name(first):
+            raise AppError(422, NAME_CHARACTERS, field="first_name")
+        if not _is_plain_name(last):
+            raise AppError(422, NAME_CHARACTERS, field="last_name")
         if not EMAIL_RE.match(email) or len(email) > 255:
             raise AppError(422, INVALID_EMAIL, field="email")
         if sum(ch.isdigit() for ch in phone) < 6 or len(phone) > 40:

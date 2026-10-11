@@ -76,7 +76,7 @@ def test_concurrent_requests_for_the_same_slot_book_it_once(make_client, frozen_
             barrier.wait()
             try:
                 create_booking(db, selection, TUESDAY_DATE, "15:00", None,
-                               CustomerDetails("Guest", str(n), f"guest{n}@example.com",
+                               CustomerDetails("Guest", "ABCD"[n], f"guest{n}@example.com",
                                                "+49 151 0000 0000"))
                 results.append("booked")
             except Exception as exc:  # AppError 400
@@ -179,3 +179,38 @@ def test_repeated_ids_count_once(empty_calendar):
     body = response.json()
     assert [i["name"] for i in body["items"]] == ["Deep tissue massage", "Hot stones"]
     assert (body["total_price"], body["total_minutes"]) == ("82.00", 75)
+
+
+def test_names_must_be_plain_text(empty_calendar):
+    """Security review finding: names go into emails, so no URLs, digits or markup."""
+    client = empty_calendar
+    for bad in ("<script>alert(1)</script>", "Visit https://evil.example", "Anna2",
+                "a@b.example"):
+        response = book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", first_name=bad)
+        assert response.status_code == 422, bad
+        assert response.json()["detail"] == "Please use only letters in your name."
+    ok = book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia",
+              first_name="Zoë", last_name="O'Neil-Åström Jr.")
+    assert ok.status_code == 200
+
+
+def test_booking_limits_per_ip_and_per_email(empty_calendar):
+    """Security review finding: cap bookings (and confirmation emails) per visitor."""
+    from app.routers import public
+
+    client = empty_calendar
+    for hour in range(10, 10 + public.BOOKINGS_PER_EMAIL_PER_DAY):  # only bookings count
+        assert book(client, ["Back and neck massage"], TUESDAY, f"{hour}:00", "Lena",
+                    email="same@example.com").status_code == 200
+    blocked = book(client, ["Back and neck massage"], TUESDAY, "16:00", "Lena",
+                   email="same@example.com")
+    assert blocked.status_code == 429
+    assert blocked.json()["detail"] == "Too many bookings in a short time. Please call the studio."
+
+    limiter = client.app.state.booking_limiter
+    for _ in range(public.BOOKINGS_PER_IP_PER_HOUR):
+        limiter.record("ip:203.0.113.50")
+    from_busy_ip = client.post("/public/bookings", headers={"X-Forwarded-For": "203.0.113.50"},
+                               json={"service_ids": [1], "add_on_ids": [], "date": TUESDAY,
+                                     "start_time": "10:00", **CUSTOMER})
+    assert from_busy_ip.status_code == 429

@@ -9,8 +9,9 @@ from app.config import Settings
 from app.db import Base, make_engine, make_session_factory
 from app.emails import Mailer
 from app.errors import install_error_handlers
+from app.logs import install_log_redaction
 from app.routers import auth, health, owner, public
-from app.security import LoginLimiter
+from app.security import LoginLimiter, RateLimiter
 from app.seed import seed
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -31,6 +32,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.session_factory = make_session_factory(engine)
         app.state.login_limiter = LoginLimiter()
         app.state.mailer = Mailer(cfg.email_api_key, cfg.email_from)
+        app.state.booking_limiter = RateLimiter()
+        install_log_redaction()
         with app.state.session_factory() as db:
             seed(db, cfg)
         yield
