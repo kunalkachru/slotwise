@@ -14,7 +14,15 @@ from app import clock
 from app.errors import AppError
 from app.logic.availability import day_bounds_utc, get_studio
 from app.logic.booking import cancel_booking
-from app.models import BOOKING_STATUSES, AddOn, Booking, BookingItem, Customer, Service
+from app.models import (
+    BOOKING_STATUSES,
+    AddOn,
+    Booking,
+    BookingItem,
+    BookingSegment,
+    Customer,
+    Service,
+)
 
 STATUS_NOT_ALLOWED = "This status change is not allowed."
 NOT_STARTED_YET = "A booking can only be marked done or no-show after it starts."
@@ -31,9 +39,10 @@ _receipt_lock = threading.Lock()
 
 def _with_details():
     return (
-        selectinload(Booking.items),
+        selectinload(Booking.items).selectinload(BookingItem.segment),
         selectinload(Booking.customer),
         selectinload(Booking.therapist),
+        selectinload(Booking.segments).selectinload(BookingSegment.therapist),
     )
 
 
@@ -62,8 +71,9 @@ def list_bookings(
         .options(*_with_details())
         .order_by(Booking.start_at, Booking.therapist_id)
     )
-    if therapist_id is not None:
-        stmt = stmt.where(Booking.therapist_id == therapist_id)
+    if therapist_id is not None:  # any part of the visit (option B)
+        stmt = stmt.where(Booking.id.in_(
+            select(BookingSegment.booking_id).where(BookingSegment.therapist_id == therapist_id)))
     if status:
         if status not in BOOKING_STATUSES:
             raise AppError(422, "Unknown status.", field="status")
@@ -136,6 +146,7 @@ class ItemInput:
     quantity: int
     service_id: int | None = None
     add_on_id: int | None = None
+    segment_position: int | None = None
 
 
 def replace_items(db: Session, booking: Booking, items: list[ItemInput]) -> Booking:
@@ -163,13 +174,21 @@ def replace_items(db: Session, booking: Booking, items: list[ItemInput]) -> Book
         if item.add_on_id is not None and db.get(AddOn, item.add_on_id) is None:
             raise AppError(422, INVALID_ITEMS, field="items")
 
+    # Lines that stay keep their therapist part (segment_position, as the detail showed it,
+    # or the same service / add-on); new lines are extras of the day.
+    by_position = {s.position: s for s in booking.segments}
+    segment_of = {(i.item_type, i.service_id, i.add_on_id): i.segment for i in booking.items}
     booking.items.clear()
     db.flush()
     for item in items:
+        service_id = item.service_id if item.item_type == "service" else None
+        add_on_id = item.add_on_id if item.item_type == "add_on" else None
         booking.items.append(BookingItem(
+            segment=by_position.get(item.segment_position) if item.segment_position is not None
+            else segment_of.get((item.item_type, service_id, add_on_id)),
             item_type=item.item_type,
-            service_id=item.service_id if item.item_type == "service" else None,
-            add_on_id=item.add_on_id if item.item_type == "add_on" else None,
+            service_id=service_id,
+            add_on_id=add_on_id,
             name_snapshot=item.name.strip(),
             minutes_snapshot=item.minutes,
             unit_price_snapshot=item.unit_price,
@@ -225,11 +244,13 @@ def bookings_csv(bookings: list[Booking]) -> str:
     for b in bookings:
         local = b.start_at.astimezone(clock.BERLIN)
         base = [
-            b.id, local.date().isoformat(), local.strftime("%H:%M"), b.therapist.display_name,
+            b.id, local.date().isoformat(), local.strftime("%H:%M"), None,
             b.status, b.source, f"{b.customer.first_name} {b.customer.last_name}",
             b.customer.email, b.customer.phone,
         ]
         for item in b.items:
+            # The therapist of the line's part of the visit; extras: everyone in the visit.
+            base[3] = item.segment.therapist.display_name if item.segment else b.therapist_names
             writer.writerow([_safe_cell(v) for v in base + [
                 item.item_type, item.name_snapshot, item.minutes_snapshot,
                 f"{item.unit_price_snapshot:.2f}", item.quantity,

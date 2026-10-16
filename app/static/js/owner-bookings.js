@@ -86,12 +86,35 @@ const servicesOf = (b) => b.items.filter((i) => i.item_type === "service").map((
 const customerName = (b) => `${b.customer.first_name} ${b.customer.last_name}`;
 const flag = (b) => b.customer.repeat_no_show && h("span", { class: "flag", title: `${b.customer.no_show_count} no-shows` }, " ⚠");
 
-function card(b, showTherapist) {
-  return h("button", { type: "button", class: `cal-card ${b.status}`, onclick: () => openDetail(b.id) },
-    h("strong", {}, b.time), ` · ${b.total_minutes} min`,
+const several = (b) => b.segments.length > 1;
+const minutesBetween = (from, to) => {
+  const [fh, fm] = from.split(":").map(Number);
+  const [th, tm] = to.split(":").map(Number);
+  return th * 60 + tm - (fh * 60 + fm);
+};
+
+// "1 of 2 · continues with Sofia 11:15" / "2 of 2 · after Lena 10:00"
+function linkNote(b, seg) {
+  const next = b.segments[seg.position + 1];
+  const prev = b.segments[seg.position - 1];
+  const where = `${seg.position + 1} of ${b.segments.length}`;
+  if (next) return `${where} · continues with ${next.therapist_name} ${next.time}`;
+  return `${where} · after ${prev.therapist_name} ${prev.time}`;
+}
+
+// A booking's card. In the Day view a visit with several therapists gets one card per part
+// (segment) in each therapist's column, linked by "1 of 2 · continues with …".
+function card(b, showTherapist, seg = null) {
+  const part = seg && several(b);
+  const services = part
+    ? b.items.filter((i) => i.segment_position === seg.position && i.item_type === "service").map((i) => i.name).join(", ")
+    : servicesOf(b);
+  return h("button", { type: "button", class: `cal-card ${b.status}${part ? " cal-part" : ""}`, onclick: () => openDetail(b.id) },
+    h("strong", {}, part ? seg.time : b.time), ` · ${part ? minutesBetween(seg.time, seg.end_time) : b.total_minutes} min`,
     h("small", {}, customerName(b), flag(b)),
-    h("small", {}, servicesOf(b)),
-    showTherapist && h("small", {}, b.therapist_name),
+    h("small", {}, services),
+    showTherapist && h("small", {}, several(b) ? b.segments.map((x) => x.therapist_name).join(" → ") : b.therapist_name),
+    part && h("small", { class: "cal-link" }, linkNote(b, seg)),
     b.status !== "booked" && b.status !== "confirmed" && h("small", {}, STATUS[b.status]),
   );
 }
@@ -112,12 +135,13 @@ function render() {
   }
   // Day: one column per therapist
   const therapistFilter = $("filter-therapist").value;
-  const columns = state.therapists.filter((t) => (t.active || state.bookings.some((b) => b.therapist_id === t.id)) && (!therapistFilter || String(t.id) === therapistFilter));
+  const parts = state.bookings.flatMap((b) => b.segments.map((seg) => ({ b, seg })));
+  const columns = state.therapists.filter((t) => (t.active || parts.some((p) => p.seg.therapist_id === t.id)) && (!therapistFilter || String(t.id) === therapistFilter));
   fill(target, h("div", { class: "cal" },
     columns.map((t) => {
-      const items = state.bookings.filter((b) => b.therapist_id === t.id);
+      const items = parts.filter((p) => p.seg.therapist_id === t.id).sort((x, y) => x.seg.time.localeCompare(y.seg.time));
       return h("div", { class: "cal-col" }, h("h3", {}, t.display_name),
-        items.length ? items.map((b) => card(b, false)) : h("p", { class: "cal-empty" }, "No bookings"));
+        items.length ? items.map(({ b, seg }) => card(b, false, seg)) : h("p", { class: "cal-empty" }, "No bookings"));
     })));
 }
 
@@ -190,7 +214,11 @@ function renderDetail(b) {
       b.late_cancellation && h("span", { class: "status-badge cancelled" }, " Late cancellation"),
       h("dl", { class: "facts" },
         h("dt", {}, "When"), h("dd", {}, `${longDay.format(asDate(b.date))}, ${b.time} (${b.total_minutes} min)`),
-        h("dt", {}, "Therapist"), h("dd", {}, b.therapist_name),
+        h("dt", {}, several(b) ? "Visit" : "Therapist"), h("dd", {}, several(b)
+          ? h("ol", { class: "visit-plan" }, b.visit.map((line) => line.is_break
+            ? h("li", { class: "plan-break" }, h("span", { class: "plan-time" }, line.time), "15 min break")
+            : h("li", {}, h("span", { class: "plan-time" }, line.time), h("span", {}, line.names.join(" "), h("small", {}, `${line.therapist_name}, until ${line.end_time}`)))))
+          : b.therapist_name),
         h("dt", {}, "Email"), h("dd", {}, h("a", { href: `mailto:${b.customer.email}` }, b.customer.email)),
         h("dt", {}, "Phone"), h("dd", {}, h("a", { href: `tel:${b.customer.phone.replace(/\s+/g, "")}` }, b.customer.phone)),
         h("dt", {}, "No-shows"), h("dd", { class: b.customer.repeat_no_show ? "flag" : "" }, String(b.customer.no_show_count), b.customer.repeat_no_show ? " ⚠ repeat no-show" : ""),
@@ -264,7 +292,8 @@ function itemsSection(b, locked) {
     h("h3", {}, "Items"),
     h("table", { class: "lines" },
       b.items.map((i) => h("tr", {},
-        h("td", { class: i.item_type === "service" ? "" : "sub" }, i.item_type === "service" ? i.name : `+ ${i.name}`, i.quantity > 1 ? ` × ${i.quantity}` : ""),
+        h("td", { class: i.item_type === "service" ? "" : "sub" }, i.item_type === "service" ? i.name : `+ ${i.name}`, i.quantity > 1 ? ` × ${i.quantity}` : "",
+          several(b) && i.segment_position != null && h("small", { class: "muted" }, ` · ${b.segments[i.segment_position].therapist_name}`)),
         h("td", {}, formatEuro(i.line_total)))),
       h("tr", { class: "total" }, h("td", {}, "Total"), h("td", {}, formatEuro(b.total_price)))),
     !locked && h("button", { class: "btn btn-ghost btn-small", type: "button", onclick: showEditor }, "Adjust items"),
@@ -294,6 +323,7 @@ function itemsSection(b, locked) {
             const updated = await ownerApi(`/owner/bookings/${b.id}/items`, { method: "PUT", body: { items: rows.map((r) => ({
               item_type: r.item_type, name: r.name, minutes: Number(r.minutes) || 0,
               unit_price: Number(r.unit_price).toFixed(2), quantity: Number(r.quantity) || 1,
+              segment_position: r.segment_position ?? null, // keeps the line with its therapist
             })) } });
             toast("Items saved");
             renderDetail(updated);
@@ -315,22 +345,39 @@ async function openNewBooking() {
   const chosen = { services: new Set(), addOns: new Set() };
   const active = state.services.filter((s) => s.active);
   const error = errorBox();
-  const therapistSelect = h("select", { id: "nb-therapist" }, h("option", { value: "" }, "No preference"));
+  // A therapist per treatment (option B): "No preference" or whoever offers it.
+  const choices = new Map(); // service id -> therapist id
+  const therapistBox = h("div", { class: "nb-therapists" });
+  let slots = [];
   const dateInput = h("input", { type: "date", id: "nb-date", value: isoDay.format(new Date()), min: isoDay.format(new Date()) });
   const timeSelect = h("select", { id: "nb-time", required: true }, h("option", { value: "" }, "Pick services and a day"));
   const addOnBox = h("div");
 
+  let timesRequest = 0; // only the newest answer counts (day and therapist can change quickly)
   const refreshTimes = async () => {
+    const request = ++timesRequest;
     fill(timeSelect, h("option", { value: "" }, "Loading…"));
     if (!chosen.services.size || !dateInput.value) return fill(timeSelect, h("option", { value: "" }, "Pick services and a day"));
-    const params = new URLSearchParams({ date: dateInput.value, service_ids: [...chosen.services].join(","), add_on_ids: [...chosen.addOns].join(",") });
-    if (therapistSelect.value) params.set("therapist_id", therapistSelect.value);
+    const params = new URLSearchParams({
+      date: dateInput.value, service_ids: [...chosen.services].join(","), add_on_ids: [...chosen.addOns].join(","),
+      therapist_choices: [...chosen.services].map((id) => `${id}:${choices.get(id) ?? "any"}`).join(","),
+    });
     try {
       const result = await ownerApi(`/owner/availability?${params}`);
-      fill(timeSelect, result.slots.length
-        ? result.slots.map((s) => h("option", { value: s.time }, `${s.time} · ${s.therapist_name}`))
+      if (request !== timesRequest) return;
+      slots = result.slots;
+      // "10:00 · Lena → 11:00 Sofia", with the break when there is one.
+      const who = (slot) => slot.steps.map((step, i) => i === 0 ? step.therapist_name
+        : step.therapist_id === slot.steps[i - 1].therapist_id && i !== slot.break_before ? null
+        : `${i === slot.break_before ? "15 min break → " : ""}${step.time} ${step.therapist_name}`).filter(Boolean).join(" → ");
+      fill(timeSelect, slots.length
+        ? slots.map((slot, index) => h("option", { value: String(index) }, `${slot.time} · ${who(slot)}`))
         : h("option", { value: "" }, "No free times"));
-    } catch (e) { fill(timeSelect, h("option", { value: "" }, e.message)); }
+    } catch (e) {
+      if (request !== timesRequest) return;
+      slots = [];
+      fill(timeSelect, h("option", { value: "" }, e.message));
+    }
   };
   const refreshAddOns = () => {
     fill(addOnBox, active.filter((s) => chosen.services.has(s.id)).flatMap((s) => s.add_ons.filter((a) => a.active).map((a) =>
@@ -338,8 +385,18 @@ async function openNewBooking() {
         `+ ${a.name} (${formatEuro(a.price)})`))));
   };
   const refreshTherapists = () => {
-    const qualified = state.therapists.filter((t) => t.active && [...chosen.services].every((id) => t.service_ids.includes(id)));
-    fill(therapistSelect, h("option", { value: "" }, "No preference"), qualified.map((t) => h("option", { value: t.id }, t.display_name)));
+    for (const id of [...choices.keys()]) if (!chosen.services.has(id)) choices.delete(id);
+    if (!chosen.services.size) return fill(therapistBox, h("p", { class: "field-hint" }, "Pick services first."));
+    fill(therapistBox, [...chosen.services].map((id) => {
+      const service = active.find((s) => s.id === id);
+      const offering = state.therapists.filter((t) => t.active && t.service_ids.includes(id));
+      const select = h("select", { id: `nb-therapist-${id}`, onchange: (e) => {
+        e.target.value ? choices.set(id, Number(e.target.value)) : choices.delete(id);
+        refreshTimes();
+      } }, h("option", { value: "" }, "No preference"),
+        offering.map((t) => h("option", { value: t.id, selected: choices.get(id) === t.id }, t.display_name)));
+      return h("div", { class: "field" }, h("label", { for: select.id }, `Therapist for ${service.name}`), select);
+    }));
   };
 
   const field = (id, label, attrs = {}) => h("div", { class: "field" }, h("label", { for: id }, label), h("input", { id, name: id, ...attrs }));
@@ -352,9 +409,8 @@ async function openNewBooking() {
           refreshAddOns(); refreshTherapists(); refreshTimes();
         } }), `${s.name} · ${s.duration_minutes} min · ${formatEuro(s.price)}`))),
     addOnBox,
-    h("div", { class: "grid-2" },
-      h("div", { class: "field" }, h("label", { for: "nb-therapist" }, "Therapist"), therapistSelect),
-      h("div", { class: "field" }, h("label", { for: "nb-date" }, "Day"), dateInput)),
+    therapistBox,
+    h("div", { class: "field" }, h("label", { for: "nb-date" }, "Day"), dateInput),
     h("div", { class: "field" }, h("label", { for: "nb-time" }, "Time"), timeSelect),
     h("div", { class: "grid-2" },
       field("first_name", "First name", { autocomplete: "off" }), field("last_name", "Last name", { autocomplete: "off" }),
@@ -363,7 +419,7 @@ async function openNewBooking() {
     error,
     h("button", { class: "btn btn-block", type: "submit" }, "Save booking"),
   );
-  therapistSelect.onchange = refreshTimes;
+  refreshTherapists();
   dateInput.onchange = refreshTimes;
   form.onsubmit = async (event) => {
     event.preventDefault();
@@ -371,8 +427,9 @@ async function openNewBooking() {
     try {
       const booking = await ownerApi("/owner/bookings", { method: "POST", body: {
         service_ids: [...chosen.services], add_on_ids: [...chosen.addOns],
-        therapist_id: therapistSelect.value ? Number(therapistSelect.value) : null,
-        date: dateInput.value, start_time: timeSelect.value,
+        therapist_choices: Object.fromEntries([...chosen.services].map((id) => [id, choices.get(id) ?? null])),
+        date: dateInput.value, start_time: slots[Number(timeSelect.value)]?.time || "",
+        break_before: slots[Number(timeSelect.value)]?.break_before ?? null,
         first_name: form.first_name.value, last_name: form.last_name.value,
         email: form.email.value, phone: form.phone.value, note: form.note.value || null,
       } });

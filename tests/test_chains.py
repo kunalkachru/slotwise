@@ -311,3 +311,76 @@ def test_the_calendar_file_covers_the_whole_visit(empty_calendar):
     unfolded = body.replace("\r\n ", "")
     assert "DTSTART:20261013T080000Z" in body and "DTEND:20261013T094500Z" in body
     assert "10:00 Deep tissue massage — Lena\\n11:00 Classic facial — Sofia" in unfolded
+
+
+# ---------- Slice 4: the owner area ----------
+
+def _owner_chain(client):
+    from tests.conftest import login
+
+    booking, _ = _booked_chain(client)
+    assert login(client).status_code == 200
+    return booking["id"]
+
+
+def test_the_owner_sees_each_part_and_can_filter_by_any_therapist(empty_calendar):
+    client = empty_calendar
+    booking_id = _owner_chain(client)
+    detail = client.get(f"/owner/bookings/{booking_id}").json()
+    assert [(s["position"], s["therapist_name"], s["time"], s["end_time"])
+            for s in detail["segments"]] == [(0, "Lena", "10:00", "11:00"),
+                                             (1, "Sofia", "11:00", "11:45")]
+    assert [i["segment_position"] for i in detail["items"]] == [0, 1]
+    for name in ("Lena", "Sofia"):
+        listed = client.get("/owner/bookings", params={
+            "from": TUESDAY, "to": TUESDAY, "therapist_id": therapist_id(client, name)}).json()
+        assert [b["id"] for b in listed] == [booking_id]
+
+
+def test_csv_names_the_therapist_of_each_line(empty_calendar):
+    import csv
+    import io
+
+    client = empty_calendar
+    _owner_chain(client)
+    text = client.get("/owner/bookings/export.csv", params={"from": TUESDAY, "to": TUESDAY}).text
+    rows = list(csv.reader(io.StringIO(text.lstrip("﻿"))))
+    assert [(r[3], r[10]) for r in rows[1:]] == [("Lena", "Deep tissue massage"),
+                                                 ("Sofia", "Classic facial")]
+
+
+def test_adjusted_items_keep_their_therapist(empty_calendar, db):
+    client = empty_calendar
+    booking_id = _owner_chain(client)
+    response = client.put(f"/owner/bookings/{booking_id}/items", json={"items": [
+        {"item_type": "service", "name": "Deep tissue massage", "minutes": 60,
+         "unit_price": "70.00", "quantity": 1, "segment_position": 0},
+        {"item_type": "service", "name": "Classic facial", "minutes": 45,
+         "unit_price": "59.00", "quantity": 1, "segment_position": 1},
+        {"item_type": "extra", "name": "Face oil", "minutes": 0, "unit_price": "18.00",
+         "quantity": 1},
+    ]})
+    assert response.status_code == 200
+    assert [i["segment_position"] for i in response.json()["items"]] == [0, 1, None]
+    assert [v["names"] for v in response.json()["visit"]] == [
+        ["Deep tissue massage"], ["Classic facial"]]
+
+
+def test_phone_bookings_choose_a_therapist_per_treatment(empty_calendar, db):
+    from tests.conftest import login
+
+    client = empty_calendar
+    assert login(client).status_code == 200
+    ids = menu_ids(client)
+    services = ["Relaxation massage", "Classic facial"]
+    lena = therapist_id(client, "Lena")
+    found = client.get("/owner/availability", params={
+        "date": TUESDAY, "service_ids": ",".join(str(ids[s]) for s in services),
+        "therapist_choices": f"{ids['Relaxation massage']}:{lena}"}).json()["slots"]
+    assert plan(found[0]) == ["10:00 Lena", "11:00 Sofia"]
+    response = client.post("/owner/bookings", json={
+        "service_ids": [ids[s] for s in services], "date": TUESDAY, "start_time": "10:00",
+        "therapist_choices": {str(ids["Relaxation massage"]): lena}, **CUSTOMER})
+    assert response.status_code == 200
+    assert [s["therapist_name"] for s in response.json()["segments"]] == ["Lena", "Sofia"]
+    assert response.json()["status"] == "booked"
