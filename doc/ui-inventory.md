@@ -22,6 +22,7 @@ Recorded at commit `0646f34`.
 | localStorage `slotwise:lang` | | `i18n.js` | `"de"` or `"en"` |
 | localStorage `slotwise:view` | | `owner-bookings.js` | `"day"`, `"week"` or `"list"` |
 | sessionStorage `slotwise:lastBooking` | | `book.js` writes, `confirmation.js` reads | |
+| sessionStorage `slotwise:details` | | `book.js` writes after booking and reads on `book.html?again=1` ("Book another treatment") | name, email and phone, this tab only |
 | 🎨 Shared classes created by scripts | | | `.btn`, `.btn-block`, `.btn-ghost`, `.btn-small`, `.btn-danger-ghost`, `.muted`, `.notice`, `.state`, `.alert`, `.success-note`, `.pay-note`, `.facts` (`dl`), `.lines` (`table` with `tr.total` and `td.sub`), `.row`, `.actions`, `.field`, `.field-hint`, `.field-error`, `.status-badge <status>` |
 
 **Status classes** on `.status-badge` and `.cal-card` are the raw status values: `pending`, `expired`, `booked`, `confirmed`, `done`, `no_show` and `cancelled`. Today the owner waitlist maps its own statuses onto these same classes. **Decided:** the redesign replaces this mapping with its own classes, `wl-pending`, `wl-waiting`, `wl-offered`, `wl-booked`, `wl-expired` and `wl-removed`, in `owner-waitlist.js` `BADGE`. The current mapping:
@@ -57,14 +58,16 @@ Recorded at commit `0646f34`.
 | 🔒 `#services` | `div` | filled with step 1 option cards |
 | 🔒 `#addons-step` / `#addons` | `section[hidden]` / `div` | toggles `hidden`; filled with option cards |
 | 🔒 `#therapist-step`, `#date-step`, `#time-step`, `#details-step` | `section[hidden]` | `hidden` toggled together; `#details-step` is scrolled into view by the waitlist |
-| 🔒 `#therapists` | `div[role=radiogroup]` | filled with 🎨 `button.chip[role=radio][aria-pressed][aria-checked][title=bio]` |
+| 🔒 `#therapist-hint` | `p.step-hint[hidden]` | shown with two or more treatments |
+| 🔒 `#therapists` | `div` | one treatment: a 🎨 `div.chips[role=radiogroup]` of `button.chip[role=radio][aria-pressed][aria-checked][title=bio]`; several: 🎨 `div.therapist-rows` > `div.therapist-row` > `p.therapist-row-name` (> `span.therapist-row-number`) + the same chips, one row per treatment |
 | 🔒 `#therapist-error` | `p.field-error[hidden]` | error text |
 | 🔒 `#days` | `div.chips.scroll` | filled with 🎨 `button.chip.day[aria-pressed][aria-label]` > `small` + text |
 | 🔒 `#date-input` | `input[type=date]` | `min`, `max`, `value` and a change handler |
-| 🔒 `#times` | `div[aria-live]` | filled with 🎨 `p.notice`, `p.field-error`, `div.times` > `button.time-btn[aria-pressed]` (> `small` for the therapist), or the waitlist box |
+| 🔒 `#times` | `div[aria-live]` | filled with 🎨 `p.notice`, `p.field-error`, `div.times` > `button.time-btn[aria-pressed]` (> `small` for the therapist), or the waitlist box. Several treatments: 🎨 `div.time-modes` (two `button.chip[aria-pressed]`: Suggested times / Choose times myself, + `p.step-hint`); suggested chains in `div.times.times-chains` (`small` = "Lena → Sofia"); "Choose times myself" = one 🎨 `div.pick-strip` (`.is-waiting` until the previous pick) per treatment |
 | 🔒 `#first_name`, `#last_name`, `#email`, `#phone`, `#note` | inputs with matching `name` | the server's field errors are matched by **ID** (`showFieldError`), so the IDs must equal the API field names |
 | 🔒 `.field` | the wrapper of each input | the error is appended into `input.closest(".field")` |
 | 🔒 `#summary-when` | `p` | text |
+| 🔒 `#summary-plan` | `ol.summary-plan[hidden]` | several treatments: one `li` per treatment (`span.plan-time` + name + `small` therapist), `li.plan-break` for a break |
 | 🔒 `#summary-lines` | `table` | filled with `tr` > `td`(`.sub`) rows + `tr.total` |
 | 🔒 `#book-error` | `div.alert[role=alert][hidden]` | the general error |
 | 🔒 `#confirm` | `button[type=submit][form=book-form]` | `disabled` toggled; text switches to "Booking…". It lives **outside** the form, linked by the `form` attribute |
@@ -164,7 +167,8 @@ There is no top bar and no language switch on the receipt, but `i18n.js` is stil
 | 🔒 `#new-form` | `form.panel-body` | rebuilt; read via `form.first_name/last_name/email/phone/note` |
 | 🔒 `dialog [data-close]` | `button.icon-btn` | close handlers (`closest("dialog")`) |
 | 🎨 Detail body | | `section` > `span.status-badge`, `dl.facts`, `dd.flag`; `h3`; `.row` > `select` + `button.btn.btn-small`; `p.field-hint`; `p.alert[role=alert]`; `table.lines`; items editor: `table.items-editor` > `select`, `input.w-name`, `input.w-num`, `input.w-qty`, `button.icon-btn` |
-| 🎨 New-booking form | | `div.field` > `label` + `label.check` > checkbox; `div.grid-2`; 🔒 IDs `#nb-therapist`, `#nb-date`, `#nb-time` (made by the script; only the labels point at them); `span.optional`; `button.btn.btn-block` |
+| 🎨 New-booking form | | `div.field` > `label` + `label.check` > checkbox; `div.grid-2`; 🎨 `div.nb-therapists` (one therapist `select` per treatment, 🔒 IDs `#nb-therapist-<service id>`); 🔒 IDs `#nb-date`, `#nb-time` (made by the script; only the labels point at them); `span.optional`; `button.btn.btn-block` |
+| 🎨 Day view parts | | a visit with several therapists: one `button.cal-card.cal-part` per part in each therapist's column, with `small.cal-link` ("1 of 2 · continues with Sofia 11:15"); the detail's "Visit" is an `ol.visit-plan` |
 | 🎨 `.toast[role=status]` | | appended to `<body>` for 3.2 seconds |
 
 ### `owner/services.html` (`js/owner-services.js` + `js/owner-forms.js`)
@@ -215,6 +219,7 @@ There is no top bar and no language switch on the receipt, but `i18n.js` is stil
 | 🔒 `#owner-menu-toggle`, `#owner-nav`, `.owner-page-name` | made by `owner-shell.js` | Menu button (`aria-expanded`, Escape, outside click) and `#sidebar.is-open` | phones and tablets in the new look; hidden in classic |
 | 🎨 `.nav-icon` | owner menu links | | `.calm-only` line icons |
 | 🎨 `.is-loading` | every "Loading…" placeholder (HTML, `book.js` times, `owner-bookings.js` detail) | | a spinner in the new look; nothing in classic |
+| 🎨 `ol.visit-plan` | confirmation, manage, receipt, offer pages; owner booking detail | `visitFact()` in `api.js` (customer pages) | a visit with several therapists: "Your visit" with one `li` per part (`span.plan-time`, names, `small` therapist) and `li.plan-break`; one-therapist bookings keep the plain Therapist fact |
 | 🎨 `dl.facts > div` | `api.js` `fact()`, used by confirmation, manage, offer and receipt | | classic: `display: contents` (same layout as before) |
 | 🎨 `.btn-danger` | "Yes, cancel booking" in `manage.js` | | replaces an inline style |
 | 🎨 `.status-badge.wl-*` | `owner-waitlist.js` `BADGE` | | `wl-pending`, `wl-waiting`, `wl-offered`, `wl-booked`, `wl-expired`, `wl-removed`; classic colours unchanged |
