@@ -79,7 +79,7 @@ class Mailer:
 
 STRINGS = {
     "en": {
-        "with": "with", "total": "Total", "pay": "Pay at the studio.", "paid": "Paid at the studio.",
+        "with": "with", "break": "15 min break", "total": "Total", "pay": "Pay at the studio.", "paid": "Paid at the studio.",
         "hello": "Hello {name}",
         "confirmed_intro": "{hello}, your booking at {studio} is confirmed.",
         "confirmed_subject": "Booking confirmed: {when} · {studio}",
@@ -128,7 +128,7 @@ STRINGS = {
         "wl_confirm_link": "Confirm my waitlist request",
     },
     "de": {
-        "with": "bei", "total": "Gesamt", "pay": "Bezahlung im Studio.", "paid": "Im Studio bezahlt.",
+        "with": "bei", "break": "15 Min. Pause", "total": "Gesamt", "pay": "Bezahlung im Studio.", "paid": "Im Studio bezahlt.",
         "hello": "Hallo {name}",
         "confirmed_intro": "{hello}, Ihre Buchung bei {studio} ist bestätigt.",
         "confirmed_subject": "Buchung bestätigt: {when} · {studio}",
@@ -213,6 +213,28 @@ def _lines(booking) -> list[tuple[str, str]]:
     return rows
 
 
+def _plan(booking) -> list[str]:
+    """Several therapists (option B): "10:00  Deep tissue massage + Hot stones — Lena",
+    one line per part of the visit, plus the break when there is one."""
+    lines = []
+    for line in booking.visit_plan():
+        at = line.start_at.astimezone(BERLIN).strftime("%H:%M")
+        if line.is_break:
+            lines.append(f"{at}  {_t(booking.language, 'break')}")
+        else:
+            lines.append(f"{at}  {' '.join(line.names)} — {line.therapist_name}")
+    return lines
+
+
+def _when_line(booking) -> str:
+    """"Tuesday 13 October 2026, 10:00 with Lena (75 min)"; with several therapists the
+    names move to the plan lines."""
+    if booking.has_several_therapists:
+        return f"{_when(booking)} ({_minutes(booking)})"
+    return (f"{_when(booking)} {_t(booking.language, 'with')} "
+            f"{booking.therapist.display_name} ({_minutes(booking)})")
+
+
 def _total_minutes(booking) -> int:
     return sum(i.minutes_snapshot * i.quantity for i in booking.items)
 
@@ -231,6 +253,8 @@ def _html_page(heading: str, intro: str, booking, buttons: list[tuple[str, str]]
                footer: str, paid: bool = False) -> str:
     esc = html.escape
     lang = booking.language
+    plan = ("<p>" + "<br>".join(esc(line) for line in _plan(booking)) + "</p>"
+            if booking.has_several_therapists else "")
     rows = "".join(
         f'<tr><td style="padding:6px 0;border-bottom:1px solid #e3e9e5">{esc(label)}</td>'
         f'<td style="padding:6px 0;border-bottom:1px solid #e3e9e5;text-align:right">'
@@ -247,8 +271,7 @@ def _html_page(heading: str, intro: str, booking, buttons: list[tuple[str, str]]
         '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
         'max-width:520px;color:#1d2a24">'
         f'<h2 style="color:#1F8756">{esc(heading)}</h2><p>{esc(intro)}</p>'
-        f"<p><strong>{esc(_when(booking))}</strong> {_t(lang, 'with')} "
-        f"{esc(booking.therapist.display_name)} ({_minutes(booking)})</p>"
+        f"<p><strong>{esc(_when_line(booking))}</strong></p>{plan}"
         f'<table style="width:100%;border-collapse:collapse">{rows}'
         f'<tr><td style="padding:8px 0;font-weight:700">{_t(lang, "total")}</td>'
         f'<td style="padding:8px 0;font-weight:700;text-align:right">'
@@ -261,8 +284,10 @@ def _html_page(heading: str, intro: str, booking, buttons: list[tuple[str, str]]
 def _text_body(intro: str, booking, links: list[tuple[str, str]], footer: str,
                paid: bool = False) -> str:
     lang = booking.language
-    lines = [intro, "", f"{_when(booking)} {_t(lang, 'with')} {booking.therapist.display_name} "
-             f"({_minutes(booking)})", ""]
+    lines = [intro, "", _when_line(booking)]
+    if booking.has_several_therapists:
+        lines += _plan(booking)
+    lines += [""]
     lines += [f"{label:<40} {price:>10}" for label, price in _lines(booking)]
     lines += [f"{_t(lang, 'total'):<40} {i18n.euro(booking.total_price, lang):>10}", "",
               _t(lang, "paid" if paid else "pay"), ""]

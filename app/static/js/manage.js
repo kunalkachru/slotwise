@@ -1,4 +1,4 @@
-import { api, fact, fill, formatEuro, formatMinutes, h } from "/js/api.js";
+import { api, fact, fill, formatEuro, formatMinutes, h, visitFact } from "/js/api.js";
 import { locale, t } from "/js/i18n.js";
 
 const params = new URLSearchParams(location.search);
@@ -54,7 +54,7 @@ function render(booking) {
     h("dl", { class: "facts" },
       fact(t("common.date"), longDate.format(new Date(`${booking.date}T12:00:00Z`))),
       fact(t("common.time"), `${t("common.at_time", { time: booking.time })} (${formatMinutes(booking.total_minutes)})`),
-      fact(t("common.therapist"), booking.therapist_name),
+      visitFact(booking, { therapist: t("common.therapist"), visit: t("common.your_visit"), break: t("book.break") }),
       studio && fact(t("common.where"), studio.address),
     ),
     h("table", { class: "lines" },
