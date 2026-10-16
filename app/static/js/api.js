@@ -98,10 +98,14 @@ export function themeSwitch(labels) {
 // readers. Hidden in the classic look (.calm-only).
 export function treatmentMedia(service, category, tag = "div") {
   const art = String(category || "").toLowerCase().replace(/[^a-z]/g, "");
+  const picture = service.photo_url || `/img/art/${art || "massages"}.svg`;
+  // An uploaded photo with the owner's description is announced; artwork is decoration.
+  const label = service.photo_url && service.photo_alt
+    ? { role: "img", "aria-label": service.photo_alt } : { "aria-hidden": "true" };
   return h(tag, {
-    class: "treatment-media calm-only", "aria-hidden": "true",
-    style: `--art: url("/img/art/${art || "massages"}.svg")`,
-  }, service.description && h("span", { class: "treatment-media-desc" }, service.description));
+    class: `treatment-media calm-only${service.photo_url ? " has-photo" : ""}`, ...label,
+    style: `--art: url("${picture.replace(/["\\]/g, "")}")`,
+  }, service.description && h("span", { class: "treatment-media-desc", "aria-hidden": "true" }, service.description));
 }
 
 export function pageLang() {

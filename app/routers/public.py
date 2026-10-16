@@ -15,6 +15,7 @@ from app.emails import (
 )
 from app.errors import TOO_MANY_BOOKINGS, AppError
 from app.i18n import category_label, request_lang
+from app.logic import photos as photos_logic
 from app.logic import waitlist
 from app.logic.availability import check_date_in_range, free_slots
 from app.logic.availability import get_studio as load_studio
@@ -33,7 +34,7 @@ from app.logic.booking import (
 )
 from app.logic.calendar import booking_ics
 from app.logic.selection import localized, parse_ids, require_therapists, resolve_selection
-from app.models import CATEGORIES, Service, Studio, Therapist
+from app.models import CATEGORIES, Service, ServicePhoto, Studio, Therapist
 from app.schemas import (
     AddOnOut,
     AvailabilityOut,
@@ -83,6 +84,7 @@ def list_services(request: Request, db: Session = Depends(get_db)):
         .order_by(Service.id)
     ).all()
     lang = request_lang(request)
+    photos = photos_logic.photos_by_service(db) if photos_logic.shown(db) else {}
     menu = []
     for category in CATEGORIES:
         in_category = [
@@ -97,6 +99,9 @@ def list_services(request: Request, db: Session = Depends(get_db)):
                              extra_minutes=a.extra_minutes, price=a.price)
                     for a in s.add_ons if a.active
                 ],
+                photo_url=photos_logic.photo_url(photos.get(s.id)),
+                photo_alt=localized(photos[s.id].alt_text, photos[s.id].alt_text_de, lang)
+                if s.id in photos else None,
             )
             for s in services
             if s.category == category
@@ -219,6 +224,18 @@ def verify(token: str, request: Request, db: Session = Depends(get_db)):
 @router.get("/bookings/{token}", response_model=ManageOut)
 def view_booking(token: str, db: Session = Depends(get_db)):
     return _manage_view(db, get_by_token(db, token))
+
+
+@router.get("/services/{service_id}/photo")
+def service_photo(service_id: int, db: Session = Depends(get_db)):
+    """An uploaded treatment photo. Its URL carries a version stamp, so it may be cached."""
+    photo = db.get(ServicePhoto, service_id)
+    if photo is None or not photo.data:
+        raise AppError(404, "Not found.")
+    return Response(photo.data, media_type=photo.content_type, headers={
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
+    })
 
 
 @router.get("/bookings/{token}/calendar.ics")

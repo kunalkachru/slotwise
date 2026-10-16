@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f2fa"/><stop offset=".6" stop-color="#e3e6f2"/><stop offset="1" stop-color="#cfe7e1"/></linearGradient>
+    <radialGradient id="peb" cx=".38" cy=".25" r=".9"><stop offset="0" stop-color="#eef3f2"/><stop offset=".6" stop-color="#a9bab8"/><stop offset="1" stop-color="#5f7674"/></radialGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <g stroke-linecap="round">
+    <path d="M300 520 C 310 400 330 280 370 150" stroke="#6b8f6f" stroke-width="5" fill="none"/>
+    <path d="M360 520 C 380 410 410 300 460 190" stroke="#6b8f6f" stroke-width="5" fill="none"/>
+    <path d="M250 520 C 250 420 260 330 280 240" stroke="#6b8f6f" stroke-width="4" fill="none"/>
+  </g>
+  <g fill="#8a78c4">
+    <ellipse cx="370" cy="160" rx="10" ry="16" transform="rotate(20 370 160)"/><ellipse cx="362" cy="186" rx="11" ry="17" transform="rotate(14 362 186)"/><ellipse cx="380" cy="190" rx="10" ry="16" transform="rotate(30 380 190)"/>
+    <ellipse cx="356" cy="214" rx="11" ry="17" transform="rotate(10 356 214)"/><ellipse cx="374" cy="220" rx="10" ry="16" transform="rotate(26 374 220)"/><ellipse cx="350" cy="244" rx="10" ry="15" transform="rotate(8 350 244)"/>
+    <ellipse cx="460" cy="200" rx="10" ry="16" transform="rotate(24 460 200)"/><ellipse cx="450" cy="226" rx="11" ry="17" transform="rotate(16 450 226)"/><ellipse cx="468" cy="232" rx="10" ry="16" transform="rotate(32 468 232)"/>
+    <ellipse cx="442" cy="256" rx="10" ry="16" transform="rotate(12 442 256)"/><ellipse cx="460" cy="262" rx="9" ry="15" transform="rotate(28 460 262)"/>
+    <ellipse cx="282" cy="250" rx="9" ry="15" transform="rotate(10 282 250)"/><ellipse cx="276" cy="276" rx="10" ry="16" transform="rotate(6 276 276)"/><ellipse cx="290" cy="282" rx="9" ry="14" transform="rotate(22 290 282)"/>
+  </g>
+  <g fill="#b3a6e0" opacity=".85">
+    <ellipse cx="378" cy="172" rx="6" ry="9"/><ellipse cx="466" cy="212" rx="6" ry="9"/><ellipse cx="286" cy="262" rx="5" ry="8"/>
+  </g>
+  <ellipse cx="560" cy="470" rx="150" ry="44" fill="url(#peb)"/>
+  <path d="M480 452c40-14 110-18 150-8" stroke="#fff" stroke-opacity=".7" stroke-width="7" fill="none" stroke-linecap="round"/>
+</svg>
