@@ -78,6 +78,9 @@ function render(booking) {
       booking.awaiting_email_confirmation && h("button", { class: "btn btn-block", type: "button", onclick: () => act("verify") }, t("manage.verify")),
       booking.can_confirm && h("button", { class: "btn btn-block", type: "button", onclick: () => act("confirm") }, t("manage.coming")),
       cancelBlock,
+      ["pending", "booked", "confirmed"].includes(booking.status) && h("a", {
+        class: "btn btn-ghost btn-block", href: `${bookingUrl()}/calendar.ics`, download: "",
+      }, t("manage.calendar")),
       h("a", { class: "btn btn-ghost btn-block", href: "/book.html" }, t("nav.book_again")),
     ),
     policy,

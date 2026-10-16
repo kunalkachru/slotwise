@@ -1,9 +1,10 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app import clock
 from app.db import get_db
 from app.emails import (
     booking_verification_email,
@@ -30,6 +31,7 @@ from app.logic.booking import (
     mailbox_key,
     verify_booking,
 )
+from app.logic.calendar import booking_ics
 from app.logic.selection import localized, parse_ids, require_therapists, resolve_selection
 from app.models import CATEGORIES, Service, Studio, Therapist
 from app.schemas import (
@@ -217,6 +219,20 @@ def verify(token: str, request: Request, db: Session = Depends(get_db)):
 @router.get("/bookings/{token}", response_model=ManageOut)
 def view_booking(token: str, db: Session = Depends(get_db)):
     return _manage_view(db, get_by_token(db, token))
+
+
+@router.get("/bookings/{token}/calendar.ics")
+def booking_calendar(token: str, request: Request, db: Session = Depends(get_db)):
+    """The booking as a calendar file (linked from the confirmation email and manage page)."""
+    booking = get_by_token(db, token)
+    studio = load_studio(db)
+    public_url = request.app.state.settings.public_url
+    body = booking_ics(booking, studio, f"{public_url}/manage.html?token={token}")
+    day = booking.start_at.astimezone(clock.BERLIN).date().isoformat()
+    return Response(body, media_type="text/calendar; charset=utf-8", headers={
+        "Content-Disposition": f'attachment; filename="booking-{day}.ics"',
+        "Cache-Control": "no-store",
+    })
 
 
 @router.post("/bookings/{token}/confirm", response_model=ManageOut)

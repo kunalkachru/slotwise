@@ -213,3 +213,22 @@ def test_a_failing_email_service_does_not_break_booking(empty_calendar, monkeypa
     empty_calendar.app.state.mailer.api_key = "re_test_key"
     response = book(empty_calendar, ["Classic facial"], TUESDAY, "10:00", "Sofia")
     assert response.status_code == 200
+
+
+def test_booking_as_calendar_file(booked):
+    client, token = booked
+    response = client.get(f"/public/bookings/{token}/calendar.ics")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/calendar")
+    assert response.headers["cache-control"] == "no-store"
+    assert 'filename="booking-2026-10-13.ics"' in response.headers["content-disposition"]
+    body = response.text
+    assert body.startswith("BEGIN:VCALENDAR\r\n") and body.endswith("END:VCALENDAR\r\n")
+    assert "DTSTART:20261013T150000Z" in body  # 17:00 in Munich (summer time)
+    assert "DTEND:20261013T161500Z" in body  # 75 minutes: Deep tissue + Hot stones
+    assert "SUMMARY:Deep tissue massage · Isar Wellness" in body
+    assert "LOCATION:Isarstraße 12\\, 80469 München" in body  # commas escaped
+    assert all(len(line.encode()) <= 75 for line in body.split("\r\n"))  # folded
+    [email] = emails(client, "Booking confirmed")
+    assert f"/public/bookings/{token}/calendar.ics" in email.text  # "Add to your calendar"
+    assert client.get("/public/bookings/nope/calendar.ics").status_code == 404

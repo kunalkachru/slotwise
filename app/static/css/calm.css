@@ -999,3 +999,11 @@
 [data-theme="calm"] .status-badge.wl-offered { background: var(--success-soft); border-color: transparent; color: var(--success); }
 [data-theme="calm"] .status-badge.wl-booked { background: var(--card); border-color: currentColor; color: var(--success); }
 [data-theme="calm"] .status-badge:is(.wl-expired, .wl-removed) { background: var(--bg); border-color: var(--line); color: var(--muted); }
+
+/* ---------- Booking terms, footer links, legal pages ---------- */
+[data-theme="calm"] .booking-terms { margin: 0 0 var(--space-3); color: var(--muted); font-size: var(--text-sm); }
+[data-theme="calm"] .footer-links { gap: var(--space-4); }
+[data-theme="calm"] .legal { gap: var(--space-4); }
+[data-theme="calm"] .legal h2 { margin-bottom: var(--space-1); font-size: var(--text-md); }
+[data-theme="calm"] .legal p { margin: 0 0 var(--space-1); color: var(--ink); }
+[data-theme="calm"] .legal > .muted { color: var(--muted); }

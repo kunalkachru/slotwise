@@ -400,6 +400,9 @@ async function init() {
   $("date-input").addEventListener("change", (e) => e.target.value && selectDate(e.target.value));
   api("/public/studio").then((studio) => {
     state.windowDays = studio.booking_window_days;
+    // The cancellation terms, right where the customer commits (as in the leading apps).
+    $("booking-terms").textContent = t("book.terms", { hours: studio.free_cancellation_hours });
+    $("booking-terms").hidden = false;
     document.querySelectorAll("[data-studio-name]").forEach((el) => (el.textContent = studio.name));
     document.title = `${t("book.title")} · ${studio.name}`;
     renderDays();
