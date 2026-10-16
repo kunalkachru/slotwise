@@ -62,6 +62,30 @@ export function fill(target, ...children) {
   target.replaceChildren(...children.flat().filter((c) => c != null && c !== false));
 }
 
+const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle fill="none" stroke="currentColor" stroke-width="1.75" cx="12" cy="12" r="2.5"/></svg>';
+
+// The Classic / New look button (state lives in theme.js). It names the look it switches
+// to: labels = { classic: "Classic look", calm: "New look" } in the page's language.
+// The label stays in the DOM (it may only be hidden visually), so screen readers always
+// hear it.
+export function themeSwitch(labels) {
+  const theme = window.slotwiseTheme;
+  const label = h("span", { class: "theme-switch-label" });
+  const button = h("button", { type: "button", class: "theme-switch" }, label);
+  button.insertAdjacentHTML("afterbegin", EYE); // static markup, no data
+  const sync = () => {
+    label.textContent = theme && theme.current() === "calm" ? labels.classic : labels.calm;
+    button.title = label.textContent;
+  };
+  button.addEventListener("click", () => {
+    if (!theme) return;
+    theme.set(theme.current() === "calm" ? "classic" : "calm");
+    sync();
+  });
+  sync();
+  return button;
+}
+
 export function pageLang() {
   return document.documentElement.lang === "de" ? "de" : "en";
 }

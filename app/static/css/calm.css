@@ -1,0 +1,55 @@
+/* "Calm modern" — the new look (doc/design/figma-prompt.md; reference: doc/design/figma-make/).
+   Every rule here is scoped to :root[data-theme="calm"], set by js/theme.js when the visitor
+   chose "New look". Without it this file changes nothing, so styles.css alone stays the
+   classic look. Values come from the Figma export's tokens (figma-make/src/index.css). */
+
+:root[data-theme="calm"] {
+  --green: #1f5c45;
+  --green-dark: #164534;
+  --accent: #3e9c72;
+  --accent-soft: #e4f0ea;
+  --warm: #a0571a;
+  --warm-soft: #fbefe3;
+  --ink: #1c2621;
+  --muted: #5a645f;
+  --line: #e6e0d6;
+  --input-border: #848f89;
+  --input-border-hover: #5a645f;
+  --bg: #faf7f2;
+  --card: #ffffff;
+  --success: #1e6b45;
+  --success-soft: #e5f3ea;
+  --warning: #8a5300;
+  --warning-soft: #fff3dc;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --info: #2c5aa0;
+  --info-soft: #eaf0fa;
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-2xl: 36px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow: 0 1px 2px rgba(28, 38, 33, 0.05), 0 4px 16px rgba(28, 38, 33, 0.06);
+  --shadow-lg: 0 8px 32px rgba(28, 38, 33, 0.14);
+  --control-height: 48px;
+  --control-height-small: 40px;
+  --tap-size: 44px;
+  --transition: 150ms;
+}
