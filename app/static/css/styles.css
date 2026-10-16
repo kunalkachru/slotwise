@@ -614,6 +614,9 @@ table.data tr.inactive td { color: var(--muted); }
 }
 .cal-card:hover { background: var(--accent-soft); }
 .cal-card strong { font-variant-numeric: tabular-nums; }
+/* One part of a visit with several therapists: linked to the other part(s). */
+.cal-card .cal-link { color: var(--green-dark); font-style: italic; }
+.nb-therapists { display: grid; gap: 0 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
 .cal-card small { display: block; color: var(--muted); }
 .cal-card.booked { border-left-color: #e0a100; }
 .cal-card.cancelled, .cal-card.no_show { border-left-color: var(--danger); opacity: 0.7; }

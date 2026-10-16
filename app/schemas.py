@@ -172,6 +172,16 @@ class BookingItemOut(ORMModel):
     unit_price: MoneyStr
     quantity: int
     line_total: MoneyStr
+    segment_position: int | None = None  # which part of the visit (option B); None = extra
+
+
+class SegmentOut(BaseModel):
+    """One therapist's part of a visit, for the owner's calendar."""
+    position: int
+    therapist_id: int
+    therapist_name: str
+    time: str  # Europe/Berlin
+    end_time: str
 
 
 class PlanLineOut(BaseModel):
@@ -213,6 +223,7 @@ def booking_fields(booking) -> dict:
                 unit_price=i.unit_price_snapshot,
                 quantity=i.quantity,
                 line_total=i.unit_price_snapshot * i.quantity,
+                segment_position=i.segment.position if i.segment else None,
             )
             for i in booking.items
         ],
@@ -304,6 +315,7 @@ class OwnerBookingOut(BaseModel):
     therapist_id: int
     therapist_name: str
     visit: list[PlanLineOut] = Field(default_factory=list)
+    segments: list[SegmentOut] = Field(default_factory=list)
     items: list[BookingItemOut]
     customer: OwnerCustomerOut
     customer_note: str | None
@@ -318,9 +330,17 @@ class OwnerBookingOut(BaseModel):
     @classmethod
     def from_booking(cls, booking, has_started: bool, threshold: int) -> "OwnerBookingOut":
         c = booking.customer
+
+        def hm(moment: datetime) -> str:
+            return moment.astimezone(BERLIN).strftime("%H:%M")
+
         return cls(
             id=booking.id,
             therapist_id=booking.therapist_id,
+            segments=[SegmentOut(position=s.position, therapist_id=s.therapist_id,
+                                 therapist_name=s.therapist.display_name,
+                                 time=hm(s.start_at), end_time=hm(s.end_at))
+                      for s in booking.segments],
             customer=OwnerCustomerOut(
                 id=c.id, first_name=c.first_name, last_name=c.last_name, email=c.email,
                 phone=c.phone, no_show_count=c.no_show_count,
@@ -349,6 +369,7 @@ class ItemIn(BaseModel):
     quantity: int = 1
     service_id: int | None = None
     add_on_id: int | None = None
+    segment_position: int | None = Field(default=None, ge=0, le=9)
 
 
 class ItemsIn(BaseModel):
