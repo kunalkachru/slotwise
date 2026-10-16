@@ -70,7 +70,10 @@ def test_self_hosted_font_is_served_as_woff2(client):
     assert response.status_code == 200
     assert response.headers["content-type"] == "font/woff2"
     assert response.content[:4] == b"wOF2"
-    assert client.get("/fonts/Inter-OFL.txt").status_code == 200  # the font's licence ships with it
+    licence = client.get("/fonts/Inter-OFL.txt")  # the OFL requires shipping it with the font
+    assert licence.status_code == 200
+    # ...including the font's own copyright notice (its name table, nameID 0)
+    assert licence.text.startswith("Copyright 2016 The Inter Project Authors")
 
 
 def test_no_third_party_font_requests():
