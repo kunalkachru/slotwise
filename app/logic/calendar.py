@@ -6,7 +6,7 @@ from app import clock
 
 
 def _escape(text: str) -> str:
-    return (text.replace("\\", "\\\\").replace(";", "\;").replace(",", "\\,")
+    return (text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
             .replace("\r\n", "\\n").replace("\n", "\\n"))
 
 
