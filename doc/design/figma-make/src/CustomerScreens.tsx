@@ -115,7 +115,7 @@ function CustomerHeader({ action, german = false }: { action?: "book" | "menu" |
       <a className="c-brand" href="#" aria-label="Isar Wellness home"><MiniIcon name="leaf" size={28} /><span>Isar Wellness</span></a>
       <div className="c-header__actions">
         <button className="language-button">{german ? "EN" : "DE"}</button>
-        <button className="button button--text button--small c-classic">Classic look</button>
+        <button className="button button--text button--small c-classic">{german ? "Klassisches Design" : "Classic look"}</button>
         {action && <button className={`button button--small ${action === "menu" ? "button--ghost" : ""}`}>{label}</button>}
       </div>
     </header>
@@ -237,6 +237,9 @@ function DetailsForm({ errors = false, nameError = false, noteError = false, ger
   );
 }
 
+// 07:00 to 21:00 in 30-minute steps (book.js timeOptions()).
+const waitlistTimes = Array.from({ length: 29 }, (_, i) => `${String(7 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
+
 function WaitlistBox({ state, german }: { state: string; german: boolean }) {
   const joining = state === "waitlist-joining";
   return (
@@ -247,9 +250,9 @@ function WaitlistBox({ state, german }: { state: string; german: boolean }) {
         <p>{german ? "Sagen Sie uns, wann Sie kommen könnten. Wenn jemand absagt, erhält die erste Person auf der Liste eine E-Mail und kann den Termin buchen." : "Tell us when you could come. If someone cancels, the first person on the list gets an email and can claim the time."}</p>
         <div className="c-time-range">
           <span>{german ? "Zwischen" : "Between"}</span>
-          <label className="sr-only" htmlFor="earliest">Earliest start</label><select id="earliest" defaultValue="09:00">{["07:00","07:30","08:00","08:30","09:00","09:30","10:00","21:00"].map(t => <option key={t}>{t}</option>)}</select>
+          <label className="sr-only" htmlFor="earliest">Earliest start</label><select id="earliest" defaultValue="09:00">{waitlistTimes.map(t => <option key={t}>{t}</option>)}</select>
           <span>{german ? "und" : "and"}</span>
-          <label className="sr-only" htmlFor="latest">Latest start</label><select id="latest" defaultValue="18:00">{["18:00","18:30","19:00","19:30","20:00","20:30","21:00"].map(t => <option key={t}>{t}</option>)}</select>
+          <label className="sr-only" htmlFor="latest">Latest start</label><select id="latest" defaultValue="18:00">{waitlistTimes.map(t => <option key={t}>{t}</option>)}</select>
         </div>
         <small>Uses your details from step 6.</small>
         <button className="button" disabled={joining}>{german ? "Auf die Warteliste setzen" : "Join the waitlist"}</button>
@@ -265,9 +268,10 @@ function WaitlistBox({ state, german }: { state: string; german: boolean }) {
 
 function BookingSummary({ state, german, mobile = false }: { state: string; german: boolean; mobile?: boolean }) {
   const started = state !== "start" && state !== "menu-error";
-  const complete = ["selected", "submitting", "fields", "name-error", "note-error"].includes(state) || state.startsWith("general");
+  // "general" = "That time was just taken": the times reload with no slot picked, so confirming is disabled again.
+  const complete = ["selected", "submitting", "fields", "name-error", "note-error"].includes(state) || (state.startsWith("general") && state !== "general");
   const loading = state === "submitting";
-  const when = !started ? (german ? "Wählen Sie zuerst eine Behandlung." : "Choose a treatment to start.") : complete ? (german ? "Dienstag, 13. Oktober um 10:00 bei Lena" : "Tuesday 13 October at 10:00 with Lena") : state === "times-loading" ? (german ? "Dienstag, 13. Oktober, Uhrzeit wählen" : "Tuesday 13 October, pick a time") : (german ? "Tag und Uhrzeit wählen" : "Pick a day and time");
+  const when = !started ? (german ? "Wählen Sie zuerst eine Behandlung." : "Choose a treatment to start.") : complete ? (german ? "Dienstag, 13. Oktober um 10:00 bei Lena" : "Tuesday 13 October at 10:00 with Lena") : state === "times-loading" || state === "general" ? (german ? "Dienstag, 13. Oktober, Uhrzeit wählen" : "Tuesday 13 October, pick a time") : (german ? "Tag und Uhrzeit wählen" : "Pick a day and time");
   if (mobile) return <div className="c-mobile-summary"><button className="c-mobile-summary__text">{started ? <>{german ? "2 Positionen · 75 Min. · " : "2 items · 75 min · "}<strong>{german ? "82 €" : "€82"}</strong></> : when}</button><button className="button" disabled={!complete || loading}>{loading ? "Booking…" : german ? "Buchung abschicken" : "Confirm booking"}</button></div>;
   return (
     <aside className="summary-card c-book-summary" id="booking-summary">

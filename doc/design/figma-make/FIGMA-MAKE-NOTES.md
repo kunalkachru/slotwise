@@ -1,5 +1,22 @@
 > **Note (Slotwise):** this was `AGENTS.md` in the Figma Make export, renamed so AI tools don't load it as instructions for this repo. It describes Figma Make's own sandbox, not our rules; our rules are in the root CLAUDE.md. This folder is a reference-only library: never built, served, tested or deployed (see doc/design/figma-prompt.md, Stage C1).
 
+## Changes made after the export (Slotwise)
+
+Small fixes so this reference matches the brief (from the PR #14 review). Re-apply them if the folder is ever replaced by a new export.
+
+1. `src/CustomerScreens.tsx` `BookingSummary`: in the "(g) Time just taken" frame, the booking is no longer "complete". Both Confirm buttons are disabled and the summary says "…, pick a time", because the slot is cleared when the times reload (as `book.js` does on a 400).
+2. `src/CustomerScreens.tsx` `WaitlistBox`: both time selects offer 07:00–21:00 in 30-minute steps (as `book.js` `timeOptions()` does). The defaults stay 09:00 and 18:00.
+3. `src/CustomerScreens.tsx` `CustomerHeader`: the look switch reads "Klassisches Design" on German pages.
+
+## Notes for the port (not changed here)
+
+- **German header at 390px:** with "EN", "Klassisches Design" and "Zurück zum Menü", the studio name shrinks to "I…". In `calm.css`, below about 400px, show the look switch as its icon only, with its text as the `aria-label`.
+- **Home:** leave out the invented "Munich · Day spa" line.
+- **Booking times:** the prototype shows therapist names under the times even when a therapist is chosen. Our `book.js` shows them only for "No preference"; keep our logic.
+- **German texts:** a few differ slightly from `i18n.js`. The port always uses our word lists.
+- **Mobile total bar:** in the prototype it sits at the end of the frame. On the real page it is fixed to the bottom of the screen.
+- **Font:** the prototype loads Inter from Google Fonts. The port self-hosts it, because of GDPR rulings on Google Fonts in Germany.
+
 # figma-make-app
 
 React + Vite + Tailwind CSS project running inside Figma Make.
