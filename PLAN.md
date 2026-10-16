@@ -370,6 +370,166 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
   - CI, deploy, Docker, pytest and ruff all ignore it;
   - it's never served or built.
 
+### Feature: several therapists per visit (option B) — planned, decisions agreed 2026-10-16
+
+Decisions follow what today's leading salon apps do. The research is listed at the end of this section; where a choice differs from an earlier draft, the reason is given.
+
+**Why.** Today one therapist does the whole booking, so a combination nobody offers alone (e.g. Deep tissue massage = Lena + Classic facial = Sofia) can't be booked online; since PR #22 the page says so. Fresha, the market leader, lets clients pick a different professional for each service in one appointment, and assigns one per service when the client has no preference. Massage + facial is the classic day-spa upsell. This replaces the blueprint rule "one therapist per booking" **[decision]**.
+
+**Words used here.**
+- A **segment** is one therapist's part of a booking: who, from when, until when.
+- A **chain** is a booking's segments in order, run back to back.
+- A single-therapist booking is a booking with one segment.
+
+**Example.** Anna books Deep tissue massage + Hot stones + Classic facial:
+
+```
+Booking #42 for Anna (one confirmation, one total, one receipt)
+├─ Segment 1: Lena   10:00 – 11:15  Deep tissue massage + Hot stones
+└─ Segment 2: Sofia  11:15 – 12:00  Classic facial
+```
+
+#### Decisions
+
+1. **Data model: a `booking_segments` table [decision]**, not linked separate bookings.
+   - A segment has `booking_id, position, therapist_id, start_at, end_at, blocked_until`.
+   - Treatment and add-on items point to their segment; extras added on the day have none.
+   - Every existing booking becomes one segment (migration).
+   - Status, manage token, total price, receipt, reminder and language stay on the booking. Price snapshots stay on the items. `bookings.start_at` and `end_at` stay as a summary; `bookings.therapist_id` is dropped once nothing reads it.
+   - "Occupies a slot" and the double-booking re-check move to segments.
+2. **Order: the order the customer picked the treatments [decision]**, as in Fresha. No automatic reordering.
+3. **Gap between therapists: back to back first; a 15-minute break only as a fallback [decision].**
+   - The leading apps aim for gapless calendars. Fresha even suggests times next to existing bookings to avoid gaps.
+   - So a chain without a wait is always preferred. A chain with one 15-minute break is offered only when no gapless chain fits that day, and it's shown honestly ("15 min break").
+   - Each therapist's cleanup buffer only blocks that therapist's own time.
+   - (Processing time, when staff are free while a colour develops, is a different thing: a property of a service. It's not needed for this studio's menu.)
+4. **Consecutive treatments with the same therapist** merge into one segment (today's rule: one buffer at the end, the largest of the chosen services).
+5. **Choosing therapists, as in Fresha [decision].**
+   - Step 3 shows one row per treatment, with "No preference" plus only the therapists who offer it. With one treatment, the page looks exactly like today. A therapist the customer picks is always honoured.
+   - "No preference" per treatment: **first prefer the therapist of the previous treatment** if qualified and free (fewer handovers); then today's rule (fewest non-cancelled bookings that day, ties go to the lower id).
+   - Availability and booking creation use the same function, which runs again inside the locked transaction.
+6. **Picking times: tap, not drag and drop [decision].** Customers in the leading apps tap a list of free times; drag and drop is an owner-calendar tool.
+   - **Suggested combinations (default):** after the treatments and a day, the page shows ready-made chains, e.g. "Tue 10:00 Deep tissue · Lena → 11:15 Classic facial · Sofia". One tap selects the chain.
+   - **"Choose times myself":** one strip of free times per treatment. The next treatment only offers times right after the previous one ends (or after a 15-minute break, see decision 3).
+7. **Different days: separate bookings, made quick [decision]. This replaces the earlier "checkout across days" draft.**
+   - In the leading apps an appointment is one day; I found no evidence of putting services on different days into one booking. A cross-day checkout would be new ground (one confirmation for several visits, partial failures) with little customer benefit.
+   - Instead, the confirmation page gets **"Book another treatment"**. It opens the booking page with the customer's name, email and phone filled in, so a second visit takes a few taps.
+8. **Booking creation.** Locks every therapist involved, then re-checks every segment in the same transaction. Anything taken returns 400 "That time was just taken. Please pick another."
+9. **Cancel, confirm, status: per booking.**
+   - Cancelling frees all segments. Late cancellation is measured from the first segment's start.
+   - Done / no-show can be set once the first segment has started.
+   - No partial cancellation of a segment online; the customer calls the studio.
+10. **Waitlist: chains supported, first in line [decision].**
+    - Fresha lets the salon pick a strategy (first in line, highest value, offer to all, manual). Slotwise keeps **first in line** with a 30-minute claim window.
+    - Entries keep their services, day window and a therapist choice per service.
+    - When time frees up, waiting entries for that day are checked in joining order for a whole chain that now fits their window (their order, gapless first, their therapist choices). The first match gets an offer for that exact chain; only one open offer may include a given therapist time. Claiming creates a booking with those segments.
+    - A strategy setting (e.g. "offer to all") is noted under "Smaller improvements".
+11. **What the customer sees.**
+    - Confirmation, emails EN/DE, manage, offer and receipt show each line with its time and therapist ("10:00 Deep tissue massage — Lena", "11:15 Classic facial — Sofia").
+    - A break shows as its own line.
+12. **Owner area.**
+    - **Day/Week view:** one card per segment in each therapist's column, marked "1 of 2 · continues with Sofia 11:15". A click opens the booking detail.
+    - **List view and CSV:** one row per booking, therapists joined.
+    - **Therapist filter:** matches any segment.
+    - **Phone booking dialog:** per-treatment therapist selects and suggested chains.
+13. **Dashboard: unchanged** (counts and revenue per booking).
+
+#### Slices (each its own branch, PR, CI, deploy)
+
+1. **Segments under the hood, no visible change.** Model, Alembic migration (one segment per existing booking), availability, double-booking check, run-jobs and waitlist offers read segments. The existing suite stays green, plus migration tests.
+2. **Chains in availability and booking.**
+   - The API accepts per-service therapist choices (`therapist_choices: {service_id: therapist_id | null}`; the old single `therapist_id` still works).
+   - Slots return their segments; gapless chains come first.
+   - Booking page: per-treatment rows, suggested combinations, "Choose times myself".
+   - Tests: chains at the edges of working hours, the second therapist busy or off, the fallback break, the "No preference" and continuity rules, availability and creation agree, the concurrent re-check across therapists.
+3. **Everything the customer sees.** Confirmation, emails, manage, receipt; cancel frees all segments; "Book another treatment" with the details filled in.
+4. **Owner area.** Segment cards, detail, list and CSV, filter, phone booking.
+5. **Waitlist chains.** Per-service choices on entries, chain matching, the one-open-offer rule per therapist time, claiming creates segments. Tests for joining order, partial fits and expiry passing on.
+6. **Docs.** CLAUDE.md rules ("one therapist per segment"), ui-inventory, this section marked done.
+
+**Out of scope for v1.**
+- Two therapists in parallel.
+- Rooms and equipment as bookable resources.
+- Reordering treatments.
+- Partial cancellation.
+- Studio packages ("Spa day").
+- Several days in one booking.
+- Drag and drop for customers.
+
+### Feature: treatment photos (planned, decided 2026-10-16)
+
+**Why.** The leading apps show photos on the service menu, and photos sell treatments. The owner needs to change them easily, all in one place.
+
+**Decisions.**
+1. **One owner page, "Treatment photos" [decision].**
+   - A new item in the owner menu. One card per treatment, grouped by category: the current photo, or an empty frame.
+   - Each card offers **Upload / Replace** (tap to choose, or drop a file on the card on desktop) and **Remove**, plus a short description for screen readers (alt text, EN and DE).
+   - Saving one card doesn't reload the page.
+2. **Where customers see them.**
+   - On the home page, each treatment card shows its photo (16:9, above the name; lazy-loaded).
+   - On the booking page, option cards show a small square thumbnail.
+   - A treatment without a photo looks exactly like today.
+   - A Studio settings switch, **"Show treatment photos to customers"**, turns all photos on or off at once.
+3. **Storage: in the database [decision].** Render's free disk is wiped on every deploy, and the project adds no other storage service.
+   - A new table `service_photos`: `service_id`, `content_type`, `data` (bytes), `alt_text`, `alt_text_de`, `updated_at`. It's kept separate from `services`, so the menu query never loads image bytes.
+   - Neon's free tier is 0.5 GB. Twenty photos of ~200 KB each are about 4 MB.
+4. **Size and safety [decision].**
+   - Photos are **resized in the owner's browser** (canvas, longest side 1600px, JPEG or WebP at ~80% quality) before upload, because image libraries such as Pillow aren't allowed here.
+   - The server accepts only JPEG, PNG or WebP, checked by the file's first bytes and not just by name; SVG is refused, because SVG can carry scripts. The limit is 600 KB.
+   - Photos are served from `GET /public/services/{id}/photo` with the stored type, `X-Content-Type-Options: nosniff`, and caching tied to `updated_at` (ETag, and a `?v=` stamp in the URL so a replaced photo shows at once).
+5. **Demo option [decision].**
+   - Slotwise ships its **own demo images**: soft, abstract images in the Figma design's colours, one per category, so there are no licence questions.
+   - With `SEED_DEMO_DATA=true`, the seed attaches them to the demo menu.
+   - The photos page also has **"Use demo photos"**, which fills only the treatments that have no photo. **"Remove demo photos"** clears only those, so the feature can be shown to a studio anytime and reset afterwards.
+6. **Privacy note.** The page says: "Only upload photos you own. If people are recognisable, you need their consent." (GDPR.)
+
+**Slices.**
+1. Table, migration, upload/serve/delete API with the type and size checks, tests (wrong type refused, SVG refused, too large refused, caching headers).
+2. The owner "Treatment photos" page (browser resize, upload, replace, remove, alt texts, demo photos), the settings switch, the demo images and the seed.
+3. Photos on the home and booking pages, in both looks; the accessibility checks stay.
+
+### European market readiness (decided 2026-10-16)
+
+What a studio in Germany or the EU needs beyond the booking features, in order of priority. "Legal" items are needed to run the app for a real German studio; "Market" items are what customers know from the leading apps.
+
+1. **Legal — VAT on receipts [decision].** A German receipt up to €250 gross (Kleinbetragsrechnung, §33 UStDV) must show the studio's name and address, the date, what was provided, the gross amount, and **the VAT rate, or a note that it is exempt** (small business, §19 UStG). Slotwise receipts don't show a VAT rate today.
+   - Add to Studio settings: VAT mode (19% / 7% / small business §19 with its fixed note) and the tax number.
+   - Receipts show the rate, or the note, per line and in the total.
+   - Receipts above €250 also need the customer's name and address and the tax number. Show a "full invoice needed" hint to the owner and ask for the customer's address there.
+   - Small, own PR, **before** the segments work.
+2. **Legal — Impressum and privacy policy [decision].**
+   - Studio settings get the Impressum text (the legal-notice details: name, address, contact, register, VAT ID) and a privacy-policy text.
+   - Every customer page footer links "Impressum" and "Datenschutz" (EN: "Legal notice", "Privacy").
+   - Slotwise stores only functional browser data (language, look), so no cookie banner is needed. That is noted in the privacy text template.
+3. **Legal — GDPR: delete or export a customer on request [decision].** Moves up from "Smaller improvements": an owner action reusing `anonymize_customer()`, plus a data export (JSON) for access requests.
+4. **Market — clear cancellation terms at booking [decision].** Above Confirm booking: "Free cancellation up to 24 hours before. Later cancellations are marked late." (EN/DE). Fresha shows its terms at booking too.
+5. **Market — "Add to calendar" [decision].** The confirmation email carries an `.ics` calendar file and the manage page gets an "Add to calendar" link. It's standard, cheap, and reduces no-shows.
+6. **Market — no-show protection (deposits or card on file) [needs your decision].**
+   - The most important commercial feature in the market. Fresha offers a deposit or a stored card, with fees such as 25% inside 48 hours and 50% for a no-show.
+   - It needs a payment provider (Stripe) and changes a hard rule in CLAUDE.md ("no online payments"). It also brings costs per transaction and EU strong customer authentication (SCA) for stored cards.
+   - Planned after option B, once agreed.
+7. **Market — later.**
+   - SMS or WhatsApp reminders (paid per message; WhatsApp is widely used in Germany and southern Europe).
+   - Reviews after a visit; gift vouchers.
+   - A waitlist strategy setting; drag-to-reschedule in the owner calendar.
+   - Listing on Google ("Reserve with Google").
+8. **Accessibility.** The European Accessibility Act (from 28 June 2025) exempts micro-businesses (fewer than 10 staff and at most €2M turnover), which covers a single small studio. A platform sold to many studios would likely be in scope. The 44px tap targets, 4.5:1 contrast and focus checks from the redesign stay part of every UI PR.
+
+**Order of work:**
+1. VAT on receipts, Impressum and privacy, cancellation terms at booking, "Add to calendar" (small PRs);
+2. then treatment photos (3 slices);
+3. then GDPR delete/export;
+4. then option B slices 1–6;
+5. then no-show protection, if agreed.
+
+**Sources (checked 2026-10-16):**
+- Fresha help centre: [booking online](https://www.fresha.com/help-center/knowledge-base/online-presence/101646-learn-how-clients-book-appointments-online), [appointment assignment](https://www.fresha.com/help-center/knowledge-base/calendar/102178-set-up-new-appointment-assignment), [no-show and cancellation fees](https://www.fresha.com/help-center/knowledge-base/payments/617-charge-no-show-and-cancellation-fees).
+- Fresha blog: [reducing calendar gaps](https://www.fresha.com/en-GB/blog/how-to-reduce-calendar-gaps).
+- [Fresha waitlist (Creative Head)](https://creativeheadmag.com/?p=10252).
+- [Square: multiple services in one checkout](https://community.squareup.com/t5/Payments-Troubleshooting/Appointment-multiple-bookings-of-services/m-p/747151).
+- [Kleinbetragsrechnung (taxfix)](https://taxfix.de/ratgeber/buchhaltung/kleinbetragsrechnung/).
+- [European Accessibility Act (iubenda)](https://www.iubenda.com/en/help/179096-eaa-compliance).
+
 ### Open setup tasks (owner)
 - [ ] **X-Forwarded-For check** (slice 1 setup): make one failed login with `X-Forwarded-For: 1.2.3.4`. The Render log line "Failed owner login from …" must show your own public IP.
 - [ ] **Own domain for email:** buy a domain, verify it in Resend (EU region, DNS records), then set `EMAIL_FROM` in Render (Save and deploy). Until then emails only reach the Resend account address.
@@ -380,7 +540,7 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
 - **Lunch breaks in the weekly-hours form:** more than one time block per day. The API already supports it; the form edits one block.
 - **"My bookings" by email:** a customer enters their email and gets a link listing all their bookings, a password-free login. Fits with item 2.
 - **Remember a confirmed device** for a while, so regular customers don't have to confirm every booking. Fits with item 2.
-- **Delete a customer on request:** an owner action reusing `anonymize_customer()`.
+- (Moved up: GDPR delete/export is now item 3 of 'European market readiness'.)
 
 ### Later (from the blueprint)
 - Deposits or no-show fees through Stripe for new customers. This would do the most against no-shows.
