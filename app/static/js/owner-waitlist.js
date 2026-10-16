@@ -7,10 +7,18 @@ const timeLabel = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "sho
 const STATUS = { pending: "Awaiting email", waiting: "Waiting", offered: "Offered", booked: "Booked", expired: "Offer expired", removed: "Removed / declined" };
 const BADGE = { pending: "pending", waiting: "booked", offered: "confirmed", booked: "done", expired: "cancelled", removed: "cancelled" };
 
+// Also called on a day change, "All upcoming" and after Remove: a failed load shows the
+// page error in the list area (the day filter stays usable) instead of old rows.
 async function load() {
   const day = document.getElementById("wl-date").value;
-  const entries = await ownerApi(`/owner/waitlist${day ? `?date=${day}` : ""}`);
   const target = document.getElementById("waitlist");
+  let entries;
+  try {
+    entries = await ownerApi(`/owner/waitlist${day ? `?date=${day}` : ""}`);
+  } catch (error) {
+    showPageError(error, target);
+    return;
+  }
   if (!entries.length) return fill(target, h("p", { class: "state" }, day ? "Nobody is waiting for this day." : "Nobody is on the waitlist."));
   fill(target, h("div", { class: "table-wrap" }, h("table", { class: "data" },
     h("thead", {}, h("tr", {}, ["Customer", "Services", "Day and window", "Therapist", "Joined", "Status", ""].map((c) => h("th", { scope: "col" }, c)))),

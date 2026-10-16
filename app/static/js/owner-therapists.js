@@ -8,10 +8,16 @@ let therapists = [];
 let services = [];
 let daysOff = [];
 
+// Also called after every save: a failed reload shows the page error instead of being lost.
 async function load() {
-  [therapists, services, daysOff] = await Promise.all([
-    ownerApi("/owner/therapists"), ownerApi("/owner/services"), ownerApi("/owner/days-off"),
-  ]);
+  try {
+    [therapists, services, daysOff] = await Promise.all([
+      ownerApi("/owner/therapists"), ownerApi("/owner/services"), ownerApi("/owner/days-off"),
+    ]);
+  } catch (error) {
+    showPageError(error);
+    return;
+  }
   render();
 }
 

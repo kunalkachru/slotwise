@@ -60,7 +60,9 @@ function step(direction) {
   load();
 }
 
-async function load() {
+// The first load shows the full page error on failure; later ones (filters, range, after
+// saving) keep the page and show the message inline.
+async function load({ initial = false } = {}) {
   document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === state.view)));
   const [from, to] = currentRange();
   $("range-label").textContent = from === to ? longDay.format(asDate(from)) : `${dayLabel.format(asDate(from))} – ${dayLabel.format(asDate(to))}`;
@@ -73,7 +75,9 @@ async function load() {
     state.bookings = bookings;
     render();
   } catch (e) {
-    if (request === state.request) fill($("bookings"), h("p", { class: "alert" }, e.message));
+    if (request !== state.request) return;
+    if (initial) showPageError(e);
+    else fill($("bookings"), h("p", { class: "alert" }, e.message));
   }
 }
 
@@ -355,17 +359,17 @@ async function init() {
   $("prev").onclick = () => step(-1);
   $("next").onclick = () => step(1);
   $("today").onclick = () => { state.anchor = isoDay.format(new Date()); load(); };
-  $("filter-therapist").onchange = load;
-  $("filter-status").onchange = load;
+  $("filter-therapist").onchange = () => load();
+  $("filter-status").onchange = () => load();
   let timer;
-  $("search").oninput = () => { clearTimeout(timer); timer = setTimeout(load, 250); };
+  $("search").oninput = () => { clearTimeout(timer); timer = setTimeout(() => load(), 250); };
   $("add-booking").onclick = openNewBooking;
 
   [state.therapists, state.services] = await Promise.all([ownerApi("/owner/therapists"), ownerApi("/owner/services")]);
   fill($("filter-therapist"), h("option", { value: "" }, "All therapists"),
     state.therapists.map((t) => h("option", { value: t.id }, t.display_name)));
   const focus = Number(new URLSearchParams(location.search).get("booking"));
-  await load();
+  await load({ initial: true });
   if (focus) openDetail(focus);
 }
 
