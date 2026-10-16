@@ -1,0 +1,10 @@
+{
+  "description": "Enables customers to book wellness treatments with therapists online and lets the studio owner manage bookings, menu, team, and waitlist efficiently.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
