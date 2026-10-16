@@ -75,8 +75,20 @@ def test_receipt_prefix_and_free_cancellation_are_used(owner, monkeypatch):
     ({"free_cancellation_hours": -1}, "free_cancellation_hours"),
     ({"waitlist_offer_minutes": 2}, "waitlist_offer_minutes"),
     ({"receipt_prefix": "IW-2026"}, "receipt_prefix"),
+    ({"vat_mode": "16"}, "vat_mode"),
+    ({"tax_number": "1" * 41}, "tax_number"),
 ])
 def test_invalid_settings_are_rejected_with_the_field(owner, change, field):
     response = settings(owner, **change)
     assert response.status_code == 422
     assert response.json()["fields"][0]["field"] == field
+
+
+def test_vat_settings_are_saved_and_shown_on_receipts(owner):
+    assert owner.get("/owner/studio").json()["vat_mode"] == "19"  # the default
+    response = settings(owner, vat_mode="7", tax_number="  143/123/45678 ")
+    assert response.status_code == 200, response.json()
+    studio = owner.get("/public/studio").json()
+    assert (studio["vat_mode"], studio["tax_number"]) == ("7", "143/123/45678")
+    settings(owner, tax_number="")
+    assert owner.get("/public/studio").json()["tax_number"] is None

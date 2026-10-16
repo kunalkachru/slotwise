@@ -33,7 +33,14 @@ function render(s) {
     h("fieldset", {},
       h("legend", {}, "Receipts"),
       text("receipt_prefix", "Receipt number prefix", s.receipt_prefix, { required: true, maxlength: "10", pattern: "[A-Za-z0-9]{1,10}" },
-        "Receipts are numbered PREFIX-YEAR-0001. A new prefix starts again at 0001.")),
+        "Receipts are numbered PREFIX-YEAR-0001. A new prefix starts again at 0001."),
+      h("div", { class: "grid-2" },
+        field("vat_mode", "VAT on receipts", h("select", {},
+          [["19", "19% (standard rate)"], ["7", "7% (reduced rate)"], ["small_business", "No VAT: small business (§ 19 UStG)"]]
+            .map(([value, label]) => h("option", { value, selected: s.vat_mode === value }, label))),
+          "German receipts must show the VAT rate, or the small-business note. Ask your tax adviser if unsure."),
+        text("tax_number", "Tax number or VAT ID", s.tax_number, { maxlength: "40" },
+          "Shown on every receipt. Required on invoices over €250."))),
     error,
     h("div", { class: "actions-row" }, h("button", { class: "btn", type: "submit" }, "Save settings")),
   );
@@ -50,6 +57,7 @@ function render(s) {
         min_notice_hours: Number(value("min_notice_hours")), booking_window_days: Number(value("booking_window_days")),
         free_cancellation_hours: Number(value("free_cancellation_hours")), waitlist_offer_minutes: Number(value("waitlist_offer_minutes")),
         receipt_prefix: value("receipt_prefix"),
+        vat_mode: value("vat_mode"), tax_number: value("tax_number") || null,
       } });
       toast("Settings saved");
       render(saved);

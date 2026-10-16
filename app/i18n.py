@@ -8,6 +8,7 @@
 
 import re
 from datetime import date, datetime
+from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import Request
 
@@ -86,6 +87,33 @@ def euro(amount, lang: str) -> str:
     if lang == "de":
         return f"{amount:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"€{amount:,.2f}"
+
+
+# ---------- VAT on receipts ----------
+
+VAT_MODES = ("19", "7", "small_business")
+# Above this gross amount a receipt is no longer a Kleinbetragsrechnung (§33 UStDV): a full
+# invoice then also needs the customer's name and address and the VAT amount (§14 UStG).
+SMALL_RECEIPT_LIMIT = Decimal("250.00")
+
+
+def vat_included(total: Decimal, mode: str) -> Decimal | None:
+    """The VAT contained in a gross total, rounded to the cent; None when no VAT is charged."""
+    if mode not in ("19", "7"):
+        return None
+    rate = Decimal(mode)
+    return (total * rate / (100 + rate)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def vat_line(total: Decimal, mode: str, lang: str) -> str:
+    """incl. 19% VAT: €13.09 / inkl. 19 % MwSt.: 13,09 € / the §19 UStG note."""
+    amount = vat_included(total, mode)
+    if amount is None:
+        return ("Gemäß § 19 UStG wird keine Umsatzsteuer berechnet." if lang == "de"
+                else "No VAT is charged: small business under § 19 UStG.")
+    if lang == "de":
+        return f"inkl. {mode} % MwSt.: {euro(amount, lang)}"
+    return f"incl. {mode}% VAT: {euro(amount, lang)}"
 
 
 # ---------- Server messages ----------
