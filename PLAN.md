@@ -370,7 +370,15 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
   - CI, deploy, Docker, pytest and ruff all ignore it;
   - it's never served or built.
 
-### Feature: several therapists per visit (option B) — planned, decisions agreed 2026-10-16
+### Feature: several therapists per visit (option B) — done, live (decisions agreed 2026-10-16)
+
+**Status:** all six slices are built and deployed (PRs #29–#34).
+
+How a few decisions turned out in the code:
+- "No preference" is one rule for the whole chain: **fewest handovers first**, then per treatment the fewest bookings that day, then the lower id. This covers decision 5's "prefer the previous treatment's therapist", and a one-therapist visit stays exactly as before.
+- Planning lives in one place, `availability.DayPlanner`. Availability, booking creation and the waitlist share it, with one search budget per request.
+- The calendar file is one event for the whole visit, with each part listed in its description.
+- **Waitlist matching:** freed time fits an entry when one of its treatments can start exactly then with that therapist, as part of a whole visit starting inside the entry's window. For one-therapist bookings this is exactly the old rule.
 
 Decisions follow what today's leading salon apps do. The research is listed at the end of this section; where a choice differs from an earlier draft, the reason is given.
 

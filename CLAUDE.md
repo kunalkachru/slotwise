@@ -78,7 +78,9 @@ The jobs must be idempotent, because a call can come late or twice.
 
 **Seed:** runs on startup only when the `studio` table is empty. It always creates the studio and the owner. Demo data (menu, Lena and Sofia, about 20 bookings) is added only when `SEED_DEMO_DATA=true`, in production too. Every seeded customer must have a fake `@example.com` email address.
 
-**Data model:** the main tables are Studio, Owners, Therapists, Services, AddOns, TherapistServices, WorkingHours, DaysOff, Customers, Bookings, BookingItems and WaitlistEntries.
+**Data model:** the main tables are Studio, Owners, Therapists, Services, AddOns, TherapistServices, WorkingHours, DaysOff, Customers, Bookings, BookingSegments, BookingItems and WaitlistEntries.
+- **Several therapists per visit (option B):** a booking has one BookingSegment per therapist part (who, start, end, `blocked_until`), back to back in the customer's order. Segments occupy time; `bookings.start_at` / `end_at` / `therapist_id` are only a summary (first start, last end, first therapist). Items point to their segment (`segment_id`); extras added on the day have none. Status, token, total, receipt and reminder stay per booking.
+- Chains are planned in one place, `availability.DayPlanner`. Availability, booking creation (inside the lock) and the waitlist all use it, so they agree.
 - Studio and Owners hold a single row each in version 1.
 - Studio holds the configurable rules: `min_notice_hours`=2, `free_cancellation_hours`=24, `booking_window_days`=60, `waitlist_offer_minutes`=30. Read these from Studio instead of hard-coding them.
 - A DaysOff row with no therapist closes the whole studio.
@@ -86,12 +88,13 @@ The jobs must be idempotent, because a call can come late or twice.
 
 ## Business rules that must hold (and need tests)
 
-- **No double booking:** blocked time = total duration + the largest buffer of the chosen services. Re-check that the slot is still free inside the same DB transaction that saves the booking. If it was taken, return 400 "That time was just taken. Please pick another."
+- **No double booking:** each segment blocks its therapist for its treatments + the largest buffer among them; a buffer never blocks another therapist. Booking creation locks every therapist involved and re-plans every segment inside the same DB transaction that saves the booking. If any part was taken, return 400 "That time was just taken. Please pick another."
+- **Chains:** treatments run in the customer's order, one therapist per segment; consecutive treatments with the same therapist merge into one segment. Gapless chains first; a single 15-minute break at a handover is offered only when no gapless chain fits that day (or when the customer picks times themselves).
 - **Availability:** start times are on 15-minute steps and must fit completely inside the therapist's working hours. A booking needs at least 2 hours' notice and can be at most 60 days ahead. Days off are excluded.
-- **"No preference" therapist:** the booking goes to the free, qualified therapist with the fewest non-cancelled bookings that day. On a tie, the lower therapist id wins. Availability and booking creation must use the same rule. Booking creation applies it again inside the locked transaction.
+- **"No preference" therapist** (per treatment): the chain with the fewest handovers wins; then, per treatment, the qualified therapist with the fewest non-cancelled bookings that day; on a tie, the lower therapist id. A therapist the customer picks is always honoured. Availability and booking creation must use the same rule. Booking creation applies it again inside the locked transaction.
 - **Price snapshot:** each BookingItem copies `name_snapshot`, `minutes_snapshot` and `unit_price_snapshot`. `total_price` = Σ snapshot × quantity. Later menu edits never change existing bookings or receipts. Inactive services and add-ons are hidden from customers but stay on old bookings.
-- **Cancellation:** free up to 24 hours before the start. Later cancellations are allowed but set `late_cancellation`. A booking can be marked done or no-show only after its start time, and only done bookings get a receipt number (e.g. `IW-2026-0042`).
-- **Waitlist:** a freed slot is offered to waiting entries in join order whose date, time window, therapist preference and total duration fit it. Only one open offer per slot is allowed at a time. A claimed offer becomes a booking with `source='waitlist'`.
+- **Cancellation:** per booking, freeing every segment. Free up to 24 hours before the first segment's start. Later cancellations are allowed but set `late_cancellation`. A booking can be marked done or no-show only after its start time, and only done bookings get a receipt number (e.g. `IW-2026-0042`).
+- **Waitlist:** entries keep a therapist choice per treatment. Freed time (each part of a cancelled or expired visit) is offered to waiting entries in join order. An entry fits when one of its treatments can start exactly then with that therapist, as part of a whole visit starting inside its window. The offer is that exact visit (`offer_plan`); only one open offer may include a given therapist time. A claimed offer becomes a booking with those segments and `source='waitlist'`.
 - **Customers:** created or reused by email. Customers with 2 or more no-shows are highlighted for the owner, never blocked automatically.
 - **Money and time:** all money is EUR with 2 decimals (use `Decimal`, not float). All times are Europe/Berlin.
 - **Error messages:** status codes and exact user-facing texts are listed in `answers.back_end_error_situations_and_messages`. Use them verbatim.
