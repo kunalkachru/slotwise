@@ -207,8 +207,8 @@ There is no top bar and no language switch on the receipt, but `i18n.js` is stil
 |---|---|---|---|
 | 🔒 `<script src="/js/theme.js">` | every page, top of `<head>`, before the stylesheets | sets `<html data-theme="classic\|calm">` before the first paint; exposes `window.slotwiseTheme.current()` / `.set()` | a normal script, not a module; `tests/test_look_switch.py` checks the order |
 | 🔒 `<link href="/css/calm.css">` | every page, after `styles.css` | the new look; every rule is scoped to `[data-theme="calm"]` | a test fails on any unscoped rule |
-| localStorage `slotwise:theme` | | `theme.js` | `"calm"` or anything else (classic). **Classic is the default** |
-| 🔒 `[data-theme-switch]` | `.topbar-actions` on customer pages (not the receipt) | `i18n.js` `mountThemeSwitch()` mounts `api.js` `themeSwitch()` | labels `theme.classic` / `theme.calm` (EN + DE) |
+| localStorage `slotwise:theme` | | `theme.js` | `"classic"` or anything else (calm). **The Figma design (calm) is the default** |
+| 🔒 `[data-theme-switch]` | `.topbar-actions` on customer pages (not the receipt) | `i18n.js` `mountThemeSwitch()` mounts `api.js` `themeSwitch()` | labels `theme.classic` / `theme.calm` (EN + DE): "Classic look" / "Figma design" |
 | 🎨 `button.theme-switch` > svg + `span.theme-switch-label` | top bars and the owner menu | | the label names the look it switches to; under 420 px only the icon shows, and the label stays as the accessible name |
 | 🎨 `.calm-only` | new-look-only markup | `styles.css` hides it; `calm.css` shows it | keeps the classic look unchanged |
 | 🔒 `#mobile-bar` > `#mobile-bar-text` + `#mobile-confirm` | `book.html` (`.calm-only`) | `book.js` `renderSummary()` and `setConfirm()` | `#mobile-confirm` is a second submit button (`form="book-form"`); both Confirm buttons always share the same state |
