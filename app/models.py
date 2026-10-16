@@ -1,6 +1,7 @@
 """All tables (PLAN.md section 2). The schema is managed by Alembic (app/migrations):
 after changing a model, add a migration (`alembic revision --autogenerate -m ...`)."""
 
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time
 from decimal import Decimal
 
@@ -216,6 +217,17 @@ class Customer(Timestamped, Base):
     bookings: Mapped[list["Booking"]] = relationship(back_populates="customer")
 
 
+@dataclass
+class PlanLine:
+    """One line of a visit as the customer sees it: a therapist's part (its treatments and
+    add-ons), or a break between two parts."""
+    start_at: datetime
+    end_at: datetime
+    therapist_name: str | None = None
+    names: list[str] = field(default_factory=list)
+    is_break: bool = False
+
+
 class Booking(Timestamped, Base):
     __tablename__ = "bookings"
     __table_args__ = (
@@ -249,6 +261,29 @@ class Booking(Timestamped, Base):
 
     customer: Mapped[Customer] = relationship(back_populates="bookings")
     therapist: Mapped[Therapist] = relationship()
+    @property
+    def has_several_therapists(self) -> bool:
+        return len(self.segments) > 1
+
+    @property
+    def therapist_names(self) -> str:
+        """"Lena" or "Lena, Sofia": everyone in the visit, in order, once each."""
+        names = [s.therapist.display_name for s in self.segments] or [self.therapist.display_name]
+        return ", ".join(dict.fromkeys(names))
+
+    def visit_plan(self) -> list[PlanLine]:
+        """The visit in order: one line per segment, with a break line where the next part
+        starts later. Items added on the day (no segment) aren't part of the plan."""
+        lines: list[PlanLine] = []
+        for segment in self.segments:
+            if lines and segment.start_at > lines[-1].end_at:
+                lines.append(PlanLine(lines[-1].end_at, segment.start_at, is_break=True))
+            names = [(i.name_snapshot if i.item_type == "service" else f"+ {i.name_snapshot}")
+                     for i in self.items if i.segment is segment]
+            lines.append(PlanLine(segment.start_at, segment.end_at,
+                                  segment.therapist.display_name, names))
+        return lines
+
     def with_one_segment(self) -> "Booking":
         """A single-therapist booking: one segment equal to the booking's own summary."""
         segment = BookingSegment(

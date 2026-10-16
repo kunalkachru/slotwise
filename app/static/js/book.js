@@ -507,6 +507,9 @@ async function confirmBooking(event) {
     const booking = await api("/public/bookings", { method: "POST", body });
     try {
       sessionStorage.setItem("slotwise:lastBooking", JSON.stringify(booking));
+      // For "Book another treatment" on the confirmation page; this tab only.
+      sessionStorage.setItem("slotwise:details", JSON.stringify({
+        first_name: body.first_name, last_name: body.last_name, email: body.email, phone: body.phone }));
     } catch {
       /* private mode: the confirmation page falls back to a short message */
     }
@@ -528,8 +531,24 @@ async function confirmBooking(event) {
 }
 
 // ---------- Start ----------
+// "Book another treatment" (confirmation page): the same customer, so fill in their details.
+function prefillDetails() {
+  if (!new URLSearchParams(location.search).has("again")) return;
+  try {
+    const details = JSON.parse(sessionStorage.getItem("slotwise:details") || "null");
+    if (!details) return;
+    const form = $("book-form");
+    for (const name of ["first_name", "last_name", "email", "phone"]) {
+      if (typeof details[name] === "string") form[name].value = details[name];
+    }
+  } catch {
+    /* private mode or nothing stored: the customer types them */
+  }
+}
+
 async function init() {
   $("book-form").addEventListener("submit", confirmBooking);
+  prefillDetails();
   $("mobile-bar-text").addEventListener("click", () => $("summary-title").scrollIntoView({ behavior: "smooth", block: "start" }));
   $("date-input").addEventListener("change", (e) => e.target.value && selectDate(e.target.value));
   api("/public/studio").then((studio) => {

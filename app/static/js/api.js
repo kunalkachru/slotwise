@@ -63,6 +63,18 @@ export function fact(label, value) {
   return h("div", {}, h("dt", {}, label), h("dd", {}, value));
 }
 
+// Who does the visit. One therapist: a plain fact. Several (option B): one line per part,
+// "10:00 Deep tissue massage + Hot stones · Lena", and the break when there is one.
+export function visitFact(booking, labels) {
+  const parts = (booking.visit || []).filter((line) => !line.is_break);
+  if (parts.length < 2) return fact(labels.therapist, booking.therapist_name);
+  return fact(labels.visit, h("ol", { class: "visit-plan" },
+    booking.visit.map((line) => line.is_break
+      ? h("li", { class: "plan-break" }, h("span", { class: "plan-time" }, line.time), labels.break)
+      : h("li", {}, h("span", { class: "plan-time" }, line.time),
+          h("span", {}, line.names.join(" "), h("small", {}, line.therapist_name))))));
+}
+
 // Replace an element's children, skipping false/null/undefined (from `cond && h(...)`).
 export function fill(target, ...children) {
   target.replaceChildren(...children.flat().filter((c) => c != null && c !== false));

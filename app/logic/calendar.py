@@ -26,6 +26,16 @@ def _utc(moment: datetime) -> str:
     return moment.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
+def _who(booking) -> str:
+    """"Lena", or with several therapists one line per part: "10:00 Deep tissue massage —
+    Lena". The event itself spans the whole visit."""
+    if not booking.has_several_therapists:
+        return booking.therapist.display_name
+    return "\n".join(
+        f"{line.start_at.astimezone(clock.BERLIN):%H:%M} {' '.join(line.names)} — "
+        f"{line.therapist_name}" for line in booking.visit_plan() if not line.is_break)
+
+
 def booking_ics(booking, studio, manage_url: str) -> str:
     treatments = ", ".join(i.name_snapshot for i in booking.items if i.item_type == "service")
     lines = [
@@ -41,7 +51,7 @@ def booking_ics(booking, studio, manage_url: str) -> str:
         f"DTEND:{_utc(booking.end_at)}",
         f"SUMMARY:{_escape(f'{treatments} · {studio.name}')}",
         f"LOCATION:{_escape(studio.address)}",
-        f"DESCRIPTION:{_escape(f'{booking.therapist.display_name} · {manage_url}')}",
+        f"DESCRIPTION:{_escape(f'{_who(booking)} · {manage_url}')}",
         f"URL:{manage_url}",
         "STATUS:" + ("CANCELLED" if booking.status in ("cancelled", "expired") else "CONFIRMED"),
         "END:VEVENT",

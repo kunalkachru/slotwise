@@ -234,3 +234,80 @@ def test_the_search_budget_is_shared_by_the_whole_request(empty_calendar, monkey
     monkeypatch.setattr(availability, "SEARCH_BUDGET", 10)
     found = chains(empty_calendar, MASSAGE_AND_FACIAL)
     assert 0 < len(found) < 10  # stops early instead of searching every start time
+
+
+# ---------- Slice 3: what the customer sees ----------
+
+def _booked_chain(client, **customer):
+    response = book_chain(client, MASSAGE_AND_FACIAL, "10:00", **customer)
+    assert response.status_code == 200
+    from tests.conftest import manage_token
+
+    token = manage_token(client, response.json()["id"])
+    assert client.post(f"/public/bookings/{token}/verify").status_code == 200
+    return response.json(), token
+
+
+def test_the_booking_shows_who_does_what(empty_calendar):
+    booking, token = _booked_chain(empty_calendar)
+    assert booking["therapist_name"] == "Lena, Sofia"
+    assert [(v["time"], v["names"], v["therapist_name"]) for v in booking["visit"]] == [
+        ("10:00", ["Deep tissue massage"], "Lena"), ("11:00", ["Classic facial"], "Sofia")]
+    manage = empty_calendar.get(f"/public/bookings/{token}").json()
+    assert [v["therapist_name"] for v in manage["visit"]] == ["Lena", "Sofia"]
+    assert manage["visit"][1]["end_time"] == "11:45"
+
+
+def test_emails_list_each_part_of_the_visit(empty_calendar):
+    _booked_chain(empty_calendar)
+    [email] = [e for e in empty_calendar.app.state.mailer.outbox
+               if e.subject.startswith("Booking confirmed")]
+    for body in (email.text, email.html):
+        assert "10:00  Deep tissue massage — Lena" in body
+        assert "11:00  Classic facial — Sofia" in body
+        assert "with Lena" not in body
+    assert "Tuesday 13 October 2026, 10:00 (105 min)" in email.text
+
+
+def test_a_break_shows_as_its_own_line_in_german_too(empty_calendar, db):
+    client = empty_calendar
+    _no_gapless_day(db, client)
+    ids = menu_ids(client)
+    response = client.post("/public/bookings", headers={"X-Lang": "de"}, json={
+        "service_ids": [ids[s] for s in MASSAGE_AND_FACIAL], "date": TUESDAY,
+        "start_time": "10:00", "break_before": 1, **CUSTOMER})
+    assert response.status_code == 200
+    assert [v["is_break"] for v in response.json()["visit"]] == [False, True, False]
+    [email] = client.app.state.mailer.outbox
+    assert "11:00  15 Min. Pause" in email.text
+    assert "11:15  Klassische Gesichtsbehandlung — Sofia" in email.text
+
+
+def test_cancelling_frees_every_part(empty_calendar):
+    client = empty_calendar
+    _, token = _booked_chain(client)
+    assert "10:00" not in [s["time"] for s in chains(client, ["Deep tissue massage"])]
+    assert "11:00" not in [s["time"] for s in chains(client, ["Classic facial"])]
+    assert client.post(f"/public/bookings/{token}/cancel").status_code == 200
+    assert "10:00" in [s["time"] for s in chains(client, ["Deep tissue massage"])]
+    assert "11:00" in [s["time"] for s in chains(client, ["Classic facial"])]
+
+
+def test_late_cancellation_counts_from_the_first_part(empty_calendar, monkeypatch):
+    from datetime import datetime
+
+    from app import clock
+
+    client = empty_calendar
+    _, token = _booked_chain(client)
+    moment = datetime(2026, 10, 12, 10, 30, tzinfo=clock.BERLIN)  # 23.5 h before 10:00
+    monkeypatch.setattr(clock, "now", lambda: moment)
+    assert client.post(f"/public/bookings/{token}/cancel").json()["late_cancellation"] is True
+
+
+def test_the_calendar_file_covers_the_whole_visit(empty_calendar):
+    _, token = _booked_chain(empty_calendar)
+    body = empty_calendar.get(f"/public/bookings/{token}/calendar.ics").text
+    unfolded = body.replace("\r\n ", "")
+    assert "DTSTART:20261013T080000Z" in body and "DTEND:20261013T094500Z" in body
+    assert "10:00 Deep tissue massage — Lena\\n11:00 Classic facial — Sofia" in unfolded

@@ -1,4 +1,4 @@
-import { api, fact, fill, formatEuro, h } from "/js/api.js";
+import { api, fact, fill, formatEuro, h, visitFact } from "/js/api.js";
 import { locale, t } from "/js/i18n.js";
 
 const params = new URLSearchParams(location.search);
@@ -38,7 +38,7 @@ async function init() {
       h("dl", { class: "facts" },
         booking.customer && fact(t("receipt.customer"), `${booking.customer.first_name} ${booking.customer.last_name}`),
         fact(t("receipt.appointment"), `${longDate.format(new Date(`${booking.date}T12:00:00Z`))}, ${t("common.at_time", { time: booking.time })}`),
-        fact(t("common.therapist"), booking.therapist_name)),
+        visitFact(booking, { therapist: t("common.therapist"), visit: t("common.your_visit"), break: t("book.break") })),
       h("table", { class: "lines" },
         booking.items.map((i) => h("tr", {},
           h("td", {}, i.item_type === "service" ? i.name : `+ ${i.name}`, i.quantity > 1 ? ` × ${i.quantity} at ${formatEuro(i.unit_price)}` : ""),

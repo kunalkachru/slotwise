@@ -1,4 +1,4 @@
-import { api, fact, fill, formatEuro, formatMinutes, h } from "/js/api.js";
+import { api, fact, fill, formatEuro, formatMinutes, h, visitFact } from "/js/api.js";
 import { locale, t } from "/js/i18n.js";
 
 const longDate = new Intl.DateTimeFormat(locale, {
@@ -44,7 +44,7 @@ async function render() {
     h("dl", { class: "facts" },
       fact(t("common.date"), longDate.format(new Date(`${booking.date}T12:00:00Z`))),
       fact(t("common.time"), `${t("common.at_time", { time: booking.time })} (${formatMinutes(booking.total_minutes)})`),
-      fact(t("common.therapist"), booking.therapist_name),
+      visitFact(booking, { therapist: t("common.therapist"), visit: t("common.your_visit"), break: t("book.break") }),
       studio && fact(t("common.where"), studio.address),
     ),
     h("table", { class: "lines" },
@@ -59,7 +59,9 @@ async function render() {
     h("p", { class: "pay-note" }, t("common.pay")),
     !pending && h("p", { class: "success-note" }, t("conf.emailed")),
     pending && h("p", { class: "muted" }, t("conf.spam")),
-    h("a", { class: "btn btn-block", href: "/" }, t("nav.back_home")),
+    // A treatment on another day is its own booking: the details are filled in again.
+    h("a", { class: "btn btn-block", href: "/book.html?again=1" }, t("conf.book_another")),
+    h("a", { class: "btn btn-ghost btn-block", href: "/" }, t("nav.back_home")),
   );
 }
 

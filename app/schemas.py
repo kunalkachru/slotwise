@@ -174,6 +174,23 @@ class BookingItemOut(ORMModel):
     line_total: MoneyStr
 
 
+class PlanLineOut(BaseModel):
+    time: str  # Europe/Berlin
+    end_time: str
+    therapist_name: str | None
+    names: list[str]
+    is_break: bool
+
+
+def plan_out(booking) -> list[PlanLineOut]:
+    def hm(moment: datetime) -> str:
+        return moment.astimezone(BERLIN).strftime("%H:%M")
+
+    return [PlanLineOut(time=hm(line.start_at), end_time=hm(line.end_at),
+                        therapist_name=line.therapist_name, names=line.names,
+                        is_break=line.is_break) for line in booking.visit_plan()]
+
+
 def booking_fields(booking) -> dict:
     local_start = booking.start_at.astimezone(BERLIN)
     return dict(
@@ -185,7 +202,9 @@ def booking_fields(booking) -> dict:
         time=local_start.strftime("%H:%M"),
         total_minutes=sum(i.minutes_snapshot * i.quantity for i in booking.items),
         total_price=booking.total_price,
-        therapist_name=booking.therapist.display_name,
+        therapist_name=booking.therapist_names,
+        # Several therapists (option B): who does what, when. One line for a simple booking.
+        visit=plan_out(booking),
         items=[
             BookingItemOut(
                 item_type=i.item_type,
@@ -213,6 +232,7 @@ class BookingOut(BaseModel):
     total_minutes: int
     total_price: MoneyStr
     therapist_name: str
+    visit: list[PlanLineOut] = Field(default_factory=list)
     customer_first_name: str
     items: list[BookingItemOut]
     hold_until: datetime | None = None  # set while the booking awaits email confirmation
@@ -244,6 +264,7 @@ class ManageOut(BaseModel):
     total_minutes: int
     total_price: MoneyStr
     therapist_name: str
+    visit: list[PlanLineOut] = Field(default_factory=list)
     items: list[BookingItemOut]
     free_cancellation_until: datetime
     late_cancellation: bool
@@ -282,6 +303,7 @@ class OwnerBookingOut(BaseModel):
     total_price: MoneyStr
     therapist_id: int
     therapist_name: str
+    visit: list[PlanLineOut] = Field(default_factory=list)
     items: list[BookingItemOut]
     customer: OwnerCustomerOut
     customer_note: str | None
