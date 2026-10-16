@@ -51,6 +51,7 @@ from app.schemas import (
     ManageOut,
     OfferLineOut,
     OfferOut,
+    PlanLineOut,
     ServiceOut,
     SlotOut,
     StudioOut,
@@ -261,9 +262,9 @@ def confirm(token: str, db: Session = Depends(get_db)):
 @router.post("/bookings/{token}/cancel", response_model=ManageOut)
 def cancel(token: str, request: Request, db: Session = Depends(get_db)):
     booking = cancel_booking(db, get_by_token(db, token))
-    # The freed slot goes to the first fitting person on the waitlist.
-    waitlist.offer_slot(db, request.app.state.mailer, request.app.state.settings.public_url,
-                        booking.therapist_id, booking.start_at)
+    # The freed time (every part of the visit) goes to the first fitting person waiting.
+    waitlist.offer_freed(db, request.app.state.mailer, request.app.state.settings.public_url,
+                         waitlist.freed_times(booking))
     return _manage_view(db, booking)
 
 
@@ -290,7 +291,8 @@ def join_waitlist(body: WaitlistIn, request: Request, db: Session = Depends(get_
     try:
         result = waitlist.join(db, waitlist.JoinRequest(
             service_ids=body.service_ids, add_on_ids=body.add_on_ids,
-            therapist_id=body.therapist_id, preferred_date=body.preferred_date,
+            therapist_id=body.therapist_id, therapist_choices=body.therapist_choices,
+            preferred_date=body.preferred_date,
             earliest_time=body.earliest_time, latest_time=body.latest_time, details=details,
             language=request_lang(request),
         ))
@@ -334,16 +336,46 @@ def _offer_view(db: Session, entry) -> OfferOut:
         lines += [OfferLineOut(name=f"+ {a.name}", price=a.price) for a in selection.add_ons]
         minutes, total = selection.total_minutes, selection.total_price
     except AppError:
-        lines, minutes, total = [], 0, 0
+        selection, lines, minutes, total = None, [], 0, 0
     local = entry.offer_start_at.astimezone(clock.BERLIN)
     status = "claimed" if entry.status == "booked" else (
         "expired" if waitlist.is_expired(entry) else "open")
+    visit = _offer_visit(db, entry, selection)
+    names = [line.therapist_name for line in visit if not line.is_break]
     return OfferOut(
         status=status, date=local.date(), time=local.strftime("%H:%M"),
-        therapist_name=db.get(Therapist, entry.offer_therapist_id).display_name,
-        total_minutes=minutes, total_price=total, lines=lines,
+        therapist_name=", ".join(dict.fromkeys(names)) if names
+        else db.get(Therapist, entry.offer_therapist_id).display_name,
+        total_minutes=minutes, total_price=total, lines=lines, visit=visit,
         expires_at=entry.offer_expires_at,
     )
+
+
+def _offer_visit(db: Session, entry, selection) -> list[PlanLineOut]:
+    """The offered visit, part by part (several therapists, option B)."""
+    from datetime import datetime
+
+    from app import clock
+
+    if not entry.offer_plan or selection is None:
+        return []
+
+    def hm(iso: str) -> str:
+        return datetime.fromisoformat(iso).astimezone(clock.BERLIN).strftime("%H:%M")
+
+    names = {s.id: [s.name] + [f"+ {a.name}" for a in selection.add_ons if a.service_id == s.id]
+             for s in selection.services}
+    visit: list[PlanLineOut] = []
+    for therapist_id, start, end, _blocked, service_ids in entry.offer_plan["segments"]:
+        if visit and hm(start) != visit[-1].end_time:
+            visit.append(PlanLineOut(time=visit[-1].end_time, end_time=hm(start),
+                                     therapist_name=None, names=[], is_break=True))
+        therapist = db.get(Therapist, therapist_id)
+        visit.append(PlanLineOut(
+            time=hm(start), end_time=hm(end), is_break=False,
+            therapist_name=therapist.display_name if therapist else "",
+            names=[n for sid in service_ids for n in names.get(sid, [])]))
+    return visit
 
 
 @router.get("/waitlist/offers/{token}", response_model=OfferOut)

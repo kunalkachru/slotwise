@@ -387,7 +387,8 @@ function waitlistBox() {
     try {
       const result = await api("/public/waitlist", { method: "POST", body: {
         service_ids: state.selectedServices, add_on_ids: [...state.selectedAddOns],
-        therapist_id: multi() ? null : (state.choices.get(state.selectedServices[0]) ?? null), preferred_date: state.date,
+        therapist_choices: Object.fromEntries(state.selectedServices.map((id) => [id, state.choices.get(id) ?? null])),
+        preferred_date: state.date,
         earliest_time: earliest.value, latest_time: latest.value,
         first_name: form.first_name.value, last_name: form.last_name.value,
         email: form.email.value, phone: form.phone.value,

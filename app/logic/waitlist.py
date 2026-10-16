@@ -2,9 +2,14 @@
 
 Rules (blueprint + PLAN.md decisions):
 - A freed slot is offered to waiting entries in join order whose date, start-time
-  window, therapist preference and total duration fit it. "Fits" uses the same free-slot
-  check as booking (working hours, other bookings, buffers).
-- Only one open offer per slot at a time; an offer lasts `waitlist_offer_minutes`.
+  window, therapist preference and total duration fit it. "Fits" uses the same chain
+  planner as booking (working hours, other bookings, buffers).
+- Several therapists per visit (option B): an entry has a therapist choice per treatment.
+  It fits freed time when one of its treatments can start exactly then, with that
+  therapist, as part of a whole visit that starts inside its window (gapless first, a
+  15-minute break as the fallback). The offer is that exact visit.
+- Only one open offer may include a given therapist time; an offer lasts
+  `waitlist_offer_minutes`.
 - Each entry gets one offer. Expired -> "expired", declined -> "removed"; the slot then
   goes to the next entry. Customers can join again [decision].
 - Offers and claims skip the 2-hour notice, so late cancellations can be refilled.
@@ -29,9 +34,9 @@ from app.errors import (
     AppError,
     date_out_of_range,
 )
-from app.logic.availability import free_slots_by_therapist, get_studio
+from app.logic.availability import DayPlanner, Slot, get_studio
 from app.logic.booking import CustomerDetails, create_booking, find_or_create_customer
-from app.logic.selection import Selection, qualified_therapists, resolve_selection
+from app.logic.selection import Selection, resolve_selection, therapist_candidates
 from app.models import Customer, DayOff, Therapist, WaitlistEntry
 from app.security import new_token
 
@@ -59,6 +64,7 @@ class JoinRequest:
     latest_time: time
     details: CustomerDetails
     language: str = "en"
+    therapist_choices: dict[int, int | None] | None = None
 
 
 MAX_OPEN_ENTRIES_PER_CUSTOMER = 5
@@ -85,10 +91,9 @@ def join(db: Session, request: JoinRequest) -> JoinResult:
     """Add an entry, or report the existing one. The caller must give the same response
     either way, so the API never reveals who is on the waitlist (security review)."""
     selection = resolve_selection(db, request.service_ids, request.add_on_ids)
-    therapists = qualified_therapists(db, selection)
-    if request.therapist_id is not None:
-        therapists = [t for t in therapists if t.id == request.therapist_id]
-    if not therapists:
+    candidates = therapist_candidates(db, selection, request.therapist_id,
+                                      request.therapist_choices)
+    if not all(candidates.values()):
         from app.errors import NO_THERAPIST_FOR_COMBINATION
 
         raise AppError(404, NO_THERAPIST_FOR_COMBINATION)
@@ -98,7 +103,8 @@ def join(db: Session, request: JoinRequest) -> JoinResult:
         raise AppError(422, date_out_of_range(window), field="preferred_date")
     if request.earliest_time >= request.latest_time:
         raise AppError(422, INVALID_TIME_WINDOW, field="earliest_time")
-    if not _anyone_works(db, therapists, request.preferred_date):
+    if not all(_anyone_works(db, options, request.preferred_date)
+               for options in candidates.values()):
         raise AppError(422, NOBODY_WORKS_THAT_DAY, field="preferred_date")
 
     details = request.details.cleaned()
@@ -123,6 +129,8 @@ def join(db: Session, request: JoinRequest) -> JoinResult:
     entry = WaitlistEntry(
         customer=customer,
         therapist_id=request.therapist_id,
+        therapist_choices={str(k): v for k, v in (request.therapist_choices or {}).items()
+                           if k in selection.service_ids and v is not None},
         service_ids=selection.service_ids,
         add_on_ids=[a.id for a in selection.add_ons],
         preferred_date=request.preferred_date,
@@ -205,54 +213,127 @@ def _selection_for(db: Session, entry: WaitlistEntry) -> Selection | None:
         return None  # a chosen service was deactivated since joining
 
 
-def _slot_has_open_offer(db: Session, therapist_id: int, start_at: datetime) -> bool:
-    return db.scalar(select(func.count()).select_from(WaitlistEntry).where(
-        WaitlistEntry.status == "offered",
-        WaitlistEntry.offer_therapist_id == therapist_id,
-        WaitlistEntry.offer_start_at == start_at,
-        WaitlistEntry.offer_expires_at > clock.now(),
-    )) > 0
+def _choices(entry: WaitlistEntry) -> dict[int, int | None]:
+    return {int(k): v for k, v in (entry.therapist_choices or {}).items()}
+
+
+def _iso(moment: datetime) -> str:
+    return moment.isoformat()
+
+
+def _plan_of(slot: Slot) -> dict:
+    return {
+        "choices": {str(step.service_id): step.therapist.id for step in slot.steps},
+        "break_before": slot.break_before,
+        "segments": [[seg.therapist.id, _iso(seg.start_at), _iso(seg.end_at),
+                      _iso(seg.blocked_until), list(seg.service_ids)] for seg in slot.segments],
+    }
+
+
+def offer_segments(db: Session, entry: WaitlistEntry) -> list[tuple[int, datetime, datetime]]:
+    """The therapist times an offer holds: (therapist id, start, blocked until)."""
+    if entry.offer_plan:
+        return [(tid, datetime.fromisoformat(start), datetime.fromisoformat(blocked))
+                for tid, start, _end, blocked, _services in entry.offer_plan["segments"]]
+    # Offers made before option B: one therapist for the whole visit.
+    selection = _selection_for(db, entry)
+    minutes = selection.blocked_minutes if selection else 0
+    return [(entry.offer_therapist_id, entry.offer_start_at,
+             entry.offer_start_at + timedelta(minutes=minutes))]
+
+
+def _open_offer_times(db: Session) -> list[tuple[int, datetime, datetime]]:
+    offers = db.scalars(select(WaitlistEntry).where(
+        WaitlistEntry.status == "offered", WaitlistEntry.offer_expires_at > clock.now())).all()
+    return [part for entry in offers for part in offer_segments(db, entry)]
+
+
+def _clashes(slot: Slot, taken: list[tuple[int, datetime, datetime]]) -> bool:
+    return any(seg.therapist.id == tid and seg.start_at < blocked and start < seg.blocked_until
+               for seg in slot.segments for tid, start, blocked in taken)
+
+
+def _chain_for(db: Session, entry: WaitlistEntry, selection: Selection, therapist_id: int,
+               start_at: datetime, taken) -> Slot | None:
+    """The entry's earliest whole visit in which one treatment starts at `start_at` with
+    that therapist (the freed time), inside its window. Gapless first, then a break."""
+    try:
+        candidates = therapist_candidates(db, selection, entry.therapist_id, _choices(entry))
+    except AppError:
+        return None
+    day = start_at.astimezone(clock.BERLIN).date()
+    planner = DayPlanner(db, day, selection, candidates, for_owner=True)
+    starts = set(planner.starts())
+    for break_before in [None, *range(1, len(selection.services))]:
+        offsets = planner.step_offsets(break_before)
+        found = []
+        for index, service in enumerate(selection.services):
+            therapist = next((t for t in candidates[service.id] if t.id == therapist_id), None)
+            start = start_at - offsets[index]
+            local = start.astimezone(clock.BERLIN).time()
+            if therapist is None or start not in starts or not (
+                    entry.earliest_time <= local <= entry.latest_time):
+                continue
+            slot = planner.chain(start, break_before, fixed=(index, therapist))
+            if slot is not None and not _clashes(slot, taken):
+                found.append(slot)
+        if found:
+            return min(found, key=lambda slot: slot.start_at)
+    return None
+
+
+def freed_times(booking) -> list[tuple[int, datetime]]:
+    """Where a cancelled or expired booking frees time: each part's therapist and start."""
+    return [(s.therapist_id, s.start_at) for s in booking.segments] or [
+        (booking.therapist_id, booking.start_at)]
+
+
+def offer_freed(db: Session, mailer: Mailer, public_url: str,
+                freed: list[tuple[int, datetime]]) -> list[WaitlistEntry]:
+    """Offer each freed therapist time to the first fitting entry. Returns those offered."""
+    offered = [offer_slot(db, mailer, public_url, therapist_id, start_at)
+               for therapist_id, start_at in freed]
+    return [entry for entry in offered if entry is not None]
 
 
 def offer_slot(db: Session, mailer: Mailer, public_url: str, therapist_id: int,
                start_at: datetime) -> WaitlistEntry | None:
-    """Offer the freed slot to the first fitting waiting entry. Returns the entry offered."""
-    if start_at <= clock.now() or _slot_has_open_offer(db, therapist_id, start_at):
+    """Offer the freed time to the first fitting waiting entry. Returns the entry offered."""
+    if start_at <= clock.now():
         return None
     therapist = db.get(Therapist, therapist_id)
     if therapist is None or not therapist.active:
         return None
+    taken = _open_offer_times(db)
+    if any(tid == therapist_id and start <= start_at < blocked for tid, start, blocked in taken):
+        return None  # already part of an open offer
     local = start_at.astimezone(clock.BERLIN)
     candidates = db.scalars(
         select(WaitlistEntry)
-        .where(
-            WaitlistEntry.status == "waiting",
-            WaitlistEntry.preferred_date == local.date(),
-            WaitlistEntry.earliest_time <= local.time(),
-            WaitlistEntry.latest_time >= local.time(),
-        )
+        .where(WaitlistEntry.status == "waiting", WaitlistEntry.preferred_date == local.date())
         .order_by(WaitlistEntry.created_at, WaitlistEntry.id)
     ).all()
     studio = get_studio(db)
     for entry in candidates:
-        if entry.therapist_id not in (None, therapist_id):
-            continue
         selection = _selection_for(db, entry)
-        if selection is None or therapist not in qualified_therapists(db, selection):
+        if selection is None:
             continue
-        free = free_slots_by_therapist(db, local.date(), selection, [therapist], for_owner=True)
-        if start_at not in free[therapist_id]:
-            continue  # their treatment doesn't fit into this gap
+        slot = _chain_for(db, entry, selection, therapist_id, start_at, taken)
+        if slot is None:
+            continue  # their visit doesn't fit into this gap
         now = clock.now()
         entry.status = "offered"
         entry.offer_token = new_token()
-        entry.offer_start_at = start_at
-        entry.offer_therapist_id = therapist_id
+        entry.offer_start_at = slot.start_at
+        entry.offer_therapist_id = slot.therapist.id
+        entry.offer_plan = _plan_of(slot)
         entry.offered_at = now
         entry.offer_expires_at = now + timedelta(minutes=studio.waitlist_offer_minutes)
         db.commit()
-        mailer.send(waitlist_offer_email(entry, studio, public_url, local,
-                                         therapist.display_name, selection.total_minutes))
+        names = ", ".join(dict.fromkeys(seg.therapist.display_name for seg in slot.segments))
+        mailer.send(waitlist_offer_email(entry, studio, public_url,
+                                         slot.start_at.astimezone(clock.BERLIN), names,
+                                         selection.total_minutes))
         return entry
     return None
 
@@ -276,10 +357,11 @@ def expire_offer(db: Session, mailer: Mailer, public_url: str, entry: WaitlistEn
     """Close an offer and pass the slot to the next entry. Returns the new offer, if any."""
     if entry.status != "offered":
         return None
-    therapist_id, start_at = entry.offer_therapist_id, entry.offer_start_at
+    freed = [(tid, start) for tid, start, _ in offer_segments(db, entry)]
     entry.status = status
     db.commit()
-    return offer_slot(db, mailer, public_url, therapist_id, start_at)
+    offered = offer_freed(db, mailer, public_url, freed)
+    return offered[0] if offered else None
 
 
 def claim(db: Session, mailer: Mailer, public_url: str, token: str):
@@ -295,12 +377,16 @@ def claim(db: Session, mailer: Mailer, public_url: str, token: str):
         raise AppError(410, OFFER_EXPIRED)
     customer = entry.customer
     local = entry.offer_start_at.astimezone(clock.BERLIN)
+    plan = entry.offer_plan or {}
     booking = create_booking(
-        db, selection, local.date(), local.strftime("%H:%M"), entry.offer_therapist_id,
+        db, selection, local.date(), local.strftime("%H:%M"),
+        None if plan else entry.offer_therapist_id,  # offers before option B: one therapist
         CustomerDetails(customer.first_name, customer.last_name, customer.email,
                         customer.phone or "000000"),
         source="waitlist",
         language=entry.language,
+        therapist_choices={int(k): v for k, v in plan.get("choices", {}).items()} or None,
+        break_before=plan.get("break_before"),
     )
     entry.status = "booked"
     entry.booking_id = booking.id
