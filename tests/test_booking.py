@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from app.logic.booking import CustomerDetails, create_booking
 from app.logic.selection import resolve_selection
-from app.models import Booking, Customer, Service
+from app.models import Booking, BookingSegment, Customer, Service
 from tests.conftest import CUSTOMER, book, menu_ids
 
 TUESDAY = "2026-10-13"
@@ -66,6 +66,7 @@ def test_concurrent_requests_for_the_same_slot_book_it_once(make_client, frozen_
     client = make_client(database_url=f"sqlite:///{tmp_path / 'race.db'}")
     factory = client.app.state.session_factory
     with factory() as db:
+        db.query(BookingSegment).delete()
         db.query(Booking).delete()
         db.commit()
     ids = menu_ids(client)

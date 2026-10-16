@@ -211,7 +211,7 @@ def create_booking(
             customer_note=details.note,
             language=language,
             items=items,
-        )
+        ).with_one_segment()
         db.add(booking)
         db.commit()
     db.refresh(booking)

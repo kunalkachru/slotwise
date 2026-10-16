@@ -249,9 +249,41 @@ class Booking(Timestamped, Base):
 
     customer: Mapped[Customer] = relationship(back_populates="bookings")
     therapist: Mapped[Therapist] = relationship()
+    def with_one_segment(self) -> "Booking":
+        """A single-therapist booking: one segment equal to the booking's own summary."""
+        self.segments = [BookingSegment(
+            position=0, therapist=self.therapist, start_at=self.start_at, end_at=self.end_at,
+            blocked_until=self.blocked_until)]
+        return self
+
+    segments: Mapped[list["BookingSegment"]] = relationship(
+        back_populates="booking", order_by="BookingSegment.position",
+        cascade="all, delete-orphan")
     items: Mapped[list["BookingItem"]] = relationship(
         back_populates="booking", order_by="BookingItem.id", cascade="all, delete-orphan"
     )
+
+
+class BookingSegment(Base):
+    """One therapist's part of a booking: who, from when, until when (blocked_until includes
+    that therapist's cleanup buffer). A single-therapist booking has one segment; a visit with
+    several therapists has one per therapist, back to back. This is what occupies a therapist's
+    time; the booking's own start_at / end_at / therapist_id are its summary (first start,
+    last end, first therapist)."""
+
+    __tablename__ = "booking_segments"
+    __table_args__ = (Index("ix_booking_segments_therapist_start", "therapist_id", "start_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    therapist_id: Mapped[int] = mapped_column(ForeignKey("therapists.id"))
+    start_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    end_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    blocked_until: Mapped[datetime] = mapped_column(UTCDateTime)
+
+    booking: Mapped["Booking"] = relationship(back_populates="segments")
+    therapist: Mapped[Therapist] = relationship()
 
 
 class BookingItem(Timestamped, Base):
