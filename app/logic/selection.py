@@ -74,6 +74,10 @@ class Selection:
         return items
 
 
+MAX_SERVICES = 10
+MAX_ADD_ONS = 20
+
+
 def parse_ids(raw: str | None) -> list[int]:
     """'1,2, 3' -> [1, 2, 3]; duplicates removed, order kept."""
     if not raw:
@@ -96,6 +100,9 @@ def resolve_selection(db: Session, service_ids: list[int], add_on_ids: list[int]
     add_on_ids = list(dict.fromkeys(add_on_ids))
     if not service_ids:
         raise AppError(422, CHOOSE_A_SERVICE, field="service_ids")
+    # Same limits as BookingIn, for the GET endpoints too: chain planning grows with them.
+    if len(service_ids) > MAX_SERVICES or len(add_on_ids) > MAX_ADD_ONS:
+        raise AppError(422, SERVICE_UNAVAILABLE, field="service_ids")
     services = db.scalars(
         select(Service).where(Service.id.in_(service_ids), Service.active.is_(True))
     ).all()

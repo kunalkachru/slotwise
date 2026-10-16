@@ -220,3 +220,17 @@ def test_concurrent_chains_sharing_a_therapist_book_once(make_client, frozen_now
     for thread in threads:
         thread.join()
     assert sorted(results) == [200, 400]
+
+
+def test_requests_are_limited_in_size(empty_calendar):
+    response = empty_calendar.get("/public/availability", params={
+        "date": TUESDAY, "service_ids": ",".join(str(i) for i in range(1, 12))})
+    assert response.status_code == 422
+
+
+def test_the_search_budget_is_shared_by_the_whole_request(empty_calendar, monkeypatch):
+    from app.logic import availability
+
+    monkeypatch.setattr(availability, "SEARCH_BUDGET", 10)
+    found = chains(empty_calendar, MASSAGE_AND_FACIAL)
+    assert 0 < len(found) < 10  # stops early instead of searching every start time

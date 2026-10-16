@@ -175,7 +175,9 @@ def bookings_per_therapist(db: Session, therapist_ids: list[int], day: date) -> 
 # ---------- Chains: one therapist per segment (option B) ----------
 
 BREAK = timedelta(minutes=15)
-MAX_CHAINS_TRIED = 5000  # per start time; far above what a small studio's menu needs
+# One search budget per request (all start times and break positions together), counted per
+# therapist tried for a treatment. A two-therapist studio needs a few thousand at most.
+SEARCH_BUDGET = 50_000
 
 
 @dataclass(frozen=True)
@@ -239,6 +241,7 @@ class DayPlanner:
         self.busy = _busy_ranges(db, ids, day) if ids else {}
         self.counts = bookings_per_therapist(db, ids, day) if ids else {}
         self.limits = booking_limits(db, for_owner)
+        self.budget = SEARCH_BUDGET
         self.windows = {
             t.id: [(local_to_utc(day, h.start_time), local_to_utc(day, h.end_time))
                    for h in t.working_hours if h.weekday == day.weekday()]
@@ -297,15 +300,13 @@ class DayPlanner:
             return None
         times = self._step_times(start, break_before)
         best: tuple[tuple, list[SegmentPlan], list[Therapist]] | None = None
-        tried = 0
 
         def walk(assigned: list[Therapist], handovers: int) -> None:
-            nonlocal best, tried
+            nonlocal best
             index = len(assigned)
-            if tried >= MAX_CHAINS_TRIED or (best and handovers > best[0][0] - 1):
+            if self.budget <= 0 or (best and handovers > best[0][0] - 1):
                 return
             if index == count:
-                tried += 1
                 segments = self._segments(assigned, times)
                 if segments is None:
                     return
@@ -315,6 +316,7 @@ class DayPlanner:
                     best = (rank, segments, list(assigned))
                 return
             for therapist in self.candidates[index]:
+                self.budget -= 1
                 handover = bool(assigned) and therapist is not assigned[-1]
                 if index == break_before and not handover:
                     continue
