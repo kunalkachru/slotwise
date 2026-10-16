@@ -1,6 +1,8 @@
 // German / English for the customer pages. Import this first on every customer page:
 // it picks the language (saved choice, else the browser's), sets <html lang>, which
 // api.js forwards to the server as X-Lang, and translates [data-i18n] elements.
+import { themeSwitch } from "/js/api.js";
+
 const KEY = "slotwise:lang";
 
 function detect() {
@@ -21,6 +23,7 @@ const DICT = {
     "nav.book_now": "Book now", "nav.back_menu": "Back to menu", "nav.studio_login": "Studio login",
     "nav.book_again": "Book again", "nav.back_home": "Back to home", "nav.back": "Back",
     "lang.other": "DE", "lang.other_name": "Deutsch",
+    "theme.classic": "Classic look", "theme.calm": "New look",
     "common.pay": "Pay at the studio", "common.total": "Total", "common.total_time": "Total time",
     "common.min": "{n} min", "common.date": "Date", "common.time": "Time",
     "common.therapist": "Therapist", "common.where": "Where", "common.at_time": "{time}",
@@ -112,6 +115,7 @@ const DICT = {
     "nav.book_now": "Jetzt buchen", "nav.back_menu": "Zurück zum Menü", "nav.studio_login": "Studio-Login",
     "nav.book_again": "Erneut buchen", "nav.back_home": "Zur Startseite", "nav.back": "Zurück",
     "lang.other": "EN", "lang.other_name": "English",
+    "theme.classic": "Klassisches Design", "theme.calm": "Neues Design",
     "common.pay": "Bezahlung im Studio", "common.total": "Gesamt", "common.total_time": "Gesamtdauer",
     "common.min": "{n} Min.", "common.date": "Datum", "common.time": "Uhrzeit",
     "common.therapist": "Therapeutin", "common.where": "Ort", "common.at_time": "{time} Uhr",
@@ -236,5 +240,12 @@ export function mountLanguageSwitch() {
   document.querySelectorAll("[data-lang-switch]").forEach((slot) => slot.replaceChildren(languageSwitch()));
 }
 
+// Classic / New look button into every element marked data-theme-switch.
+export function mountThemeSwitch() {
+  const labels = { classic: t("theme.classic"), calm: t("theme.calm") };
+  document.querySelectorAll("[data-theme-switch]").forEach((slot) => slot.replaceChildren(themeSwitch(labels)));
+}
+
 translatePage();
 mountLanguageSwitch();
+mountThemeSwitch();

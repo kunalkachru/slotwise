@@ -9,8 +9,9 @@ const asDate = (iso) => new Date(`${iso}T12:00:00Z`);
 const percent = (rate) => (rate === null || rate === undefined ? "–" : `${Math.round(rate * 1000) / 10}%`);
 const STATUS = { pending: "Awaiting email", expired: "Not confirmed", booked: "Booked", confirmed: "Confirmed", done: "Done", no_show: "No-show", cancelled: "Cancelled" };
 const SERIES = [
-  { key: "no_shows", label: "No-shows", cls: "s1", color: "#2a78d6" },
-  { key: "late_cancellations", label: "Late cancellations", cls: "s2", color: "#eb6834" },
+  // Colours are the --chart-1 / --chart-2 tokens, so both looks can theme them.
+  { key: "no_shows", label: "No-shows", cls: "s1", color: "var(--chart-1)" },
+  { key: "late_cancellations", label: "Late cancellations", cls: "s2", color: "var(--chart-2)" },
 ];
 
 // ---------- Tiles ----------

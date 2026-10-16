@@ -1,5 +1,5 @@
 // Shared owner-area frame: session check, side menu, log out.
-import { api, ApiError, fill, h, redirectToLoginOn401 } from "/js/api.js";
+import { api, ApiError, fill, h, redirectToLoginOn401, themeSwitch } from "/js/api.js";
 
 const LEAF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#33C375" d="M20 3C10 3 4 8.5 4 15.5c0 1.6.4 3 1 4.2C6.8 13 11 9.6 16 8c-4.3 2.6-7.4 6.6-8.6 12 1.2.6 2.6 1 4.1 1C18.6 21 21 14 20 3z"/></svg>';
 
@@ -30,6 +30,7 @@ export async function startOwnerPage(active) {
           ? h("a", { href: p.href, "aria-current": p.key === active ? "page" : null }, p.label)
           : h("a", { class: "soon", "aria-disabled": "true" }, p.label, " ", h("span", { class: "badge" }, "soon")),
       ),
+      themeSwitch({ classic: "Classic look", calm: "New look" }),
       h("button", {
         type: "button",
         onclick: async () => {
@@ -71,7 +72,7 @@ export function showPageError(error, target) {
   const reason = error instanceof ApiError ? error.message : "Something went wrong. Please try again.";
   const newLook = document.documentElement.dataset.theme === "calm";
   const switchToClassic = () => {
-    try { localStorage.setItem("slotwise:theme", "classic"); } catch { /* private mode */ }
+    window.slotwiseTheme?.set("classic");
     window.location.reload();
   };
   const icon = h("span", { class: "page-error-icon" });
