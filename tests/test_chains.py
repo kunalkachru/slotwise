@@ -384,3 +384,121 @@ def test_phone_bookings_choose_a_therapist_per_treatment(empty_calendar, db):
     assert response.status_code == 200
     assert [s["therapist_name"] for s in response.json()["segments"]] == ["Lena", "Sofia"]
     assert response.json()["status"] == "booked"
+
+
+# ---------- Slice 5: waitlist chains ----------
+
+def wait_for(client, name, services, choices=None, earliest="09:00", latest="18:00"):
+    """Join Tuesday's waitlist and click the opt-in link."""
+    from app.models import Customer, WaitlistEntry
+
+    ids = menu_ids(client)
+    response = client.post("/public/waitlist", json={
+        "service_ids": [ids[s] for s in services], "preferred_date": TUESDAY,
+        "therapist_choices": {str(ids[s]): therapist_id(client, n) if n else None
+                              for s, n in (choices or {}).items()},
+        "earliest_time": earliest, "latest_time": latest, "first_name": name,
+        "last_name": "Waiting", "email": f"{name.lower()}@example.com",
+        "phone": "+49 151 0000 0100"})
+    assert response.status_code == 200, response.json()
+    with client.app.state.session_factory() as session:
+        customer = session.scalar(select(Customer).where(Customer.first_name == name))
+        token = session.scalar(select(WaitlistEntry.confirm_token).where(
+            WaitlistEntry.customer_id == customer.id))
+    assert client.post(f"/public/waitlist/confirm/{token}").status_code == 200
+
+
+def waitlist_entry(db, name):
+    from app.models import Customer, WaitlistEntry
+
+    db.expire_all()
+    customer = db.scalar(select(Customer).where(Customer.first_name == name))
+    return db.scalar(select(WaitlistEntry).where(WaitlistEntry.customer_id == customer.id))
+
+
+def cancel(client, booking_id):
+    from tests.conftest import manage_token
+
+    assert client.post(f"/public/bookings/{manage_token(client, booking_id)}/cancel") \
+        .status_code == 200
+
+
+def test_a_freed_part_is_offered_as_a_whole_visit_and_claimed(empty_calendar, db):
+    client = empty_calendar
+    facial = book(client, ["Classic facial"], TUESDAY, "11:00", "Sofia",
+                  email="mia.wagner@example.com", first_name="Mia")
+    wait_for(client, "Anna", MASSAGE_AND_FACIAL, latest="10:00")
+    cancel(client, facial.json()["id"])
+
+    entry = waitlist_entry(db, "Anna")
+    assert entry.status == "offered"
+    assert [(s[0], s[1][11:16]) for s in entry.offer_plan["segments"]] == [
+        (therapist_id(client, "Lena"), "08:00"), (therapist_id(client, "Sofia"), "09:00")]
+    [mail] = [e for e in client.app.state.mailer.outbox if e.subject.startswith("A time is")]
+    assert "Tue 13 Oct, 10:00 with Lena, Sofia (105 min)" in mail.text
+
+    offer = client.get(f"/public/waitlist/offers/{entry.offer_token}").json()
+    assert [(v["time"], v["therapist_name"]) for v in offer["visit"]] == [
+        ("10:00", "Lena"), ("11:00", "Sofia")]
+    claimed = client.post(f"/public/waitlist/offers/{entry.offer_token}/claim")
+    assert claimed.status_code == 200, claimed.json()
+    assert claimed.json()["source"] == "waitlist"
+    assert segments(db, claimed.json()["id"]) == [("Lena", "08:00", "09:00", "09:10"),
+                                                  ("Sofia", "09:00", "09:45", "09:55")]
+
+
+def test_join_order_skips_visits_that_do_not_fit(empty_calendar, db):
+    client = empty_calendar
+    facial = book(client, ["Classic facial"], TUESDAY, "11:00", "Sofia",
+                  email="mia.wagner@example.com", first_name="Mia")
+    wait_for(client, "Early", MASSAGE_AND_FACIAL, earliest="12:00")  # visit starts 10:00
+    wait_for(client, "Picky", MASSAGE_AND_FACIAL, choices={"Classic facial": None,
+                                                           "Deep tissue massage": None},
+             latest="09:30")
+    wait_for(client, "Fits", ["Express facial"])
+    cancel(client, facial.json()["id"])
+    assert [waitlist_entry(db, n).status for n in ("Early", "Picky", "Fits")] == [
+        "waiting", "waiting", "offered"]
+
+
+def test_one_open_offer_per_therapist_time_and_expiry_passes_every_part_on(
+        empty_calendar, db, monkeypatch):
+    from datetime import datetime
+
+    from app import clock
+
+    client = empty_calendar
+    visit = book_chain(client, MASSAGE_AND_FACIAL, "10:00", email="mia.wagner@example.com")
+    from tests.conftest import manage_token
+
+    client.post(f"/public/bookings/{manage_token(client, visit.json()['id'])}/verify")
+    wait_for(client, "Chain", MASSAGE_AND_FACIAL)
+    wait_for(client, "Foot", ["Foot reflexology"])
+    wait_for(client, "Face", ["Express facial"])
+    cancel(client, visit.json()["id"])
+    # The first in line takes both parts; nobody else may be offered those times.
+    assert [waitlist_entry(db, n).status for n in ("Chain", "Foot", "Face")] == [
+        "offered", "waiting", "waiting"]
+
+    later = datetime(2026, 10, 10, 12, 31, tzinfo=clock.BERLIN)
+    monkeypatch.setattr(clock, "now", lambda: later)
+    run = client.post("/internal/run-jobs", headers={"X-Jobs-Secret": "test-jobs-secret"})
+    assert run.json()["offers_expired"] == 1
+    assert [waitlist_entry(db, n).status for n in ("Chain", "Foot", "Face")] == [
+        "expired", "offered", "offered"]
+    assert waitlist_entry(db, "Foot").offer_start_at.strftime("%H:%M") == "08:00"  # 10:00
+    assert waitlist_entry(db, "Face").offer_start_at.strftime("%H:%M") == "09:00"  # 11:00
+
+
+def test_waitlist_choices_per_treatment_are_honoured(empty_calendar, db):
+    client = empty_calendar
+    relax = book(client, ["Relaxation massage"], TUESDAY, "11:00", "Sofia",
+                 email="mia.wagner@example.com", first_name="Mia")
+    wait_for(client, "Lenafan", ["Relaxation massage"], choices={"Relaxation massage": "Lena"})
+    wait_for(client, "Anyone", ["Relaxation massage"])
+    entry = waitlist_entry(db, "Lenafan")
+    assert entry.therapist_choices == {str(menu_ids(client)["Relaxation massage"]):
+                                       therapist_id(client, "Lena")}
+    cancel(client, relax.json()["id"])  # Sofia's time frees up
+    assert waitlist_entry(db, "Lenafan").status == "waiting"
+    assert waitlist_entry(db, "Anyone").status == "offered"

@@ -175,6 +175,7 @@ def bookings_per_therapist(db: Session, therapist_ids: list[int], day: date) -> 
 # ---------- Chains: one therapist per segment (option B) ----------
 
 BREAK = timedelta(minutes=15)
+EPOCH = datetime(2000, 1, 1, tzinfo=UTC)
 # One search budget per request (all start times and break positions together), counted per
 # therapist tried for a treatment. A two-therapist studio needs a few thousand at most.
 SEARCH_BUDGET = 50_000
@@ -261,6 +262,10 @@ class DayPlanner:
         return not any(start < b_end and b_start < end for b_start, b_end in
                        self.busy[therapist.id])
 
+    def step_offsets(self, break_before: int | None) -> list[timedelta]:
+        """How long after the visit's start each treatment begins."""
+        return [start - EPOCH for start, _ in self._step_times(EPOCH, break_before)]
+
     def _step_times(self, start: datetime, break_before: int | None):
         times, at = [], start
         for index, minutes in enumerate(self.minutes):
@@ -290,10 +295,12 @@ class DayPlanner:
             first = index
         return segments
 
-    def chain(self, start: datetime, break_before: int | None = None) -> Slot | None:
+    def chain(self, start: datetime, break_before: int | None = None,
+              fixed: tuple[int, Therapist] | None = None) -> Slot | None:
         """The best chain starting at `start`: fewest handovers first, then per treatment
         the therapist with the fewest bookings that day, then the lower id. A break only
-        sits at a handover."""
+        sits at a handover. `fixed` = (treatment index, therapist) pins one treatment to a
+        therapist (the waitlist fills freed time with it)."""
         count = len(self.services)
         if not self.limits.allows(start) or (
                 break_before is not None and not 0 < break_before < count):
@@ -315,7 +322,10 @@ class DayPlanner:
                 if best is None or rank < best[0]:
                     best = (rank, segments, list(assigned))
                 return
-            for therapist in self.candidates[index]:
+            options = self.candidates[index]
+            if fixed and fixed[0] == index:
+                options = [t for t in options if t is fixed[1]]
+            for therapist in options:
                 self.budget -= 1
                 handover = bool(assigned) and therapist is not assigned[-1]
                 if index == break_before and not handover:

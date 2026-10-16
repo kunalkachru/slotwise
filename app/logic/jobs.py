@@ -64,7 +64,7 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
     within a day, expire. A released booking slot goes to the waitlist.
     Returns (bookings expired, waitlist requests expired)."""
     from app.logic.availability import BOOKING_HOLD_MINUTES
-    from app.logic.waitlist import WAITLIST_CONFIRM_HOURS, offer_slot
+    from app.logic.waitlist import WAITLIST_CONFIRM_HOURS, freed_times, offer_freed
 
     now = clock.now()
     stale = db.scalars(select(Booking).where(
@@ -74,7 +74,7 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
     for booking in stale:
         booking.status = "expired"
         db.commit()
-        offer_slot(db, mailer, public_url, booking.therapist_id, booking.start_at)
+        offer_freed(db, mailer, public_url, freed_times(booking))
     requests = db.scalars(select(WaitlistEntry).where(
         WaitlistEntry.status == "pending",
         WaitlistEntry.created_at <= now - timedelta(hours=WAITLIST_CONFIRM_HOURS),

@@ -133,8 +133,9 @@ def test_join_validation(empty_calendar):
     client = empty_calendar
     assert join(client, "Tom", earliest="15:00", latest="10:00").status_code == 422
     assert join(client, "Tom", day="2026-12-31").status_code == 422
-    assert join(client, "Tom", services=("Deep tissue massage", "Classic facial")) \
-        .status_code == 404
+    # Lena doesn't do facials (a combination of Lena + Sofia is fine: option B).
+    assert join(client, "Tom", services=("Deep tissue massage", "Classic facial"),
+                therapist="Lena").status_code == 404
     closed = join(client, "Tom", day="2026-10-11")  # Sunday
     assert closed.status_code == 422
     assert closed.json()["detail"] == (

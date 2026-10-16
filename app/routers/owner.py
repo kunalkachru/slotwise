@@ -185,9 +185,9 @@ def set_status(booking_id: int, body: StatusIn, request: Request, db: Session = 
     was_freed = booking.status in ("cancelled", "expired")
     booking = change_status(db, booking, body.status)
     if booking.status in ("cancelled", "expired") and not was_freed:
-        waitlist.offer_slot(db, request.app.state.mailer,
-                            request.app.state.settings.public_url,
-                            booking.therapist_id, booking.start_at)
+        waitlist.offer_freed(db, request.app.state.mailer,
+                             request.app.state.settings.public_url,
+                             waitlist.freed_times(booking))
     return _out(booking)
 
 
@@ -290,13 +290,15 @@ def _waitlist_out(db: Session, e) -> OwnerWaitlistOut:
 
     names = [db.get(Service, i).name for i in e.service_ids if db.get(Service, i)]
     names += [f"+ {db.get(AddOn, i).name}" for i in e.add_on_ids if db.get(AddOn, i)]
-    therapist = db.get(Therapist, e.therapist_id) if e.therapist_id else None
+    chosen = [e.therapist_id] if e.therapist_id else [
+        t for t in (e.therapist_choices or {}).values() if t]
+    therapists = [db.get(Therapist, t) for t in dict.fromkeys(chosen)]
     return OwnerWaitlistOut(
         id=e.id, customer_name=f"{e.customer.first_name} {e.customer.last_name}",
         email=e.customer.email, phone=e.customer.phone, services=names,
         preferred_date=e.preferred_date, earliest_time=e.earliest_time.strftime("%H:%M"),
         latest_time=e.latest_time.strftime("%H:%M"),
-        therapist_name=therapist.display_name if therapist else None,
+        therapist_name=", ".join(t.display_name for t in therapists if t) or None,
         joined_at=e.created_at, status=e.status, offered_at=e.offered_at,
         offer_expires_at=e.offer_expires_at,
         offer_time=e.offer_start_at.astimezone(clock.BERLIN).strftime("%a %-d %b %H:%M")

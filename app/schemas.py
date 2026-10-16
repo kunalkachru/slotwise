@@ -489,6 +489,7 @@ class WaitlistIn(BaseModel):
     service_ids: list[int] = Field(min_length=1, max_length=10)
     add_on_ids: list[int] = Field(default_factory=list, max_length=20)
     therapist_id: int | None = None
+    therapist_choices: dict[int, int | None] | None = Field(default=None, max_length=10)
     preferred_date: date
     earliest_time: time
     latest_time: time
@@ -527,6 +528,7 @@ class OfferOut(BaseModel):
     total_minutes: int
     total_price: MoneyStr
     lines: list[OfferLineOut]
+    visit: list[PlanLineOut] = Field(default_factory=list)
     expires_at: datetime
 
 

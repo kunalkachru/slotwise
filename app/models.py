@@ -357,6 +357,8 @@ class WaitlistEntry(Timestamped, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"))
     therapist_id: Mapped[int | None] = mapped_column(ForeignKey("therapists.id"))  # NULL = any
+    # Option B: a therapist per treatment, {"3": 1, "5": null}; therapist_id (if set) wins.
+    therapist_choices: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     service_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
     add_on_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
     preferred_date: Mapped[date] = mapped_column(Date)
@@ -367,6 +369,10 @@ class WaitlistEntry(Timestamped, Base):
     offer_token: Mapped[str | None] = mapped_column(String(64), unique=True)
     offer_start_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     offer_therapist_id: Mapped[int | None] = mapped_column(ForeignKey("therapists.id"))
+    # The offered visit, exactly: {"choices": {service id: therapist id}, "break_before": k,
+    # "segments": [[therapist id, start ISO, end ISO, blocked-until ISO, [service ids]]]}.
+    # offer_start_at / offer_therapist_id are its first part.
+    offer_plan: Mapped[dict | None] = mapped_column(JSON)
     offer_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     offered_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"))
