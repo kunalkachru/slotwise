@@ -1,10 +1,12 @@
 // Shared helpers for every page: JSON API calls, safe DOM building, formatting.
 
 export class ApiError extends Error {
-  constructor(status, message, body) {
+  // status 0 = no response (network error or server unreachable).
+  constructor(status, message, body, path) {
     super(message);
     this.status = status;
     this.body = body;
+    this.path = path;
   }
 }
 
@@ -19,13 +21,13 @@ export async function api(path, { method = "GET", body } = {}) {
   try {
     response = await fetch(path, options);
   } catch {
-    throw new ApiError(0, "Could not reach the server. Please check your connection.");
+    throw new ApiError(0, "Could not reach the server. Please check your connection.", null, path);
   }
   if (response.status === 204) return null;
   const data = await response.json().catch(() => null);
   if (!response.ok) {
     const message = (data && data.detail) || "Something went wrong. Please try again.";
-    throw new ApiError(response.status, message, data);
+    throw new ApiError(response.status, message, data, path);
   }
   return data;
 }

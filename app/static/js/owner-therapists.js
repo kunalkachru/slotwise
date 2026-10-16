@@ -1,6 +1,6 @@
 import { fill, h } from "/js/api.js";
 import { field, openEditor, toast } from "/js/owner-forms.js";
-import { ownerApi, startOwnerPage } from "/js/owner-shell.js";
+import { ownerApi, showPageError, startOwnerPage } from "/js/owner-shell.js";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const dayLabel = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -8,10 +8,16 @@ let therapists = [];
 let services = [];
 let daysOff = [];
 
+// Also called after every save: a failed reload shows the page error instead of being lost.
 async function load() {
-  [therapists, services, daysOff] = await Promise.all([
-    ownerApi("/owner/therapists"), ownerApi("/owner/services"), ownerApi("/owner/days-off"),
-  ]);
+  try {
+    [therapists, services, daysOff] = await Promise.all([
+      ownerApi("/owner/therapists"), ownerApi("/owner/services"), ownerApi("/owner/days-off"),
+    ]);
+  } catch (error) {
+    showPageError(error);
+    return;
+  }
   render();
 }
 
@@ -129,4 +135,4 @@ async function removeDayOff(dayOff) {
   } catch (e) { toast(e.message); }
 }
 
-startOwnerPage("therapists").then(load).catch(() => {});
+startOwnerPage("therapists").then(load).catch((error) => showPageError(error));

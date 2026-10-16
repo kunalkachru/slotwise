@@ -123,7 +123,7 @@ There is no top bar and no language switch on the receipt, but `i18n.js` is stil
 
 **Redesign notes:**
 - The mobile top-menu button and the "Classic look" switch get added here, in `startOwnerPage()`.
-- **Decided:** a new `showPageError(error, path)` helper here replaces the silent `init().catch(() => {})` on every owner page, and the bare `document.body.textContent = error.message` in the shell. It uses `ApiError.status` (`0` = no response) and `error.message`; see the porting section 2.8 of the Figma prompt.
+- **Built (step 0):** `showPageError(error, target?)` renders 🎨 `section.page-error[role=alert]` > `span.page-error-icon` (inline SVG), `h2`, `p`, `p.page-error-details`, `p.page-error-tips-title`, `ul` > `li`, `.row` > `button.btn` (+ `button.btn.btn-ghost` only when `data-theme="calm"`). It goes into `.owner-main` (or the given `target`, e.g. `#dashboard` when only the day changed), or into `body > main.center-page` when the session check failed. It reads `ApiError.status` (`0` = no response) and `ApiError.path` (new in `api.js`; the query string is never shown). It replaces the silent `init().catch(() => {})` on every owner page and the bare `document.body.textContent = error.message` in the shell (see the porting section 2.8 of the Figma prompt).
 
 ### `owner/login.html` (`js/owner-login.js`)
 

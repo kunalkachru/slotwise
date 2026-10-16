@@ -1,12 +1,18 @@
 import { fill, formatEuro, h } from "/js/api.js";
 import { field, openEditor, toast } from "/js/owner-forms.js";
-import { ownerApi, startOwnerPage } from "/js/owner-shell.js";
+import { ownerApi, showPageError, startOwnerPage } from "/js/owner-shell.js";
 
 const CATEGORIES = ["Massages", "Facials", "Reflexology"];
 let services = [];
 
+// Also called after every save: a failed reload shows the page error instead of being lost.
 async function load() {
-  services = await ownerApi("/owner/services");
+  try {
+    services = await ownerApi("/owner/services");
+  } catch (error) {
+    showPageError(error);
+    return;
+  }
   render();
 }
 
@@ -90,4 +96,4 @@ function editAddOn(service, addOn) {
   });
 }
 
-startOwnerPage("services").then(load).catch(() => {});
+startOwnerPage("services").then(load).catch((error) => showPageError(error));

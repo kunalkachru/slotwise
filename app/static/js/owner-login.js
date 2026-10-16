@@ -21,14 +21,15 @@ form.addEventListener("submit", async (event) => {
   }
   const button = form.querySelector("button[type=submit]");
   button.disabled = true;
+  button.textContent = "Logging in…";
   errorBox.hidden = true;
   try {
     await api("/auth/login", { method: "POST", body: { email, password } });
-    window.location.assign("/owner/dashboard.html");
+    window.location.assign("/owner/dashboard.html"); // keeps "Logging in…" until the dashboard opens
   } catch (error) {
     showError(error.message);
-    form.password.select();
-  } finally {
     button.disabled = false;
+    button.textContent = "Log in";
+    form.password.select();
   }
 });

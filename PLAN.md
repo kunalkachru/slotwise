@@ -360,7 +360,9 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
 - **Decisions:**
   - The new look lives in `calm.css` behind a "Classic look / New look" switch, available to customers and the owner. **Classic stays the default.**
   - Waitlist statuses get their own badge colours.
-  - Owner pages get a real error state (reason, details, workarounds) instead of an endless "Loading…". This ships first.
+  - Owner pages get a real error state (reason, details, workarounds) instead of an endless "Loading…". This ships first (porting step 0, PR `owner-page-error-state`).
+  - The login button shows "Logging in…" while signing in (step 0).
+  - The Inter font is **self-hosted** in `app/static/fonts/` rather than loaded from Google Fonts, because of German GDPR rulings on Google Fonts. It ships with the base styles (step 2).
 - **Figma Make's exported React code** goes into `doc/design/figma-make/` as a **reference-only library**:
   - CI, deploy, Docker, pytest and ruff all ignore it;
   - it's never served or built.
