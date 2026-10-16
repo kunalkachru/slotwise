@@ -627,6 +627,7 @@ dialog.panel::backdrop { background: rgba(16, 40, 28, 0.35); }
   box-shadow: var(--shadow); z-index: 100; max-width: calc(100vw - 32px);
 }
 .btn.danger { background: var(--danger); }
+.btn-danger, .btn-danger:hover { background: var(--danger); } /* was an inline style in manage.js */
 @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
 
 /* ---------- Printable receipt ---------- */

@@ -42,7 +42,7 @@ function render(booking) {
     ? h("div", { class: "confirm-cancel", role: "group", "aria-label": t("manage.confirm_cancel") },
         h("p", {}, t(isLateNow ? "manage.sure_late" : "manage.sure")),
         h("div", { class: "row" },
-          h("button", { class: "btn", type: "button", style: "background: var(--danger)", onclick: () => act("cancel") }, t("manage.yes_cancel")),
+          h("button", { class: "btn btn-danger", type: "button", onclick: () => act("cancel") }, t("manage.yes_cancel")),
           h("button", { class: "btn btn-ghost", type: "button", onclick: () => { askingToCancel = false; render(booking); } }, t("manage.keep")),
         ))
     : h("button", { class: "btn btn-danger-ghost btn-block", type: "button", onclick: () => { askingToCancel = true; render(booking); } }, t("manage.cancel")));

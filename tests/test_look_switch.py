@@ -26,12 +26,25 @@ def test_customer_top_bars_have_the_look_switch(page):
     assert "<span data-theme-switch></span>" in page.read_text(encoding="utf-8")
 
 
+def top_level_split(selector_list):
+    """Split "a, :is(b, c)" on the commas outside brackets: ["a", ":is(b, c)"]."""
+    parts, depth, current = [], 0, ""
+    for char in selector_list:
+        depth += {"(": 1, ")": -1}.get(char, 0)
+        if char == "," and depth == 0:
+            parts.append(current)
+            current = ""
+        else:
+            current += char
+    return [*parts, current]
+
+
 def test_calm_rules_only_apply_to_the_new_look():
     css = (STATIC / "css" / "calm.css").read_text(encoding="utf-8")
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     css = re.sub(r"@font-face\s*{[^}]*}", "", css)
     for block in re.findall(r"([^{}]+){", css):
-        for selector in block.split(","):
+        for selector in top_level_split(block):
             selector = selector.strip()
             if selector.startswith("@media") or selector.startswith("@supports") or not selector:
                 continue
@@ -50,3 +63,18 @@ def test_look_files_are_served(client):
         response = client.get(path)
         assert response.status_code == 200
         assert response.headers["cache-control"] == "no-cache"
+
+
+def test_self_hosted_font_is_served_as_woff2(client):
+    response = client.get("/fonts/inter-latin-wght-normal.woff2")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "font/woff2"
+    assert response.content[:4] == b"wOF2"
+    assert client.get("/fonts/Inter-OFL.txt").status_code == 200  # the font's licence ships with it
+
+
+def test_no_third_party_font_requests():
+    # GDPR: the font is self-hosted, never loaded from Google Fonts or another CDN.
+    for path in [*PAGES, *STATIC.glob("css/*.css")]:
+        text = path.read_text(encoding="utf-8")
+        assert "fonts.googleapis.com" not in text and "fonts.gstatic.com" not in text, path
