@@ -837,6 +837,11 @@
     right: var(--space-2);
     display: none;
     width: 260px;
+    /* Short screens (a phone held sideways): stay inside the viewport and scroll, so
+       Classic look and Log out stay reachable. 100dvh where supported. */
+    max-height: calc(100vh - 64px - var(--space-3));
+    max-height: calc(100dvh - 64px - var(--space-3));
+    overflow-y: auto;
     flex-direction: column;
     padding: var(--space-2);
     border: 1px solid var(--line);
