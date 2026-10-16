@@ -217,7 +217,45 @@ function renderDetail(b) {
         "Over €250 a receipt isn't enough for the customer's tax records: a full invoice also needs their name and address (§ 14 UStG)."),
       receiptError,
     ),
+    customerDataSection(b),
   );
+}
+
+// GDPR requests: a copy of the customer's data, or erasing it (the same anonymization as the
+// automatic clean-up after two years). Bookings and receipts keep dates and amounts.
+function customerDataSection(b) {
+  const section = h("section", { class: "customer-data" });
+  const error = errorBox();
+  const erased = b.customer.first_name === "Anonymized" && b.customer.email.endsWith("@invalid.example");
+  const showButtons = () => fill(section,
+    h("h3", {}, "Customer data"),
+    erased
+      ? h("p", { class: "field-hint" }, "This customer's personal details were deleted.")
+      : h("div", { class: "row" },
+          h("a", { class: "btn btn-ghost btn-small", href: `/owner/customers/${b.customer.id}/export`, download: "" }, "Download customer data"),
+          h("button", { class: "btn btn-danger-ghost btn-small", type: "button", onclick: confirmErase }, "Delete customer data")),
+    h("p", { class: "field-hint" }, "For a customer's request under the GDPR: a copy of everything stored about them, or deleting their details."),
+    error,
+  );
+  const confirmErase = () => fill(section,
+    h("h3", {}, "Delete customer data?"),
+    h("div", { class: "confirm-cancel" },
+      h("p", {}, `This removes ${customerName(b)}'s name, email, phone and notes from all their bookings and waitlist requests. Dates and amounts stay, as tax law requires. This can't be undone.`),
+      h("div", { class: "row" },
+        h("button", { class: "btn btn-danger btn-small", type: "button", onclick: async () => {
+          error.hidden = true;
+          try {
+            await ownerApi(`/owner/customers/${b.customer.id}/erase`, { method: "POST" });
+            toast("Customer data deleted");
+            openDetail(b.id);
+            load();
+          } catch (e) { showError(error, e); }
+        } }, "Delete customer data"),
+        h("button", { class: "btn btn-ghost btn-small", type: "button", onclick: showButtons }, "Keep"))),
+    error,
+  );
+  showButtons();
+  return section;
 }
 
 function itemsSection(b, locked) {
