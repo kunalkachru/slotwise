@@ -16,6 +16,57 @@
       <div class="topbar-actions"><span data-lang-switch></span><span data-theme-switch></span><a class="btn btn-small" href="/book.html" data-i18n="nav.book_now">Book now</a></div>
     </div>
   </header>
+  <!-- Figma design only (hidden in classic): the Isar — glacial water over river stones. -->
+  <section class="hero calm-only" aria-labelledby="hero-title">
+    <svg class="hero-art" viewBox="0 0 1440 720" preserveAspectRatio="xMaxYMax slice" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="hero-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c3a32"/><stop offset=".55" stop-color="#11493f"/><stop offset="1" stop-color="#16594d"/></linearGradient>
+        <radialGradient id="hero-glow" cx=".78" cy=".72" r=".55"><stop offset="0" stop-color="#5fd0c3" stop-opacity=".55"/><stop offset="1" stop-color="#5fd0c3" stop-opacity="0"/></radialGradient>
+        <linearGradient id="hero-water-1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2e9c93" stop-opacity="0"/><stop offset=".5" stop-color="#3fb4a8" stop-opacity=".55"/><stop offset="1" stop-color="#2e9c93" stop-opacity="0"/></linearGradient>
+        <linearGradient id="hero-water-2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8ed3c8" stop-opacity="0"/><stop offset=".5" stop-color="#bfe9e2" stop-opacity=".45"/><stop offset="1" stop-color="#8ed3c8" stop-opacity="0"/></linearGradient>
+        <radialGradient id="hero-stone-a" cx=".38" cy=".25" r=".9"><stop offset="0" stop-color="#dfe8e6"/><stop offset=".55" stop-color="#93a7a5"/><stop offset="1" stop-color="#4f6664"/></radialGradient>
+        <radialGradient id="hero-stone-b" cx=".38" cy=".25" r=".9"><stop offset="0" stop-color="#eef3f2"/><stop offset=".6" stop-color="#a9bab8"/><stop offset="1" stop-color="#5f7674"/></radialGradient>
+      </defs>
+      <rect width="1440" height="720" fill="url(#hero-sky)"/>
+      <rect width="1440" height="720" fill="url(#hero-glow)"/>
+      <g class="hero-flow hero-flow-slow">
+        <path d="M-1440 470 C -1200 420 -960 520 -720 470 S -240 420 0 470 S 480 520 720 470 S 1200 420 1440 470 S 1920 520 2160 470 V720 H-1440Z" fill="url(#hero-water-1)"/>
+      </g>
+      <g class="hero-flow hero-flow-fast">
+        <path d="M-1440 540 C -1180 500 -940 590 -700 540 S -230 500 0 540 S 500 590 740 540 S 1210 500 1440 540 S 1940 590 2180 540 V720 H-1440Z" fill="url(#hero-water-2)"/>
+        <path d="M-1440 610 C -1200 585 -980 640 -720 610 S -260 585 0 610 S 460 640 720 610 S 1180 585 1440 610 S 1900 640 2160 610" stroke="#cfede7" stroke-opacity=".35" stroke-width="2" fill="none"/>
+      </g>
+      <g class="hero-stones">
+        <circle cx="1150" cy="300" r="190" fill="#bfe9e2" opacity=".10"/>
+        <circle cx="1150" cy="300" r="120" fill="#bfe9e2" opacity=".10"/>
+        <g class="hero-branch" transform="translate(1180 -20) rotate(24)">
+          <path d="M0 0 C 60 160 90 320 60 520" stroke="#8ed3c8" stroke-opacity=".75" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <g fill="#8ed3c8">
+            <ellipse cx="10" cy="60" rx="46" ry="29" opacity=".55" transform="rotate(-28 10 60)"/>
+            <ellipse cx="62" cy="128" rx="50" ry="31" opacity=".7" transform="rotate(30 62 128)"/>
+            <ellipse cx="36" cy="200" rx="52" ry="32" opacity=".5" transform="rotate(-24 36 200)"/>
+            <ellipse cx="92" cy="270" rx="52" ry="32" opacity=".7" transform="rotate(32 92 270)"/>
+            <ellipse cx="54" cy="346" rx="50" ry="31" opacity=".5" transform="rotate(-20 54 346)"/>
+            <ellipse cx="96" cy="414" rx="46" ry="29" opacity=".65" transform="rotate(28 96 414)"/>
+            <ellipse cx="62" cy="480" rx="40" ry="26" opacity=".45" transform="rotate(-18 62 480)"/>
+          </g>
+        </g>
+        <ellipse cx="1080" cy="604" rx="170" ry="40" fill="url(#hero-stone-b)"/>
+        <ellipse cx="1290" cy="622" rx="120" ry="30" fill="url(#hero-stone-a)"/>
+        <ellipse cx="1080" cy="630" rx="170" ry="12" fill="#2e9c93" opacity=".45"/>
+        <ellipse cx="1290" cy="642" rx="120" ry="9" fill="#2e9c93" opacity=".45"/>
+        <path d="M990 590c50-14 130-16 180-6M1220 610c34-8 86-9 116-3" stroke="#fff" stroke-opacity=".45" stroke-width="5" fill="none" stroke-linecap="round"/>
+      </g>
+    </svg>
+    <div class="container hero-inner">
+      <h1 id="hero-title" data-studio-name>Isar Wellness</h1>
+      <p class="hero-lead" data-i18n="home.lead">Massages, facials and foot reflexology in Munich.</p>
+      <div class="hero-actions">
+        <a class="btn btn-hero" href="/book.html" data-i18n="home.cta_book">Book a treatment</a>
+        <a class="btn btn-glass" href="#menu" data-i18n="home.cta_menu">See treatments</a>
+      </div>
+    </div>
+  </section>
 
   <main class="container">
     <section class="studio" aria-labelledby="studio-name">

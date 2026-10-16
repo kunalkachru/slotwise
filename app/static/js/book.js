@@ -1,4 +1,4 @@
-import { api, fill, ApiError, formatEuro, formatMinutes, h } from "/js/api.js";
+import { api, fill, ApiError, formatEuro, formatMinutes, h, treatmentMedia } from "/js/api.js";
 import { locale, t } from "/js/i18n.js";
 
 // ---------- State ----------
@@ -41,13 +41,15 @@ function renderServices(menu) {
     ...menu.flatMap((category) => [
       h("p", { class: "choice-group-title" }, category.label || category.name),
       ...category.services.map((service) =>
-        h("label", { class: "choice" },
+        h("label", { class: "choice choice-treatment" },
+          treatmentMedia(service, category.name, "span"),
           h("input", {
             type: "checkbox", value: service.id, name: "service",
             checked: state.selectedServices.includes(service.id),
             onchange: (e) => toggleService(service.id, e.target.checked),
           }),
-          h("span", {}, h("span", { class: "choice-name" }, service.name)),
+          h("span", {}, h("span", { class: "choice-name" }, service.name),
+            service.description && h("small", { class: "choice-desc" }, service.description)),
           h("span", { class: "choice-meta" }, formatEuro(service.price), h("small", {}, formatMinutes(service.duration_minutes))),
         ),
       ),

@@ -68,3 +68,6 @@ Thumbs.db
 
 # Node (the Figma Make export in doc/design/figma-make/ is reference-only, never built)
 node_modules/
+
+# Playwright MCP screenshots and logs (local browser checks)
+.playwright-mcp/

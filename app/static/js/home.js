@@ -1,4 +1,4 @@
-import { api, fill, formatEuro, formatMinutes, h } from "/js/api.js";
+import { api, fill, formatEuro, formatMinutes, h, treatmentMedia } from "/js/api.js";
 import { t } from "/js/i18n.js";
 
 async function loadStudio() {
@@ -18,12 +18,14 @@ async function loadStudio() {
     policy.textContent = t("home.policy", { hours: studio.free_cancellation_hours });
     policy.hidden = false;
   } catch {
-    document.querySelector("h1[data-studio-name]").textContent = t("home.title");
+    document.querySelectorAll("h1[data-studio-name]").forEach((el) => (el.textContent = t("home.title")));
   }
 }
 
-function serviceRow(service) {
-  return h("article", { class: "service" },
+function serviceRow(service, category) {
+  // tabindex: on a phone, tapping the tile focuses it and reveals the description.
+  return h("article", { class: "service", tabindex: "0" },
+    treatmentMedia(service, category),
     h("div", {},
       h("div", { class: "service-name" }, service.name),
       service.description && h("div", { class: "service-desc" }, service.description),
@@ -59,7 +61,7 @@ async function loadMenu() {
       ...categories.map((category) =>
         h("section", { class: "menu-category", "aria-label": category.name },
           h("h2", {}, category.label || category.name),
-          category.services.map(serviceRow),
+          category.services.map((service) => serviceRow(service, category.name)),
         ),
       ),
     );

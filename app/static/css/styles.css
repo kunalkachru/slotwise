@@ -759,6 +759,7 @@ details.table-view table { margin-top: 0.5rem; }
 @media print { .theme-switch { display: none; } }
 /* New-look-only elements stay hidden in the classic look; calm.css shows them. */
 .calm-only { display: none; }
+.choice-desc { display: none; } /* treatment descriptions on the booking page: Figma design only */
 
 /* ---------- Booking terms, footer links, legal pages ---------- */
 .booking-terms { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.75rem; }
