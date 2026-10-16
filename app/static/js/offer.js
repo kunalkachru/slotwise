@@ -1,4 +1,4 @@
-import { api, fill, formatEuro, formatMinutes, h } from "/js/api.js";
+import { api, fact, fill, formatEuro, formatMinutes, h } from "/js/api.js";
 import { locale, t } from "/js/i18n.js";
 
 const token = new URLSearchParams(location.search).get("token") || "";
@@ -46,10 +46,10 @@ function render(offer, studio) {
   fill(target,
     h("h1", {}, t("offer.h1")),
     h("dl", { class: "facts" },
-      h("dt", {}, t("common.date")), h("dd", {}, longDate.format(new Date(`${offer.date}T12:00:00Z`))),
-      h("dt", {}, t("common.time")), h("dd", {}, `${t("common.at_time", { time: offer.time })} (${formatMinutes(offer.total_minutes)})`),
-      h("dt", {}, t("common.therapist")), h("dd", {}, offer.therapist_name),
-      studio && h("dt", {}, t("common.where")), studio && h("dd", {}, studio.address)),
+      fact(t("common.date"), longDate.format(new Date(`${offer.date}T12:00:00Z`))),
+      fact(t("common.time"), `${t("common.at_time", { time: offer.time })} (${formatMinutes(offer.total_minutes)})`),
+      fact(t("common.therapist"), offer.therapist_name),
+      studio && fact(t("common.where"), studio.address)),
     h("table", { class: "lines" },
       offer.lines.map((l) => h("tr", {}, h("td", { class: l.name.startsWith("+") ? "sub" : "" }, l.name), h("td", {}, formatEuro(l.price)))),
       h("tr", { class: "total" }, h("td", {}, t("common.total")), h("td", {}, formatEuro(offer.total_price)))),

@@ -57,6 +57,12 @@ export function h(tag, attrs = {}, ...children) {
   return el;
 }
 
+// One label/value pair of a <dl class="facts">, wrapped in a <div> (valid inside <dl>) so
+// the new look can lay pairs out in columns; the classic look ignores the wrapper.
+export function fact(label, value) {
+  return h("div", {}, h("dt", {}, label), h("dd", {}, value));
+}
+
 // Replace an element's children, skipping false/null/undefined (from `cond && h(...)`).
 export function fill(target, ...children) {
   target.replaceChildren(...children.flat().filter((c) => c != null && c !== false));

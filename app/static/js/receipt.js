@@ -1,4 +1,4 @@
-import { api, fill, formatEuro, h } from "/js/api.js";
+import { api, fact, fill, formatEuro, h } from "/js/api.js";
 import { locale, t } from "/js/i18n.js";
 
 const params = new URLSearchParams(location.search);
@@ -25,9 +25,9 @@ async function init() {
         h("div", { class: "meta" }, h("span", { class: "muted" }, t("receipt.title")), h("strong", {}, booking.receipt_number),
           booking.receipt_sent_at && h("span", { class: "muted" }, t("receipt.issued", { date: issued.format(new Date(booking.receipt_sent_at)) })))),
       h("dl", { class: "facts" },
-        booking.customer && h("dt", {}, t("receipt.customer")), booking.customer && h("dd", {}, `${booking.customer.first_name} ${booking.customer.last_name}`),
-        h("dt", {}, t("receipt.appointment")), h("dd", {}, `${longDate.format(new Date(`${booking.date}T12:00:00Z`))}, ${t("common.at_time", { time: booking.time })}`),
-        h("dt", {}, t("common.therapist")), h("dd", {}, booking.therapist_name)),
+        booking.customer && fact(t("receipt.customer"), `${booking.customer.first_name} ${booking.customer.last_name}`),
+        fact(t("receipt.appointment"), `${longDate.format(new Date(`${booking.date}T12:00:00Z`))}, ${t("common.at_time", { time: booking.time })}`),
+        fact(t("common.therapist"), booking.therapist_name)),
       h("table", { class: "lines" },
         booking.items.map((i) => h("tr", {},
           h("td", {}, i.item_type === "service" ? i.name : `+ ${i.name}`, i.quantity > 1 ? ` × ${i.quantity} at ${formatEuro(i.unit_price)}` : ""),

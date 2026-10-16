@@ -79,6 +79,12 @@
       <div class="alert" id="book-error" role="alert" hidden></div>
       <button class="btn btn-block" type="submit" form="book-form" id="confirm" disabled data-i18n="book.confirm">Confirm booking</button>
     </aside>
+    <!-- New look only (hidden in classic): the running total and Confirm booking, pinned to
+         the bottom of the screen on phones. Filled by book.js renderSummary(). -->
+    <div class="mobile-bar calm-only" id="mobile-bar">
+      <button class="mobile-bar-text" type="button" id="mobile-bar-text" aria-controls="summary-title" data-i18n="book.start">Choose a treatment to start.</button>
+      <button class="btn" type="submit" form="book-form" id="mobile-confirm" disabled data-i18n="book.confirm">Confirm booking</button>
+    </div>
   </main>
 
   <script type="module" src="/js/book.js"></script>

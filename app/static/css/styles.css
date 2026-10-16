@@ -494,6 +494,7 @@ textarea {
 }
 .confirm-icon svg { width: 1.6rem; height: 1.6rem; }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; margin: 1rem 0 1.25rem; }
+.facts > div { display: contents; } /* fact() wrappers (api.js): same layout as plain dt/dd */
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; font-weight: 600; }
 
