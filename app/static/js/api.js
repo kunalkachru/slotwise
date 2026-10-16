@@ -92,6 +92,18 @@ export function themeSwitch(labels) {
   return button;
 }
 
+// Figma design: the picture for a treatment tile. Category artwork (img/art/) until the studio
+// uploads its own photo. Decorative (aria-hidden); a visual copy of the description slides up
+// over it on hover, focus or tap, while the real description stays in the page for screen
+// readers. Hidden in the classic look (.calm-only).
+export function treatmentMedia(service, category, tag = "div") {
+  const art = String(category || "").toLowerCase().replace(/[^a-z]/g, "");
+  return h(tag, {
+    class: "treatment-media calm-only", "aria-hidden": "true",
+    style: `--art: url("/img/art/${art || "massages"}.svg")`,
+  }, service.description && h("span", { class: "treatment-media-desc" }, service.description));
+}
+
 export function pageLang() {
   return document.documentElement.lang === "de" ? "de" : "en";
 }
