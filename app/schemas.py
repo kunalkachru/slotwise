@@ -48,6 +48,8 @@ class ServiceOut(ORMModel):
     duration_minutes: int
     price: MoneyStr
     add_ons: list[AddOnOut]
+    photo_url: str | None = None  # None: no photo, or photos switched off
+    photo_alt: str | None = None  # the owner's description of the photo, in the page language
 
 
 class CategoryOut(BaseModel):
@@ -473,6 +475,18 @@ class OwnerWaitlistOut(BaseModel):
     offer_expires_at: datetime | None
     offer_time: str | None
     booking_id: int | None
+
+
+# ---------- Treatment photos ----------
+
+
+class PhotoTexts(BaseModel):
+    alt_text: str | None = Field(default=None, max_length=300)
+    alt_text_de: str | None = Field(default=None, max_length=300)
+
+
+class PhotoSettings(BaseModel):
+    show_photos: bool
 
 
 # ---------- Studio settings ----------

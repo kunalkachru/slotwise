@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app import clock
 from app.config import Settings
+from app.logic import photos
 from app.models import (
     AddOn,
     Booking,
@@ -183,6 +184,7 @@ def _seed_demo(session: Session) -> None:
     session.flush()
 
     _seed_demo_bookings(session, services, therapists, customers)
+    photos.use_demo_photos(session)  # built-in demo images, so the photo feature shows
 
 
 def _demo_slots(today: date) -> list[tuple[datetime, str]]:

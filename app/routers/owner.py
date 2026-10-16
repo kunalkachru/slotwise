@@ -1,13 +1,16 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import clock
 from app.db import get_db
 from app.emails import confirmation_email, receipt_email
+from app.errors import AppError
 from app.logic import catalog, waitlist
 from app.logic import dashboard as dashboard_logic
+from app.logic import photos as photos_logic
 from app.logic.availability import check_date_in_range, free_slots, get_studio
 from app.logic.booking import CustomerDetails, create_booking
 from app.logic.owner_bookings import (
@@ -22,7 +25,7 @@ from app.logic.owner_bookings import (
     replace_items,
 )
 from app.logic.selection import parse_ids, require_therapists, resolve_selection
-from app.models import Owner, Therapist
+from app.models import Owner, Service, Therapist
 from app.routers.auth import current_owner, same_origin
 from app.schemas import (
     AddOnAdminOut,
@@ -36,6 +39,8 @@ from app.schemas import (
     ItemsIn,
     OwnerBookingOut,
     OwnerWaitlistOut,
+    PhotoSettings,
+    PhotoTexts,
     ServiceAdminOut,
     ServiceIn,
     SlotOut,
@@ -316,3 +321,64 @@ def studio_settings(db: Session = Depends(get_db)):
 @router.put("/studio", response_model=StudioSettings)
 def update_studio(body: StudioSettings, db: Session = Depends(get_db)):
     return catalog.save_studio(db, catalog.StudioInput(**body.model_dump()))
+
+
+# ---------- Treatment photos ----------
+
+
+@router.get("/photos")
+def list_photos(db: Session = Depends(get_db)):
+    """Every treatment (active or not) with its photo, for the owner's photos page."""
+    photos = photos_logic.photos_by_service(db)
+    services = db.scalars(select(Service).order_by(Service.id)).all()
+    return {
+        "show_photos": photos_logic.shown(db),
+        "services": [{
+            "id": s.id, "name": s.name, "category": s.category, "active": s.active,
+            "photo_url": photos_logic.photo_url(photos.get(s.id)),
+            "is_demo": bool(photos.get(s.id) and photos[s.id].demo_key),
+            "alt_text": photos[s.id].alt_text if s.id in photos else None,
+            "alt_text_de": photos[s.id].alt_text_de if s.id in photos else None,
+        } for s in services],
+    }
+
+
+@router.put("/services/{service_id}/photo")
+async def upload_photo(service_id: int, request: Request, db: Session = Depends(get_db)):
+    """The photo is the raw request body (already resized in the browser)."""
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > photos_logic.MAX_BYTES:
+        raise AppError(422, photos_logic.TOO_BIG)
+    data = await request.body()
+    photo = photos_logic.save_upload(db, service_id, data)
+    return {"photo_url": photos_logic.photo_url(photo)}
+
+
+@router.put("/services/{service_id}/photo/text")
+def photo_texts(service_id: int, body: PhotoTexts, db: Session = Depends(get_db)):
+    photo = photos_logic.save_texts(db, service_id, body.alt_text, body.alt_text_de)
+    return {"alt_text": photo.alt_text, "alt_text_de": photo.alt_text_de}
+
+
+@router.delete("/services/{service_id}/photo", status_code=204)
+def delete_photo(service_id: int, db: Session = Depends(get_db)):
+    photos_logic.remove(db, service_id)
+    return Response(status_code=204)
+
+
+@router.post("/photos/demo")
+def add_demo_photos(db: Session = Depends(get_db)):
+    return {"added": photos_logic.use_demo_photos(db)}
+
+
+@router.delete("/photos/demo")
+def delete_demo_photos(db: Session = Depends(get_db)):
+    return {"removed": photos_logic.remove_demo_photos(db)}
+
+
+@router.put("/photos/settings")
+def photo_settings(body: PhotoSettings, db: Session = Depends(get_db)):
+    studio = get_studio(db)
+    studio.show_photos = body.show_photos
+    db.commit()
+    return {"show_photos": studio.show_photos}

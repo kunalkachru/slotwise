@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Table,
@@ -70,6 +71,24 @@ class Studio(Timestamped, Base):
     # "small_business" (§19 UStG, no VAT charged).
     vat_mode: Mapped[str] = mapped_column(String(20), default="19", server_default="19")
     tax_number: Mapped[str | None] = mapped_column(String(40))
+    show_photos: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+
+
+class ServicePhoto(Base):
+    """A treatment's photo. Stored in the database: Render's disk is wiped on every deploy.
+    Either uploaded bytes (JPEG, PNG or WebP, resized in the owner's browser) or one of the
+    built-in demo images (`demo_key`, a file under static/img/)."""
+
+    __tablename__ = "service_photos"
+
+    service_id: Mapped[int] = mapped_column(
+        ForeignKey("services.id", ondelete="CASCADE"), primary_key=True)
+    content_type: Mapped[str | None] = mapped_column(String(20))
+    data: Mapped[bytes | None] = mapped_column(LargeBinary)
+    demo_key: Mapped[str | None] = mapped_column(String(40))
+    alt_text: Mapped[str | None] = mapped_column(String(200))
+    alt_text_de: Mapped[str | None] = mapped_column(String(200))
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=_utcnow)
 
 
 class Owner(Timestamped, Base):

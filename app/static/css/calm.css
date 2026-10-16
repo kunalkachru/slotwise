@@ -1185,6 +1185,8 @@
 /* Until the studio uploads photos, the category artwork gets a different crop per tile. */
 [data-theme="calm"] :is(.service, .choice-treatment):nth-of-type(3n+2) .treatment-media { --zoom: 1.3; --origin: 50% 60%; --flip: -1; } /* mirror around the centre so the tile stays covered */
 [data-theme="calm"] :is(.service, .choice-treatment):nth-of-type(3n+3) .treatment-media { --zoom: 1.2; --origin: 25% 40%; }
+/* Photos (uploaded or demo) are shown as they are: never mirrored or cropped differently. */
+[data-theme="calm"] :is(.service, .choice-treatment) .treatment-media.has-photo { --zoom: 1; --flip: 1; --origin: 50% 50%; }
 [data-theme="calm"] .treatment-media-desc {
   position: absolute;
   inset: auto 0 0 0;
@@ -1320,3 +1322,14 @@
   [data-theme="calm"] .confirm-icon svg path { animation: none; stroke-dashoffset: 0; }
   [data-theme="calm"] :is(.service, .choice-treatment, .treatment-media::after) { transition: none; }
 }
+
+/* ---------- Owner: treatment photos ---------- */
+[data-theme="calm"] .photos-toolbar { padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); }
+[data-theme="calm"] .photo-group h2 { margin-bottom: var(--space-3); font-family: var(--font-display); font-variation-settings: "SOFT" 100; font-size: 26px; font-weight: 520; }
+[data-theme="calm"] .photo-grid { gap: var(--space-4); }
+[data-theme="calm"] .photo-card { border-radius: 20px; box-shadow: var(--shadow); }
+[data-theme="calm"] .photo-card:hover { box-shadow: 0 16px 36px rgba(14, 59, 51, 0.12); }
+[data-theme="calm"] .photo-card.is-dragover { border-color: var(--isar); box-shadow: 0 0 0 4px color-mix(in srgb, var(--glacier-strong) 60%, transparent); }
+[data-theme="calm"] .photo-preview { background-color: var(--glacier); }
+[data-theme="calm"] .photo-card-body { padding: var(--space-4); gap: var(--space-3); }
+[data-theme="calm"] .photo-card-body h3 { font-size: var(--text-md); }
