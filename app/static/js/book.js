@@ -308,7 +308,20 @@ function renderSummary() {
     lines.length > 0 && h("tr", {}, h("td", { class: "sub" }, t("common.total_time")), h("td", { class: "sub" }, formatMinutes(minutes))),
     lines.length > 0 && h("tr", { class: "total" }, h("td", {}, t("common.total")), h("td", {}, euros(total))),
   );
-  $("confirm").disabled = !(lines.length && state.slot);
+  // New look, phones: "2 items · 75 min · €82" in the bar pinned to the bottom.
+  fill($("mobile-bar-text"), lines.length === 0
+    ? t("book.start")
+    : [t(lines.length === 1 ? "book.bar_one" : "book.bar", { count: lines.length, minutes: formatMinutes(minutes), total: "" }),
+       h("strong", {}, euros(total))]);
+  setConfirm({ disabled: !(lines.length && state.slot) });
+}
+
+// The summary's Confirm button and the mobile bar's copy always show the same state.
+function setConfirm({ disabled, text = t("book.confirm") }) {
+  for (const id of ["confirm", "mobile-confirm"]) {
+    $(id).disabled = disabled;
+    $(id).textContent = text;
+  }
 }
 
 // ---------- Confirm ----------
@@ -346,9 +359,7 @@ async function confirmBooking(event) {
     phone: form.phone.value,
     note: form.note.value || null,
   };
-  const button = $("confirm");
-  button.disabled = true;
-  button.textContent = t("book.booking");
+  setConfirm({ disabled: true, text: t("book.booking") });
   try {
     const booking = await api("/public/bookings", { method: "POST", body });
     try {
@@ -369,14 +380,14 @@ async function confirmBooking(event) {
       loadTimes();
     }
   } finally {
-    button.textContent = t("book.confirm");
-    renderSummary();
+    renderSummary(); // resets both Confirm buttons
   }
 }
 
 // ---------- Start ----------
 async function init() {
   $("book-form").addEventListener("submit", confirmBooking);
+  $("mobile-bar-text").addEventListener("click", () => $("summary-title").scrollIntoView({ behavior: "smooth", block: "start" }));
   $("date-input").addEventListener("change", (e) => e.target.value && selectDate(e.target.value));
   api("/public/studio").then((studio) => {
     state.windowDays = studio.booking_window_days;

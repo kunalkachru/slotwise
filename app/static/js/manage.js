@@ -1,4 +1,4 @@
-import { api, fill, formatEuro, formatMinutes, h } from "/js/api.js";
+import { api, fact, fill, formatEuro, formatMinutes, h } from "/js/api.js";
 import { locale, t } from "/js/i18n.js";
 
 const params = new URLSearchParams(location.search);
@@ -52,10 +52,10 @@ function render(booking) {
     h("span", { class: `status-badge ${booking.status}` }, statusLabel(booking.status)),
     h("h1", {}, t("manage.h1")),
     h("dl", { class: "facts" },
-      h("dt", {}, t("common.date")), h("dd", {}, longDate.format(new Date(`${booking.date}T12:00:00Z`))),
-      h("dt", {}, t("common.time")), h("dd", {}, `${t("common.at_time", { time: booking.time })} (${formatMinutes(booking.total_minutes)})`),
-      h("dt", {}, t("common.therapist")), h("dd", {}, booking.therapist_name),
-      studio && h("dt", {}, t("common.where")), studio && h("dd", {}, studio.address),
+      fact(t("common.date"), longDate.format(new Date(`${booking.date}T12:00:00Z`))),
+      fact(t("common.time"), `${t("common.at_time", { time: booking.time })} (${formatMinutes(booking.total_minutes)})`),
+      fact(t("common.therapist"), booking.therapist_name),
+      studio && fact(t("common.where"), studio.address),
     ),
     h("table", { class: "lines" },
       booking.items.map((item) =>
