@@ -1,3 +1,4 @@
+import json
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -7,6 +8,7 @@ from app import clock
 from app.db import get_db
 from app.emails import confirmation_email, receipt_email
 from app.logic import catalog, waitlist
+from app.logic import customers as customers_logic
 from app.logic import dashboard as dashboard_logic
 from app.logic.availability import check_date_in_range, free_slots, get_studio
 from app.logic.booking import CustomerDetails, create_booking
@@ -316,3 +318,21 @@ def studio_settings(db: Session = Depends(get_db)):
 @router.put("/studio", response_model=StudioSettings)
 def update_studio(body: StudioSettings, db: Session = Depends(get_db)):
     return catalog.save_studio(db, catalog.StudioInput(**body.model_dump()))
+
+
+# ---------- Customer data (GDPR) ----------
+
+
+@router.get("/customers/{customer_id}/export")
+def export_customer(customer_id: int, db: Session = Depends(get_db)):
+    data = customers_logic.export(db, customers_logic.get_customer(db, customer_id))
+    return Response(json.dumps(data, ensure_ascii=False, indent=2), media_type="application/json",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="customer-{customer_id}.json"',
+                             "Cache-Control": "no-store"})
+
+
+@router.post("/customers/{customer_id}/erase")
+def erase_customer(customer_id: int, db: Session = Depends(get_db)):
+    customer = customers_logic.erase(db, customers_logic.get_customer(db, customer_id))
+    return {"anonymized_at": customer.anonymized_at}
