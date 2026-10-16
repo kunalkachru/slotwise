@@ -363,8 +363,8 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
   - Owner pages get a real error state (reason, details, workarounds) instead of an endless "Loading…". This ships first (porting step 0, PR `owner-page-error-state`).
   - The login button shows "Logging in…" while signing in (step 0).
   - The Inter font is **self-hosted** in `app/static/fonts/` rather than loaded from Google Fonts, because of German GDPR rulings on Google Fonts. It ships with the base styles (step 2).
-- **Status:** ported in PRs #15–#19 plus the polish PR, and live. Classic is still the default.
-  - **To make the new look the default:** in `app/static/js/theme.js`, `read()` returns `"classic"` unless the browser chose `"calm"`; flip that default. It's a one-line PR.
+- **Status:** ported in PRs #15–#20 and live. **The Figma design is the default look** (since PR `figma-design-default`); the switch offers "Classic look" / "Figma design" ("Klassisches Design" / "Figma-Design"). Visitors who chose Classic keep it, because their choice is stored in their browser (`slotwise:theme`).
+  - **To go back to Classic as the default:** in `app/static/js/theme.js`, `read()` returns `"calm"` unless the browser chose `"classic"`; flip that default. It's a one-line PR.
   - **To retire a look later:** delete its CSS (and the switch). It's a one-PR clean-up.
 - **Figma Make's exported React code** goes into `doc/design/figma-make/` as a **reference-only library**:
   - CI, deploy, Docker, pytest and ruff all ignore it;

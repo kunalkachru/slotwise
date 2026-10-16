@@ -63,7 +63,7 @@ export async function startOwnerPage(active) {
           ? h("a", { href: p.href, "aria-current": p.key === active ? "page" : null }, icon(p.key), h("span", {}, p.label))
           : h("a", { class: "soon", "aria-disabled": "true" }, p.label, " ", h("span", { class: "badge" }, "soon")),
       ),
-      themeSwitch({ classic: "Classic look", calm: "New look" }),
+      themeSwitch({ classic: "Classic look", calm: "Figma design" }),
       h("button", {
         type: "button",
         onclick: async () => {
@@ -120,7 +120,7 @@ export function showPageError(error, target) {
     h("ul", {},
       h("li", {}, "Wait a moment and try again. On the free hosting plan the server sleeps when nobody uses it and can take up to a minute to wake up."),
       h("li", {}, "Check your internet connection."),
-      newLook && h("li", {}, "Switch to the Classic look. If only the new look has a problem, the classic one keeps working."),
+      newLook && h("li", {}, "Switch to the Classic look. If only the Figma design has a problem, the classic one keeps working."),
       h("li", {}, "If it keeps happening, send the details line above to your developer."),
     ),
     h("div", { class: "row" },

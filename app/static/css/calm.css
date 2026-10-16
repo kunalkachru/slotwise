@@ -1,7 +1,8 @@
-/* "Calm modern" — the new look (doc/design/figma-prompt.md; reference: doc/design/figma-make/).
-   Every rule here is scoped to :root[data-theme="calm"], set by js/theme.js when the visitor
-   chose "New look". Without it this file changes nothing, so styles.css alone stays the
-   classic look. Values come from the Figma export's tokens (figma-make/src/index.css). */
+/* "Figma design" ("Calm modern", doc/design/figma-prompt.md; reference: doc/design/figma-make/),
+   the default look. Every rule here is scoped to :root[data-theme="calm"], which js/theme.js
+   sets unless the visitor chose "Classic look". Without it this file changes nothing, so
+   styles.css alone is the classic look. Values come from the Figma export's tokens
+   (figma-make/src/index.css). */
 
 :root[data-theme="calm"] {
   --green: #1f5c45;

@@ -1,5 +1,6 @@
-"""Classic / New look switch: every page loads theme.js before the styles and calm.css after
-them; customer top bars have the switch; the new look only applies under data-theme="calm"."""
+"""Classic look / Figma design switch: every page loads theme.js before the styles and calm.css
+after them; customer top bars have the switch; the Figma design only applies under
+data-theme="calm" and is the default look."""
 
 import re
 from pathlib import Path
@@ -55,8 +56,8 @@ def test_calm_rules_only_apply_to_the_new_look():
 
 def test_look_switch_labels_exist_in_both_languages():
     i18n = (STATIC / "js" / "i18n.js").read_text(encoding="utf-8")
-    for label in ('"theme.classic": "Classic look"', '"theme.calm": "New look"',
-                  '"theme.classic": "Klassisches Design"', '"theme.calm": "Neues Design"'):
+    for label in ('"theme.classic": "Classic look"', '"theme.calm": "Figma design"',
+                  '"theme.classic": "Klassisches Design"', '"theme.calm": "Figma-Design"'):
         assert label in i18n
 
 
@@ -83,3 +84,10 @@ def test_no_third_party_font_requests():
     for path in [*PAGES, *STATIC.glob("css/*.css")]:
         text = path.read_text(encoding="utf-8")
         assert "fonts.googleapis.com" not in text and "fonts.gstatic.com" not in text, path
+
+
+def test_figma_design_is_the_default_look():
+    # Only a visitor who chose "classic" gets it; nothing stored (or no storage) means calm.
+    theme = (STATIC / "js" / "theme.js").read_text(encoding="utf-8")
+    assert 'localStorage.getItem(KEY) === "classic" ? "classic" : "calm"' in theme
+    assert 'return "calm"; // private mode' in theme
