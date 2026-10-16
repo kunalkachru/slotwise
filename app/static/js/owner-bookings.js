@@ -213,6 +213,8 @@ function renderDetail(b) {
           b.receipt_number ? "Resend receipt" : "Send receipt"),
       ),
       b.status !== "done" && h("p", { class: "field-hint" }, "Mark the booking done to send a receipt."),
+      Number(b.total_price) > 250 && h("p", { class: "field-hint" },
+        "Over €250 a receipt isn't enough for the customer's tax records: a full invoice also needs their name and address (§ 14 UStG)."),
       receiptError,
     ),
   );

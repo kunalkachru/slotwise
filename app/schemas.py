@@ -30,6 +30,8 @@ class StudioOut(ORMModel):
     min_notice_hours: int
     free_cancellation_hours: int
     booking_window_days: int
+    vat_mode: str  # for the receipt: "19", "7" or "small_business"
+    tax_number: str | None
 
 
 class AddOnOut(ORMModel):
@@ -488,3 +490,5 @@ class StudioSettings(ORMModel):
     booking_window_days: int
     waitlist_offer_minutes: int
     receipt_prefix: str = Field(max_length=10)
+    vat_mode: str = Field(default="19", max_length=20)
+    tax_number: str | None = Field(default=None, max_length=60)

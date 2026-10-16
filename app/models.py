@@ -66,6 +66,10 @@ class Studio(Timestamped, Base):
     booking_window_days: Mapped[int] = mapped_column(default=60)
     waitlist_offer_minutes: Mapped[int] = mapped_column(default=30)
     receipt_prefix: Mapped[str] = mapped_column(String(10), default="IW")
+    # Receipts must show the VAT rate, or the small-business note (§33 UStDV): "19", "7" or
+    # "small_business" (§19 UStG, no VAT charged).
+    vat_mode: Mapped[str] = mapped_column(String(20), default="19", server_default="19")
+    tax_number: Mapped[str | None] = mapped_column(String(40))
 
 
 class Owner(Timestamped, Base):
