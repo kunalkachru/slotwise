@@ -35,7 +35,8 @@
 
       <section class="step" id="therapist-step" aria-labelledby="step-therapist" hidden>
         <h2 id="step-therapist"><span class="step-number">3</span><span data-i18n="book.therapist">Therapist</span></h2>
-        <div class="chips" id="therapists" role="radiogroup" aria-labelledby="step-therapist"></div>
+        <p class="step-hint" id="therapist-hint" data-i18n="book.therapist_hint" hidden>Each treatment can have its own therapist.</p>
+        <div id="therapists"></div>
         <p class="field-error" id="therapist-error" hidden></p>
       </section>
 
@@ -74,6 +75,7 @@
     <aside class="summary" aria-labelledby="summary-title">
       <h2 id="summary-title" data-i18n="book.summary">Your booking</h2>
       <p class="summary-when" id="summary-when" data-i18n="book.start">Choose a treatment to start.</p>
+      <ol class="summary-plan" id="summary-plan" hidden></ol>
       <table class="lines" id="summary-lines"></table>
       <p class="pay-note" data-i18n="common.pay">Pay at the studio</p>
       <p class="booking-terms" id="booking-terms" hidden></p>

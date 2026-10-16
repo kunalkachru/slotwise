@@ -436,6 +436,26 @@ details.manage p { margin: 0.6rem 0 0.2rem; color: var(--muted); }
 .time-btn:hover { border-color: var(--green); }
 .time-btn[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: #fff; }
 .time-btn[aria-pressed="true"] small { color: #e6f6ed; }
+/* Several treatments (option B): a therapist row per treatment, whole-visit times, and
+   "Choose times myself" with one strip per treatment. */
+.therapist-rows { display: grid; gap: 0.9rem; }
+.therapist-row-name { margin: 0 0 0.4rem; font-weight: 650; display: flex; align-items: center; gap: 0.5rem; }
+.therapist-row-number {
+  display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem;
+  border-radius: 50%; background: var(--line); font-size: 0.8rem; font-variant-numeric: tabular-nums;
+}
+.time-modes { margin-bottom: 0.9rem; }
+.time-modes .step-hint { margin: 0.5rem 0 0; }
+.times.times-chains { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
+.times-chains .time-btn { padding: 0.45rem 0.6rem; }
+.pick-strip { margin-bottom: 1rem; }
+.pick-strip.is-waiting .step-hint { margin: 0; }
+.summary-plan[hidden] { display: none; }
+.summary-plan { list-style: none; margin: -0.25rem 0 0.75rem; padding: 0; display: grid; gap: 0.35rem; }
+.summary-plan li { display: flex; gap: 0.6rem; align-items: baseline; }
+.summary-plan small { display: block; color: var(--muted); font-size: 0.85rem; }
+.plan-time { min-width: 2.9rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.plan-break { color: var(--muted); font-size: 0.9rem; font-style: italic; }
 .notice { color: var(--muted); padding: 0.5rem 0; }
 
 .form-grid { display: grid; gap: 0 1rem; }

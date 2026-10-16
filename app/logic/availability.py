@@ -11,9 +11,14 @@ Rules:
 - no overlap with the therapist's non-cancelled bookings, buffer included:
   a.start < b.blocked_until AND b.start < a.blocked_until
 - therapist days off and whole-studio closures are excluded
+
+Several therapists per visit (option B, PLAN.md): each treatment can have its own
+therapist. A visit is a chain of segments, one per therapist, run back to back in the
+order the customer chose. A 15-minute break at a handover is offered only when no gapless
+chain fits that day (or when the customer picks times themselves).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import and_, func, or_, select
@@ -36,16 +41,6 @@ def occupies_slot():
         Booking.status.notin_(("cancelled", "expired")),
         or_(Booking.status != "pending", Booking.created_at > hold_start),
     )
-
-
-@dataclass(frozen=True)
-class Slot:
-    start_at: datetime  # UTC
-    therapist: Therapist
-
-    @property
-    def local_time(self) -> str:
-        return self.start_at.astimezone(clock.BERLIN).strftime("%H:%M")
 
 
 def local_to_utc(day: date, at: time) -> datetime:
@@ -176,25 +171,191 @@ def bookings_per_therapist(db: Session, therapist_ids: list[int], day: date) -> 
     return counts
 
 
-def pick_therapist(candidates: list[Therapist], counts: dict[int, int]) -> Therapist:
-    """'No preference' rule: fewest non-cancelled bookings that day, then lower id."""
-    return min(candidates, key=lambda t: (counts.get(t.id, 0), t.id))
+
+# ---------- Chains: one therapist per segment (option B) ----------
+
+BREAK = timedelta(minutes=15)
+# One search budget per request (all start times and break positions together), counted per
+# therapist tried for a treatment. A two-therapist studio needs a few thousand at most.
+SEARCH_BUDGET = 50_000
 
 
-def free_slots(
-    db: Session, day: date, selection: Selection, therapists: list[Therapist],
-    for_owner: bool = False,
+@dataclass(frozen=True)
+class Step:
+    """One chosen treatment (with its add-ons) inside a chain."""
+    service_id: int
+    therapist: Therapist
+    start_at: datetime
+    end_at: datetime
+
+
+@dataclass(frozen=True)
+class SegmentPlan:
+    """One therapist's part of a visit: consecutive treatments with the same therapist.
+    Its cleanup buffer (largest of its treatments) only blocks that therapist."""
+    therapist: Therapist
+    start_at: datetime
+    end_at: datetime
+    blocked_until: datetime
+    service_ids: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class Slot:
+    start_at: datetime  # UTC
+    steps: tuple[Step, ...]
+    segments: tuple[SegmentPlan, ...]
+    break_before: int | None = None  # index of the treatment that follows the break
+    rank: tuple = field(default=(), compare=False)
+
+    @property
+    def therapist(self) -> Therapist:
+        return self.steps[0].therapist
+
+    @property
+    def end_at(self) -> datetime:
+        return self.steps[-1].end_at
+
+    @property
+    def local_time(self) -> str:
+        return self.start_at.astimezone(clock.BERLIN).strftime("%H:%M")
+
+
+class DayPlanner:
+    """Everything needed to plan chains on one day, read once: busy times, working hours,
+    days off and the "fewest bookings" counts. Availability and booking creation (inside
+    the lock) both plan with this class, so they always agree."""
+
+    def __init__(self, db: Session, day: date, selection: Selection,
+                 candidates: dict[int, list[Therapist]], for_owner: bool = False):
+        self.day = day
+        self.services = selection.services
+        self.minutes = [selection.step_minutes(s) for s in self.services]
+        self.buffers = [s.buffer_minutes for s in self.services]
+        studio_closed, off = _closed_therapist_ids(db, day)
+        self.candidates = [
+            [] if studio_closed else [t for t in candidates[s.id] if t.id not in off]
+            for s in self.services
+        ]
+        ids = sorted({t.id for options in self.candidates for t in options})
+        self.busy = _busy_ranges(db, ids, day) if ids else {}
+        self.counts = bookings_per_therapist(db, ids, day) if ids else {}
+        self.limits = booking_limits(db, for_owner)
+        self.budget = SEARCH_BUDGET
+        self.windows = {
+            t.id: [(local_to_utc(day, h.start_time), local_to_utc(day, h.end_time))
+                   for h in t.working_hours if h.weekday == day.weekday()]
+            for options in self.candidates for t in options
+        }
+
+    def starts(self) -> list[datetime]:
+        found = {start for t in self.candidates[0]
+                 for start in _candidate_starts(t, self.day, self.minutes[0])}
+        return sorted(start for start in found if self.limits.allows(start))
+
+    def _works(self, therapist: Therapist, start: datetime, end: datetime) -> bool:
+        return any(w_start <= start and end <= w_end for w_start, w_end in
+                   self.windows[therapist.id])
+
+    def _free(self, therapist: Therapist, start: datetime, end: datetime) -> bool:
+        return not any(start < b_end and b_start < end for b_start, b_end in
+                       self.busy[therapist.id])
+
+    def _step_times(self, start: datetime, break_before: int | None):
+        times, at = [], start
+        for index, minutes in enumerate(self.minutes):
+            if index == break_before:
+                at += BREAK
+            times.append((at, at + timedelta(minutes=minutes)))
+            at = times[-1][1]
+        return times
+
+    def _segments(self, assigned: list[Therapist], times) -> list[SegmentPlan] | None:
+        segments: list[SegmentPlan] = []
+        first = 0
+        for index in range(1, len(assigned) + 1):
+            if index < len(assigned) and assigned[index] is assigned[first] and (
+                    times[index][0] == times[index - 1][1]):
+                continue
+            therapist, start, end = assigned[first], times[first][0], times[index - 1][1]
+            blocked = end + timedelta(minutes=max(self.buffers[first:index]))
+            if not (self._works(therapist, start, end) and self._free(therapist, start, blocked)):
+                return None
+            # The same therapist twice in one visit (Lena, Sofia, Lena): her own parts,
+            # buffer included, must not overlap either.
+            if any(s.therapist is therapist and start < s.blocked_until for s in segments):
+                return None
+            segments.append(SegmentPlan(therapist, start, end, blocked,
+                                        tuple(s.id for s in self.services[first:index])))
+            first = index
+        return segments
+
+    def chain(self, start: datetime, break_before: int | None = None) -> Slot | None:
+        """The best chain starting at `start`: fewest handovers first, then per treatment
+        the therapist with the fewest bookings that day, then the lower id. A break only
+        sits at a handover."""
+        count = len(self.services)
+        if not self.limits.allows(start) or (
+                break_before is not None and not 0 < break_before < count):
+            return None
+        times = self._step_times(start, break_before)
+        best: tuple[tuple, list[SegmentPlan], list[Therapist]] | None = None
+
+        def walk(assigned: list[Therapist], handovers: int) -> None:
+            nonlocal best
+            index = len(assigned)
+            if self.budget <= 0 or (best and handovers > best[0][0] - 1):
+                return
+            if index == count:
+                segments = self._segments(assigned, times)
+                if segments is None:
+                    return
+                rank = (len(segments),
+                        tuple((self.counts.get(t.id, 0), t.id) for t in assigned))
+                if best is None or rank < best[0]:
+                    best = (rank, segments, list(assigned))
+                return
+            for therapist in self.candidates[index]:
+                self.budget -= 1
+                handover = bool(assigned) and therapist is not assigned[-1]
+                if index == break_before and not handover:
+                    continue
+                if not (self._works(therapist, *times[index])
+                        and self._free(therapist, *times[index])):
+                    continue
+                walk(assigned + [therapist], handovers + handover)
+
+        walk([], 0)
+        if best is None:
+            return None
+        rank, segments, assigned = best
+        steps = tuple(Step(s.id, t, *times[i])
+                      for i, (s, t) in enumerate(zip(self.services, assigned, strict=True)))
+        return Slot(start_at=start, steps=steps, segments=tuple(segments),
+                    break_before=break_before, rank=(*rank, break_before or 0))
+
+
+def chain_slots(
+    db: Session, day: date, selection: Selection, candidates: dict[int, list[Therapist]],
+    for_owner: bool = False, choose_myself: bool = False,
 ) -> list[Slot]:
-    """One slot per start time. With several therapists ("no preference") each time is
-    listed once, with the therapist `pick_therapist` would assign."""
-    by_therapist = free_slots_by_therapist(db, day, selection, therapists, for_owner)
-    counts = bookings_per_therapist(db, [t.id for t in therapists], day)
-    by_id = {t.id: t for t in therapists}
-    free_at: dict[datetime, list[Therapist]] = {}
-    for therapist_id, starts in by_therapist.items():
-        for start in starts:
-            free_at.setdefault(start, []).append(by_id[therapist_id])
-    return [
-        Slot(start_at=start, therapist=pick_therapist(free_at[start], counts))
-        for start in sorted(free_at)
-    ]
+    """Free chains on a day, by start time.
+
+    Suggested (default): one chain per start time, gapless; only when no gapless chain
+    fits all day, one chain with a 15-minute break per start time.
+    Choose myself: every gapless chain plus, per start time, the best chain with a break
+    at each possible handover, so the customer can pick each treatment's time."""
+    planner = DayPlanner(db, day, selection, candidates, for_owner)
+    starts = planner.starts()
+    gapless = [slot for slot in map(planner.chain, starts) if slot]
+    if len(selection.services) == 1 or (gapless and not choose_myself):
+        return gapless
+    with_break = [slot for start in starts for k in range(1, len(selection.services))
+                  if (slot := planner.chain(start, k))]
+    if choose_myself:
+        return sorted(gapless + with_break, key=lambda s: (s.start_at, s.break_before or 0))
+    best: dict[datetime, Slot] = {}
+    for slot in with_break:
+        if slot.start_at not in best or slot.rank < best[slot.start_at].rank:
+            best[slot.start_at] = slot
+    return [best[start] for start in sorted(best)]

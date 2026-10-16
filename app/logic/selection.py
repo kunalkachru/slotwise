@@ -35,6 +35,12 @@ class Selection:
             a.extra_minutes for a in self.add_ons
         )
 
+    def step_minutes(self, service: Service) -> int:
+        """One treatment with its own add-ons: how long that part of the visit takes."""
+        return service.duration_minutes + sum(
+            a.extra_minutes for a in self.add_ons if a.service_id == service.id
+        )
+
     @property
     def buffer_minutes(self) -> int:
         """Cleanup after the appointment: the largest buffer of the chosen services."""
@@ -68,6 +74,10 @@ class Selection:
         return items
 
 
+MAX_SERVICES = 10
+MAX_ADD_ONS = 20
+
+
 def parse_ids(raw: str | None) -> list[int]:
     """'1,2, 3' -> [1, 2, 3]; duplicates removed, order kept."""
     if not raw:
@@ -90,6 +100,9 @@ def resolve_selection(db: Session, service_ids: list[int], add_on_ids: list[int]
     add_on_ids = list(dict.fromkeys(add_on_ids))
     if not service_ids:
         raise AppError(422, CHOOSE_A_SERVICE, field="service_ids")
+    # Same limits as BookingIn, for the GET endpoints too: chain planning grows with them.
+    if len(service_ids) > MAX_SERVICES or len(add_on_ids) > MAX_ADD_ONS:
+        raise AppError(422, SERVICE_UNAVAILABLE, field="service_ids")
     services = db.scalars(
         select(Service).where(Service.id.in_(service_ids), Service.active.is_(True))
     ).all()
@@ -120,6 +133,44 @@ def qualified_therapists(db: Session, selection: Selection) -> list[Therapist]:
     ).all()
     wanted = set(selection.service_ids)
     return [t for t in therapists if wanted <= {s.id for s in t.services}]
+
+
+def therapist_candidates(
+    db: Session, selection: Selection, therapist_id: int | None = None,
+    choices: dict[int, int | None] | None = None,
+) -> dict[int, list[Therapist]]:
+    """Per chosen treatment: who may do it, lowest id first (option B: one therapist per
+    segment). `therapist_id` (the old API) means that therapist does every treatment;
+    `choices` maps a service id to a therapist id, or None for "No preference".
+    A chosen therapist who doesn't offer the treatment leaves no one, so no times."""
+    therapists = db.scalars(
+        select(Therapist)
+        .where(Therapist.active.is_(True))
+        .options(selectinload(Therapist.services), selectinload(Therapist.working_hours))
+        .order_by(Therapist.id)
+    ).all()
+    result: dict[int, list[Therapist]] = {}
+    for service in selection.services:
+        offering = [t for t in therapists if service.id in {s.id for s in t.services}]
+        if not offering:
+            raise AppError(404, NO_THERAPIST_FOR_COMBINATION)
+        wanted = therapist_id if therapist_id is not None else (choices or {}).get(service.id)
+        result[service.id] = [t for t in offering if wanted is None or t.id == wanted]
+    return result
+
+
+def parse_choices(raw: str | None) -> dict[int, int | None]:
+    """'3:1,5:any' -> {3: 1, 5: None} (service id: therapist id, or no preference)."""
+    choices: dict[int, int | None] = {}
+    for part in (raw or "").split(","):
+        if not part.strip():
+            continue
+        service, _, therapist = part.strip().partition(":")
+        therapist = therapist.strip()
+        if not service.strip().isdigit() or not (therapist in ("", "any") or therapist.isdigit()):
+            raise AppError(422, SERVICE_UNAVAILABLE)
+        choices[int(service)] = int(therapist) if therapist.isdigit() else None
+    return choices
 
 
 def require_therapists(db: Session, selection: Selection) -> list[Therapist]:

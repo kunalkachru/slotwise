@@ -13,7 +13,7 @@ from app.logic import catalog, waitlist
 from app.logic import customers as customers_logic
 from app.logic import dashboard as dashboard_logic
 from app.logic import photos as photos_logic
-from app.logic.availability import check_date_in_range, free_slots, get_studio
+from app.logic.availability import chain_slots, check_date_in_range, get_studio
 from app.logic.booking import CustomerDetails, create_booking
 from app.logic.owner_bookings import (
     REPEAT_NO_SHOW_THRESHOLD,
@@ -26,7 +26,12 @@ from app.logic.owner_bookings import (
     list_bookings,
     replace_items,
 )
-from app.logic.selection import parse_ids, require_therapists, resolve_selection
+from app.logic.selection import (
+    parse_choices,
+    parse_ids,
+    resolve_selection,
+    therapist_candidates,
+)
 from app.models import Owner, Service, Therapist
 from app.routers.auth import current_owner, same_origin
 from app.schemas import (
@@ -146,20 +151,19 @@ def owner_availability(
     service_ids: str = Query(""),
     add_on_ids: str = Query(""),
     therapist_id: int | None = None,
+    therapist_choices: str = Query("", max_length=200),
+    choose_myself: bool = False,
     db: Session = Depends(get_db),
 ):
     """Like the public endpoint, but without the 2-hour notice (phone bookings)."""
     check_date_in_range(db, date)
     selection = resolve_selection(db, parse_ids(service_ids), parse_ids(add_on_ids))
-    therapists = require_therapists(db, selection)
-    if therapist_id is not None:
-        therapists = [t for t in therapists if t.id == therapist_id]
-    slots = free_slots(db, date, selection, therapists, for_owner=True)
-    return AvailabilityOut(
-        date=date, total_minutes=selection.total_minutes,
-        slots=[SlotOut(time=s.local_time, start_at=s.start_at, therapist_id=s.therapist.id,
-                       therapist_name=s.therapist.display_name) for s in slots],
-    )
+    candidates = therapist_candidates(db, selection, therapist_id,
+                                      parse_choices(therapist_choices))
+    slots = chain_slots(db, date, selection, candidates, for_owner=True,
+                        choose_myself=choose_myself)
+    return AvailabilityOut(date=date, total_minutes=selection.total_minutes,
+                           slots=[SlotOut.from_slot(s) for s in slots])
 
 
 @router.post("/bookings", response_model=OwnerBookingOut)
@@ -168,7 +172,7 @@ def phone_booking(body: BookingIn, request: Request, db: Session = Depends(get_d
     booking = create_booking(
         db, selection, body.date, body.start_time, body.therapist_id,
         CustomerDetails(body.first_name, body.last_name, body.email, body.phone, body.note),
-        source="phone",
+        source="phone", therapist_choices=body.therapist_choices, break_before=body.break_before,
     )
     settings = request.app.state.settings
     request.app.state.mailer.send(confirmation_email(booking, get_studio(db), settings.public_url))
