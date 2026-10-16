@@ -1257,6 +1257,26 @@ The current design stays exactly as it is. The new design is an extra layer that
 
 ### 5. Order of work (each step is its own branch and PR)
 
+**Status: done.** Shipped as:
+- PR #15: step 0, the owner error state;
+- PR #16: step 1, tokens and the switch;
+- PR #17: steps 2+3, font, base and components, combined because they depend on each other;
+- PR #18: step 4, customer pages;
+- PR #19: step 5, owner pages;
+- the polish PR: step 6.
+
+Deviations from the plan below:
+- Tokens the new look adds (`--warm`, `--space-*`, `--text-*`, `--radius-lg`…) live only in `calm.css`. `styles.css` got just the tokens whose classic values had to stay (input border, success, warning, info, chart).
+- A few new-look parts needed small markup or script changes, all hidden or neutral in classic:
+  - the mobile total bar;
+  - the owner Menu button and icons;
+  - `fact()` wrappers;
+  - `.is-loading`;
+  - `.btn-danger`;
+  - the `wl-*` waitlist badges.
+
+  The list is in `doc/ui-inventory.md`.
+
 0. **Owner page error state** (see 2.8): a small behaviour fix, styled in the classic look. It can ship before the Figma design is ready.
 1. **Tokens and switch:**
    - add the new tokens to `styles.css` with classic values (no visual change);

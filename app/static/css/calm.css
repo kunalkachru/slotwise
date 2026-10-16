@@ -978,3 +978,18 @@
 @media (max-width: 600px) {
   [data-theme="calm"] .settings .actions-row .btn { width: 100%; }
 }
+
+/* ================= Polish (step 6): tap targets found by an audit at 390 px ================= */
+[data-theme="calm"] .logo { min-height: var(--tap-size); }
+[data-theme="calm"] .studio-facts a { display: inline-flex; align-items: center; min-height: var(--tap-size); }
+@media (max-width: 859px) {
+  [data-theme="calm"] .segmented button { min-height: var(--tap-size); }
+}
+
+/* Waitlist statuses with their own colours (Figma): waiting = warning, offered = success,
+   booked = success outlined, expired and removed / declined = neutral. */
+[data-theme="calm"] .status-badge.wl-pending { background: var(--info-soft); border-color: transparent; color: var(--info); }
+[data-theme="calm"] .status-badge.wl-waiting { background: var(--warning-soft); border-color: transparent; color: var(--warning); }
+[data-theme="calm"] .status-badge.wl-offered { background: var(--success-soft); border-color: transparent; color: var(--success); }
+[data-theme="calm"] .status-badge.wl-booked { background: var(--card); border-color: currentColor; color: var(--success); }
+[data-theme="calm"] .status-badge:is(.wl-expired, .wl-removed) { background: var(--bg); border-color: var(--line); color: var(--muted); }

@@ -355,7 +355,7 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
    - Emails go out in the customer's language. That needs a `language` column on customers, so it waits for item 1.
    - Decide whether the owner area is translated too, and whether services get a German name and description field.
 
-### UI redesign "Calm modern" (in progress)
+### UI redesign "Calm modern" (done, live)
 - The Figma Make prompt, workflow and porting plan are in `doc/design/figma-prompt.md`. The JavaScript hooks that must survive are in `doc/ui-inventory.md`.
 - **Decisions:**
   - The new look lives in `calm.css` behind a "Classic look / New look" switch, available to customers and the owner. **Classic stays the default.**
@@ -363,6 +363,9 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
   - Owner pages get a real error state (reason, details, workarounds) instead of an endless "Loading…". This ships first (porting step 0, PR `owner-page-error-state`).
   - The login button shows "Logging in…" while signing in (step 0).
   - The Inter font is **self-hosted** in `app/static/fonts/` rather than loaded from Google Fonts, because of German GDPR rulings on Google Fonts. It ships with the base styles (step 2).
+- **Status:** ported in PRs #15–#19 plus the polish PR, and live. Classic is still the default.
+  - **To make the new look the default:** in `app/static/js/theme.js`, `read()` returns `"classic"` unless the browser chose `"calm"`; flip that default. It's a one-line PR.
+  - **To retire a look later:** delete its CSS (and the switch). It's a one-PR clean-up.
 - **Figma Make's exported React code** goes into `doc/design/figma-make/` as a **reference-only library**:
   - CI, deploy, Docker, pytest and ruff all ignore it;
   - it's never served or built.
