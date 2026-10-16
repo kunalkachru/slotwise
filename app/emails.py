@@ -84,7 +84,7 @@ STRINGS = {
         "confirmed_intro": "{hello}, your booking at {studio} is confirmed.",
         "confirmed_subject": "Booking confirmed: {when} · {studio}",
         "confirmed_heading": "You're booked!",
-        "manage": "View or manage your booking",
+        "manage": "View or manage your booking", "calendar": "Add to your calendar",
         "free_until": "Free cancellation until {deadline}.",
         "reminder_intro": ("{hello}, a reminder of your appointment on {when}. Please confirm "
                            "you're coming, or cancel so someone on the waitlist can have the time."),
@@ -133,7 +133,7 @@ STRINGS = {
         "confirmed_intro": "{hello}, Ihre Buchung bei {studio} ist bestätigt.",
         "confirmed_subject": "Buchung bestätigt: {when} · {studio}",
         "confirmed_heading": "Sie sind gebucht!",
-        "manage": "Buchung ansehen oder verwalten",
+        "manage": "Buchung ansehen oder verwalten", "calendar": "Zum Kalender hinzufügen",
         "free_until": "Kostenlose Stornierung bis {deadline}.",
         "reminder_intro": ("{hello}, wir erinnern Sie an Ihren Termin am {when}. Bitte bestätigen "
                            "Sie, dass Sie kommen, oder sagen Sie ab, damit jemand von der "
@@ -297,7 +297,9 @@ def confirmation_email(booking, studio, public_url: str) -> Email:
     intro = _t(lang, "confirmed_intro", hello=_hello(lang, booking.customer), studio=studio.name)
     footer = (f"{_t(lang, 'free_until', deadline=i18n.short_when(deadline, lang))} "
               f"{_studio_line(studio)}")
-    links = [(_t(lang, "manage"), manage_link(public_url, booking))]
+    links = [(_t(lang, "manage"), manage_link(public_url, booking)),
+             (_t(lang, "calendar"),
+              f"{public_url}/public/bookings/{booking.manage_token}/calendar.ics")]
     return Email(
         to=booking.customer.email,
         subject=_t(lang, "confirmed_subject", when=_when(booking), studio=studio.name),
