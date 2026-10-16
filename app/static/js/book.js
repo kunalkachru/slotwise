@@ -181,7 +181,7 @@ async function loadTimes() {
     return;
   }
   const request = ++state.timesRequest; // ignore answers to outdated requests
-  fill(target, h("p", { class: "notice" }, t("book.looking")));
+  fill(target, h("p", { class: "notice is-loading" }, t("book.looking")));
   const params = new URLSearchParams({
     date: state.date,
     service_ids: state.selectedServices.join(","),

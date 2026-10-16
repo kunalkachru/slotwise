@@ -43,6 +43,8 @@ def test_calm_rules_only_apply_to_the_new_look():
     css = (STATIC / "css" / "calm.css").read_text(encoding="utf-8")
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     css = re.sub(r"@font-face\s*{[^}]*}", "", css)
+    # Animation steps ("to { … }") are not selectors.
+    css = re.sub(r"@keyframes[^{]*{(?:[^{}]*{[^{}]*})*[^{}]*}", "", css)
     for block in re.findall(r"([^{}]+){", css):
         for selector in top_level_split(block):
             selector = selector.strip()

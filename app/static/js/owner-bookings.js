@@ -138,7 +138,7 @@ function renderList(target) {
 // ---------- Detail panel ----------
 async function openDetail(id) {
   const dialog = $("detail");
-  fill($("detail-body"), h("p", { class: "notice" }, "Loading…"));
+  fill($("detail-body"), h("p", { class: "notice is-loading" }, "Loading…"));
   if (!dialog.open) dialog.showModal();
   try {
     renderDetail(await ownerApi(`/owner/bookings/${id}`));

@@ -3,6 +3,22 @@ import { api, ApiError, fill, h, redirectToLoginOn401, themeSwitch } from "/js/a
 
 const LEAF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#33C375" d="M20 3C10 3 4 8.5 4 15.5c0 1.6.4 3 1 4.2C6.8 13 11 9.6 16 8c-4.3 2.6-7.4 6.6-8.6 12 1.2.6 2.6 1 4.1 1C18.6 21 21 14 20 3z"/></svg>';
 
+// Line icons for the new look's menu (from the Figma export); hidden in the classic look.
+const ICONS = {
+  dashboard: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  bookings: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4m8-4v4M3 10h18"/>',
+  services: '<path d="M4 7h16M4 12h16M4 17h16"/><circle cx="8" cy="7" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="17" r="2"/>',
+  therapists: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  waitlist: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+};
+function icon(name) {
+  const el = h("span", { class: "nav-icon calm-only" });
+  el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`; // static markup
+  return el;
+}
+
 const PAGES = [
   { key: "dashboard", label: "Dashboard", href: "/owner/dashboard.html" },
   { key: "bookings", label: "Bookings", href: "/owner/bookings.html" },
@@ -22,12 +38,29 @@ export async function startOwnerPage(active) {
   }
   const logo = h("a", { class: "logo", href: "/owner/dashboard.html" });
   logo.innerHTML = `${LEAF} Slotwise`; // static markup
-  document.getElementById("sidebar").replaceChildren(
+  const sidebar = document.getElementById("sidebar");
+  // New look on phones: the side menu becomes a top bar with the page name and a Menu
+  // button that opens the links as a dropdown. Both are hidden in the classic look.
+  const current = PAGES.find((p) => p.key === active);
+  const menuButton = h("button", {
+    type: "button", class: "owner-menu-toggle calm-only", id: "owner-menu-toggle",
+    "aria-expanded": "false", "aria-controls": "owner-nav", "aria-label": "Menu",
+  }, icon("menu"));
+  const setOpen = (open) => {
+    sidebar.classList.toggle("is-open", open);
+    menuButton.setAttribute("aria-expanded", String(open));
+  };
+  menuButton.addEventListener("click", () => setOpen(!sidebar.classList.contains("is-open")));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sidebar.classList.contains("is-open")) { setOpen(false); menuButton.focus(); } });
+  document.addEventListener("click", (e) => { if (!sidebar.contains(e.target)) setOpen(false); });
+  sidebar.replaceChildren(
     logo,
-    h("nav", { "aria-label": "Owner menu" },
+    h("span", { class: "owner-page-name calm-only", "aria-hidden": "true" }, current ? current.label : ""),
+    menuButton,
+    h("nav", { "aria-label": "Owner menu", id: "owner-nav" },
       PAGES.map((p) =>
         p.href
-          ? h("a", { href: p.href, "aria-current": p.key === active ? "page" : null }, p.label)
+          ? h("a", { href: p.href, "aria-current": p.key === active ? "page" : null }, icon(p.key), h("span", {}, p.label))
           : h("a", { class: "soon", "aria-disabled": "true" }, p.label, " ", h("span", { class: "badge" }, "soon")),
       ),
       themeSwitch({ classic: "Classic look", calm: "New look" }),
