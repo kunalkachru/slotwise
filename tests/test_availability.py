@@ -137,3 +137,24 @@ def test_times_are_correct_across_the_october_dst_change(empty_calendar, db):
 
     summer = slots(client, ["Deep tissue massage"], "2026-10-20", "Lena")
     assert summer.json()["slots"][0]["start_at"].startswith("2026-10-20T08:00:00")  # CEST
+
+
+def test_a_segment_blocks_its_own_therapist(empty_calendar, db):
+    """Availability reads segments: a booking's second part (another therapist) blocks that
+    therapist, as a visit with several therapists will."""
+    from datetime import timedelta
+
+    from app.models import Booking, BookingSegment
+
+    client = empty_calendar
+    lena_booking = book(client, ["Deep tissue massage"], "2026-10-13", "10:00", "Lena").json()
+    assert "11:15" in times(slots(client, ["Classic facial"], "2026-10-13", "Sofia"))
+    booking = db.get(Booking, lena_booking["id"])
+    [only] = booking.segments  # every booking has its segment(s)
+    assert (only.therapist.display_name, only.start_at) == ("Lena", booking.start_at)
+    start = booking.end_at
+    booking.segments.append(BookingSegment(
+        position=1, therapist_id=therapist_id(client, "Sofia"), start_at=start,
+        end_at=start + timedelta(minutes=45), blocked_until=start + timedelta(minutes=55)))
+    db.commit()
+    assert "11:15" not in times(slots(client, ["Classic facial"], "2026-10-13", "Sofia"))

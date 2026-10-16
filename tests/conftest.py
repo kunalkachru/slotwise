@@ -72,10 +72,11 @@ def empty_calendar(client):
     """Demo menu and therapists, but no bookings or customers."""
     from sqlalchemy import delete
 
-    from app.models import Booking, BookingItem, Customer
+    from app.models import Booking, BookingItem, BookingSegment, Customer
 
     with client.app.state.session_factory() as session:
         session.execute(delete(BookingItem))
+        session.execute(delete(BookingSegment))  # SQLite in tests doesn't cascade
         session.execute(delete(Booking))
         session.execute(delete(Customer))
         session.commit()

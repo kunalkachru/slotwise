@@ -244,7 +244,7 @@ def _seed_demo_bookings(session, services, therapists, customers) -> None:
             source=("online", "online", "phone", "online", "waitlist")[index % 5],
             manage_token=new_token(),
             items=items,
-        )
+        ).with_one_segment()
 
         if start < now:
             past_count += 1

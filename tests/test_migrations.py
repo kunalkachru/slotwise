@@ -83,3 +83,31 @@ def test_every_migration_downgrades_and_upgrades_again(tmp_path):
     migrate(engine)
     assert current_revision(engine) == head()
     assert schema_drift(engine) == []
+
+
+def test_existing_bookings_become_one_segment_bookings(tmp_path):
+    """0006: the live bookings keep exactly the therapist and blocked time they had."""
+    engine = make_engine(f"sqlite:///{tmp_path / 'before_segments.db'}")
+    with engine.begin() as connection:
+        command.upgrade(alembic_config(connection), "0005")
+        connection.execute(text(
+            "INSERT INTO therapists (id, display_name, active, created_at) "
+            "VALUES (7, 'Lena', 1, '2026-10-01 10:00:00')"))
+        connection.execute(text(
+            "INSERT INTO customers (id, first_name, last_name, email, phone, no_show_count, "
+            "created_at) VALUES (3, 'Anna', 'M', 'a@example.com', '+49 1', 0, "
+            "'2026-10-01 10:00:00')"))
+        connection.execute(text(
+            "INSERT INTO bookings (id, customer_id, therapist_id, start_at, end_at, blocked_until,"
+            " status, total_price, source, manage_token, late_cancellation, created_at) VALUES "
+            "(42, 3, 7, '2026-10-13 15:00:00', '2026-10-13 16:15:00', '2026-10-13 16:25:00', "
+            "'booked', 82, 'online', 't', 0, '2026-10-01 10:00:00')"))
+
+    migrate(engine)
+
+    with engine.connect() as connection:
+        rows = connection.execute(text(
+            "SELECT booking_id, position, therapist_id, start_at, end_at, blocked_until "
+            "FROM booking_segments")).all()
+    assert [tuple(r) for r in rows] == [
+        (42, 0, 7, "2026-10-13 15:00:00", "2026-10-13 16:15:00", "2026-10-13 16:25:00")]

@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.errors import AppError, date_out_of_range
 from app.logic.selection import Selection
-from app.models import Booking, DayOff, Studio, Therapist
+from app.models import Booking, BookingSegment, DayOff, Studio, Therapist
 
 STEP = timedelta(minutes=15)
 BOOKING_HOLD_MINUTES = 30  # an unconfirmed online booking holds its slot this long [decision]
@@ -97,14 +97,17 @@ def _closed_therapist_ids(db: Session, day: date) -> tuple[bool, set[int]]:
 
 
 def _busy_ranges(db: Session, therapist_ids: list[int], day: date):
-    """Non-cancelled bookings that touch the day, as (start, blocked_until) per therapist."""
+    """Each therapist's busy time that touches the day, as (start, blocked_until): the
+    segments of bookings that occupy their slot (one per therapist part of a booking)."""
     start, end = day_bounds_utc(day)
     rows = db.execute(
-        select(Booking.therapist_id, Booking.start_at, Booking.blocked_until).where(
-            Booking.therapist_id.in_(therapist_ids),
+        select(BookingSegment.therapist_id, BookingSegment.start_at, BookingSegment.blocked_until)
+        .join(Booking, Booking.id == BookingSegment.booking_id)
+        .where(
+            BookingSegment.therapist_id.in_(therapist_ids),
             occupies_slot(),
-            Booking.start_at < end + timedelta(hours=12),
-            Booking.blocked_until > start - timedelta(hours=12),
+            BookingSegment.start_at < end + timedelta(hours=12),
+            BookingSegment.blocked_until > start - timedelta(hours=12),
         )
     ).all()
     busy: dict[int, list[tuple[datetime, datetime]]] = {t: [] for t in therapist_ids}
@@ -157,15 +160,16 @@ def free_slots_by_therapist(
 
 def bookings_per_therapist(db: Session, therapist_ids: list[int], day: date) -> dict[int, int]:
     start, end = day_bounds_utc(day)
-    rows = db.execute(
-        select(Booking.therapist_id, func.count())
+    rows = db.execute(  # bookings in which the therapist has a part that day
+        select(BookingSegment.therapist_id, func.count(func.distinct(BookingSegment.booking_id)))
+        .join(Booking, Booking.id == BookingSegment.booking_id)
         .where(
-            Booking.therapist_id.in_(therapist_ids),
+            BookingSegment.therapist_id.in_(therapist_ids),
             occupies_slot(),
-            Booking.start_at >= start,
-            Booking.start_at < end,
+            BookingSegment.start_at >= start,
+            BookingSegment.start_at < end,
         )
-        .group_by(Booking.therapist_id)
+        .group_by(BookingSegment.therapist_id)
     ).all()
     counts = {t: 0 for t in therapist_ids}
     counts.update({row[0]: row[1] for row in rows})
