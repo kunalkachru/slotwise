@@ -15,7 +15,7 @@
     <button class="btn btn-ghost btn-small" type="button" onclick="history.length > 1 ? history.back() : location.assign('/')" data-i18n="nav.back">Back</button>
     <button class="btn btn-small" type="button" onclick="window.print()" data-i18n="receipt.print">Print / Save as PDF</button>
   </div>
-  <main class="receipt" id="receipt" aria-live="polite"><p class="notice" data-i18n="receipt.loading">Loading receipt…</p></main>
+  <main class="receipt" id="receipt" aria-live="polite"><p class="notice is-loading" data-i18n="receipt.loading">Loading receipt…</p></main>
   <script type="module" src="/js/receipt.js"></script>
 </body>
 </html>
