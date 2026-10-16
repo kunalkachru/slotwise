@@ -1,4 +1,5 @@
 import logging
+import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,6 +17,9 @@ from app.security import LoginLimiter, RateLimiter
 from app.seed import seed
 
 STATIC_DIR = Path(__file__).parent / "static"
+# The self-hosted font. python:3.12-slim has no system mime.types, so register it here
+# instead of relying on the host to know .woff2.
+mimetypes.add_type("font/woff2", ".woff2")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
