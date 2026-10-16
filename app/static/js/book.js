@@ -8,6 +8,7 @@ const state = {
   selectedServices: [], // ids, in the order chosen
   selectedAddOns: new Set(),
   therapists: [], // offering every selected service
+  therapistError: null, // e.g. "No therapist offers this combination…", shown in steps 3 and 5
   therapistId: null, // null = no preference
   date: null, // "YYYY-MM-DD"
   slot: null, // { time, therapist_id, therapist_name }
@@ -106,10 +107,12 @@ async function loadTherapists() {
 
   const error = $("therapist-error");
   error.hidden = true;
+  state.therapistError = null;
   try {
     state.therapists = await api(`/public/therapists?service_ids=${state.selectedServices.join(",")}`);
   } catch (e) {
     state.therapists = [];
+    state.therapistError = e.message;
     error.textContent = e.message;
     error.hidden = false;
   }
@@ -176,6 +179,12 @@ function selectDate(day) {
 // ---------- Step 5: times ----------
 async function loadTimes() {
   const target = $("times");
+  // One therapist does the whole booking. When nobody offers every chosen treatment, say so
+  // here too: an empty Time step looked like a bug.
+  if (state.therapistError) {
+    fill(target, h("p", { class: "field-error" }, state.therapistError));
+    return;
+  }
   if (!state.date || state.selectedServices.length === 0 || state.therapists.length === 0) {
     fill(target, h("p", { class: "notice" }, state.date ? "" : t("book.pick_day")));
     return;

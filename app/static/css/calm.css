@@ -207,7 +207,7 @@
 }
 [data-theme="calm"] .icon-btn:hover { border-color: var(--green); background: var(--accent-soft); }
 
-/* "Classic look" text button: quiet until hovered; icon only on narrow phones (the label
+/* "Classic look" text button: quiet until hovered; icon only on narrow phones, up to 480 px (the label
    stays in the DOM for screen readers), so German labels don't squeeze the studio name. */
 [data-theme="calm"] .theme-switch {
   min-height: var(--tap-size);
@@ -222,7 +222,7 @@
 }
 [data-theme="calm"] .theme-switch:hover { background: var(--accent-soft); color: var(--green); }
 [data-theme="calm"] .theme-switch svg { width: 20px; height: 20px; }
-@media (max-width: 420px) {
+@media (max-width: 480px) {
   [data-theme="calm"] .topbar .theme-switch { width: var(--tap-size); justify-content: center; padding: 0; }
   [data-theme="calm"] .topbar .theme-switch-label {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
