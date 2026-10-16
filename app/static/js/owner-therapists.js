@@ -1,6 +1,6 @@
 import { fill, h } from "/js/api.js";
 import { field, openEditor, toast } from "/js/owner-forms.js";
-import { ownerApi, startOwnerPage } from "/js/owner-shell.js";
+import { ownerApi, showPageError, startOwnerPage } from "/js/owner-shell.js";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const dayLabel = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -129,4 +129,4 @@ async function removeDayOff(dayOff) {
   } catch (e) { toast(e.message); }
 }
 
-startOwnerPage("therapists").then(load).catch(() => {});
+startOwnerPage("therapists").then(load).catch((error) => showPageError(error));

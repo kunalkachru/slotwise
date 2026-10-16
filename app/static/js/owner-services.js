@@ -1,6 +1,6 @@
 import { fill, formatEuro, h } from "/js/api.js";
 import { field, openEditor, toast } from "/js/owner-forms.js";
-import { ownerApi, startOwnerPage } from "/js/owner-shell.js";
+import { ownerApi, showPageError, startOwnerPage } from "/js/owner-shell.js";
 
 const CATEGORIES = ["Massages", "Facials", "Reflexology"];
 let services = [];
@@ -90,4 +90,4 @@ function editAddOn(service, addOn) {
   });
 }
 
-startOwnerPage("services").then(load).catch(() => {});
+startOwnerPage("services").then(load).catch((error) => showPageError(error));

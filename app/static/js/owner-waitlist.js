@@ -1,6 +1,6 @@
 import { fill, h } from "/js/api.js";
 import { toast } from "/js/owner-forms.js";
-import { ownerApi, startOwnerPage } from "/js/owner-shell.js";
+import { ownerApi, showPageError, startOwnerPage } from "/js/owner-shell.js";
 
 const dayLabel = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const timeLabel = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
@@ -46,4 +46,4 @@ async function init() {
   await load();
 }
 
-init().catch(() => {});
+init().catch((error) => showPageError(error));

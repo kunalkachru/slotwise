@@ -1,6 +1,6 @@
 import { ApiError, fill, h } from "/js/api.js";
 import { field, toast } from "/js/owner-forms.js";
-import { ownerApi, startOwnerPage } from "/js/owner-shell.js";
+import { ownerApi, showPageError, startOwnerPage } from "/js/owner-shell.js";
 
 const form = document.getElementById("settings-form");
 
@@ -70,4 +70,4 @@ async function init() {
   render(await ownerApi("/owner/studio"));
 }
 
-init().catch(() => {});
+init().catch((error) => showPageError(error));

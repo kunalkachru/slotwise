@@ -1,5 +1,5 @@
 import { fill, formatEuro, h } from "/js/api.js";
-import { ownerApi, startOwnerPage } from "/js/owner-shell.js";
+import { ownerApi, showPageError, startOwnerPage } from "/js/owner-shell.js";
 
 const BERLIN = "Europe/Berlin";
 const isoDay = new Intl.DateTimeFormat("en-CA", { timeZone: BERLIN });
@@ -150,8 +150,8 @@ async function init() {
   await startOwnerPage("dashboard");
   const input = document.getElementById("dash-date");
   input.value = isoDay.format(new Date());
-  input.onchange = () => load().catch(() => {});
+  input.onchange = () => load().catch((error) => showPageError(error, document.getElementById("dashboard")));
   await load();
 }
 
-init().catch(() => {});
+init().catch((error) => showPageError(error));

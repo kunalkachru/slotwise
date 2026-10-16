@@ -1,5 +1,5 @@
 import { ApiError, fill, formatEuro, h } from "/js/api.js";
-import { ownerApi, startOwnerPage } from "/js/owner-shell.js";
+import { ownerApi, showPageError, startOwnerPage } from "/js/owner-shell.js";
 
 const $ = (id) => document.getElementById(id);
 const BERLIN = "Europe/Berlin";
@@ -369,4 +369,4 @@ async function init() {
   if (focus) openDetail(focus);
 }
 
-init().catch(() => {});
+init().catch((error) => showPageError(error));
