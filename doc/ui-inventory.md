@@ -201,6 +201,25 @@ There is no top bar and no language switch on the receipt, but `i18n.js` is stil
 | 🔒 `#settings-form` | `form.settings` | rebuilt: `fieldset` > `legend`, `p.lead`, `div.field` (via `owner-forms.js` `field()`), `div.grid-2`; `p.alert`; `div.actions-row` > `button.btn` |
 | 🔒 input names | | `name`, `address`, `phone`, `email`, `opening_hours_text`, `opening_hours_text_de`, `min_notice_hours`, `booking_window_days`, `free_cancellation_hours`, `waitlist_offer_minutes`, `receipt_prefix`, which must equal the API field names (errors are matched by name) |
 
+## Added by the redesign port (steps 0–6)
+
+| Hook | Where | Used by | Notes |
+|---|---|---|---|
+| 🔒 `<script src="/js/theme.js">` | every page, top of `<head>`, before the stylesheets | sets `<html data-theme="classic\|calm">` before the first paint; exposes `window.slotwiseTheme.current()` / `.set()` | a normal script, not a module; `tests/test_look_switch.py` checks the order |
+| 🔒 `<link href="/css/calm.css">` | every page, after `styles.css` | the new look; every rule is scoped to `[data-theme="calm"]` | a test fails on any unscoped rule |
+| localStorage `slotwise:theme` | | `theme.js` | `"calm"` or anything else (classic). **Classic is the default** |
+| 🔒 `[data-theme-switch]` | `.topbar-actions` on customer pages (not the receipt) | `i18n.js` `mountThemeSwitch()` mounts `api.js` `themeSwitch()` | labels `theme.classic` / `theme.calm` (EN + DE) |
+| 🎨 `button.theme-switch` > svg + `span.theme-switch-label` | top bars and the owner menu | | the label names the look it switches to; under 420 px only the icon shows, and the label stays as the accessible name |
+| 🎨 `.calm-only` | new-look-only markup | `styles.css` hides it; `calm.css` shows it | keeps the classic look unchanged |
+| 🔒 `#mobile-bar` > `#mobile-bar-text` + `#mobile-confirm` | `book.html` (`.calm-only`) | `book.js` `renderSummary()` and `setConfirm()` | `#mobile-confirm` is a second submit button (`form="book-form"`); both Confirm buttons always share the same state |
+| 🔒 `#owner-menu-toggle`, `#owner-nav`, `.owner-page-name` | made by `owner-shell.js` | Menu button (`aria-expanded`, Escape, outside click) and `#sidebar.is-open` | phones and tablets in the new look; hidden in classic |
+| 🎨 `.nav-icon` | owner menu links | | `.calm-only` line icons |
+| 🎨 `.is-loading` | every "Loading…" placeholder (HTML, `book.js` times, `owner-bookings.js` detail) | | a spinner in the new look; nothing in classic |
+| 🎨 `dl.facts > div` | `api.js` `fact()`, used by confirmation, manage, offer and receipt | | classic: `display: contents` (same layout as before) |
+| 🎨 `.btn-danger` | "Yes, cancel booking" in `manage.js` | | replaces an inline style |
+| 🎨 `.status-badge.wl-*` | `owner-waitlist.js` `BADGE` | | `wl-pending`, `wl-waiting`, `wl-offered`, `wl-booked`, `wl-expired`, `wl-removed`; classic colours unchanged |
+| `/fonts/inter-latin-wght-normal.woff2` + `Inter-OFL.txt` | `calm.css` `@font-face` | | self-hosted Inter (no Google Fonts); `main.py` registers `font/woff2` |
+
 ## Rules for the redesign
 
 1. **Never rename** a 🔒 ID, `name` or data attribute without changing the script in the same PR.

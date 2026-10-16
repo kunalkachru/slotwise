@@ -5,7 +5,9 @@ import { ownerApi, showPageError, startOwnerPage } from "/js/owner-shell.js";
 const dayLabel = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const timeLabel = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
 const STATUS = { pending: "Awaiting email", waiting: "Waiting", offered: "Offered", booked: "Booked", expired: "Offer expired", removed: "Removed / declined" };
-const BADGE = { pending: "pending", waiting: "booked", offered: "confirmed", booked: "done", expired: "cancelled", removed: "cancelled" };
+// Waitlist statuses have their own badge classes (wl-*); styles.css gives them the colours they
+// always had, calm.css the new look's.
+const BADGE = { pending: "wl-pending", waiting: "wl-waiting", offered: "wl-offered", booked: "wl-booked", expired: "wl-expired", removed: "wl-removed" };
 
 // Also called on a day change, "All upcoming" and after Remove: a failed load shows the
 // page error in the list area (the day filter stays usable) instead of old rows.
