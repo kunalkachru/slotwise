@@ -86,7 +86,8 @@ def test_every_migration_downgrades_and_upgrades_again(tmp_path):
 
 
 def test_existing_bookings_become_one_segment_bookings(tmp_path):
-    """0006: the live bookings keep exactly the therapist and blocked time they had."""
+    """0006: the live bookings keep exactly the therapist and blocked time they had.
+    0007: their items belong to that one segment."""
     engine = make_engine(f"sqlite:///{tmp_path / 'before_segments.db'}")
     with engine.begin() as connection:
         command.upgrade(alembic_config(connection), "0005")
@@ -102,6 +103,10 @@ def test_existing_bookings_become_one_segment_bookings(tmp_path):
             " status, total_price, source, manage_token, late_cancellation, created_at) VALUES "
             "(42, 3, 7, '2026-10-13 15:00:00', '2026-10-13 16:15:00', '2026-10-13 16:25:00', "
             "'booked', 82, 'online', 't', 0, '2026-10-01 10:00:00')"))
+        connection.execute(text(
+            "INSERT INTO booking_items (id, booking_id, item_type, name_snapshot, "
+            "minutes_snapshot, unit_price_snapshot, quantity, created_at) VALUES "
+            "(5, 42, 'service', 'Deep tissue massage', 60, 70, 1, '2026-10-01 10:00:00')"))
 
     migrate(engine)
 
@@ -111,3 +116,7 @@ def test_existing_bookings_become_one_segment_bookings(tmp_path):
             "FROM booking_segments")).all()
     assert [tuple(r) for r in rows] == [
         (42, 0, 7, "2026-10-13 15:00:00", "2026-10-13 16:15:00", "2026-10-13 16:25:00")]
+    with engine.connect() as connection:
+        segment = connection.execute(text("SELECT id FROM booking_segments")).scalar()
+        assert connection.execute(text(
+            "SELECT segment_id FROM booking_items WHERE id = 5")).scalar() == segment

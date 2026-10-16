@@ -7,11 +7,14 @@ const state = {
   addOns: new Map(), // id -> add-on (with service_id)
   selectedServices: [], // ids, in the order chosen
   selectedAddOns: new Set(),
-  therapists: [], // offering every selected service
-  therapistError: null, // e.g. "No therapist offers this combination…", shown in steps 3 and 5
-  therapistId: null, // null = no preference
+  therapistsByService: new Map(), // service id -> therapists who offer it
+  therapistError: null, // e.g. a failed load, shown in steps 3 and 5
+  choices: new Map(), // service id -> therapist id; missing = no preference
   date: null, // "YYYY-MM-DD"
-  slot: null, // { time, therapist_id, therapist_name }
+  timeMode: "suggested", // several treatments: "suggested" chains or "myself" (a time each)
+  slots: [], // the last availability answer
+  picks: [], // "Choose times myself": the time picked for each treatment, in order
+  slot: null, // { time, therapist_id, therapist_name, steps: [...], break_before }
   windowDays: 60,
   timesRequest: 0,
 };
@@ -101,7 +104,18 @@ function renderAddOns() {
   );
 }
 
-// ---------- Step 3: therapist ----------
+// ---------- Step 3: therapists, one choice per treatment ----------
+// Several therapists per visit (option B): each treatment gets its own row with
+// "No preference" plus whoever offers it. With one treatment the step looks as before.
+const multi = () => state.selectedServices.length > 1;
+
+async function therapistsFor(serviceId) {
+  if (!state.therapistsByService.has(serviceId)) {
+    state.therapistsByService.set(serviceId, await api(`/public/therapists?service_ids=${serviceId}`));
+  }
+  return state.therapistsByService.get(serviceId);
+}
+
 async function loadTherapists() {
   const hasServices = state.selectedServices.length > 0;
   for (const id of ["therapist-step", "date-step", "time-step", "details-step"]) $(id).hidden = !hasServices;
@@ -111,39 +125,58 @@ async function loadTherapists() {
   error.hidden = true;
   state.therapistError = null;
   try {
-    state.therapists = await api(`/public/therapists?service_ids=${state.selectedServices.join(",")}`);
+    await Promise.all(state.selectedServices.map(therapistsFor));
   } catch (e) {
-    state.therapists = [];
     state.therapistError = e.message;
     error.textContent = e.message;
     error.hidden = false;
   }
-  if (!state.therapists.some((t) => t.id === state.therapistId)) state.therapistId = null;
+  // Keep a choice only while that therapist still offers the treatment.
+  for (const [serviceId, therapistId] of [...state.choices]) {
+    const offered = state.therapistsByService.get(serviceId) || [];
+    if (!state.selectedServices.includes(serviceId) || !offered.some((t) => t.id === therapistId)) state.choices.delete(serviceId);
+  }
   renderTherapists();
   loadTimes();
 }
 
-function renderTherapists() {
-  const options = state.therapists.length > 1
-    ? [{ id: null, display_name: t("book.no_preference") }, ...state.therapists]
-    : state.therapists;
-  fill($("therapists"), 
-    ...options.map((t) =>
-      h("button", {
+function therapistChips(serviceId, labelledBy) {
+  const offered = state.therapistsByService.get(serviceId) || [];
+  const chosen = state.choices.get(serviceId) ?? null;
+  const options = offered.length > 1 ? [{ id: null, display_name: t("book.no_preference") }, ...offered] : offered;
+  return h("div", { class: "chips", role: "radiogroup", "aria-labelledby": labelledBy },
+    options.map((therapist) => {
+      const on = therapist.id === chosen || offered.length === 1;
+      return h("button", {
         type: "button", class: "chip", role: "radio",
-        "aria-pressed": String(t.id === state.therapistId || (state.therapists.length === 1 && t.id === state.therapists[0].id)),
-        "aria-checked": String(t.id === state.therapistId),
-        title: t.short_bio || "",
+        "aria-pressed": String(on), "aria-checked": String(on),
+        title: therapist.short_bio || "",
         onclick: () => {
-          state.therapistId = t.id;
+          if (therapist.id === null) state.choices.delete(serviceId);
+          else state.choices.set(serviceId, therapist.id);
           state.slot = null;
           renderTherapists();
           renderSummary();
           loadTimes();
         },
-      }, t.display_name),
-    ),
-  );
+      }, therapist.display_name);
+    }));
+}
+
+function renderTherapists() {
+  $("therapist-hint").hidden = !multi();
+  if (!multi()) {
+    fill($("therapists"), therapistChips(state.selectedServices[0], "step-therapist"));
+    return;
+  }
+  fill($("therapists"), h("div", { class: "therapist-rows" },
+    state.selectedServices.map((serviceId, index) => {
+      const labelId = `therapist-for-${serviceId}`;
+      return h("div", { class: "therapist-row" },
+        h("p", { class: "therapist-row-name", id: labelId },
+          h("span", { class: "therapist-row-number" }, `${index + 1}`), state.services.get(serviceId).name),
+        therapistChips(serviceId, labelId));
+    })));
 }
 
 // ---------- Step 4: day ----------
@@ -179,60 +212,149 @@ function selectDate(day) {
 }
 
 // ---------- Step 5: times ----------
+// One treatment: a grid of start times, as before. Several: "Suggested times" (each a whole
+// visit, gapless first) or "Choose times myself" (a strip per treatment, in order).
+function choicesParam() {
+  return state.selectedServices.map((id) => `${id}:${state.choices.get(id) ?? "any"}`).join(",");
+}
+
 async function loadTimes() {
   const target = $("times");
-  // One therapist does the whole booking. When nobody offers every chosen treatment, say so
-  // here too: an empty Time step looked like a bug.
+  state.picks = [];
   if (state.therapistError) {
     fill(target, h("p", { class: "field-error" }, state.therapistError));
     return;
   }
-  if (!state.date || state.selectedServices.length === 0 || state.therapists.length === 0) {
+  if (!state.date || state.selectedServices.length === 0) {
     fill(target, h("p", { class: "notice" }, state.date ? "" : t("book.pick_day")));
     return;
   }
   const request = ++state.timesRequest; // ignore answers to outdated requests
-  fill(target, h("p", { class: "notice is-loading" }, t("book.looking")));
+  fill(target, timeModes(), h("p", { class: "notice is-loading" }, t("book.looking")));
   const params = new URLSearchParams({
     date: state.date,
     service_ids: state.selectedServices.join(","),
     add_on_ids: [...state.selectedAddOns].join(","),
+    therapist_choices: choicesParam(),
   });
-  if (state.therapistId !== null) params.set("therapist_id", state.therapistId);
+  if (multi() && state.timeMode === "myself") params.set("choose_myself", "true");
   try {
     const result = await api(`/public/availability?${params}`);
     if (request !== state.timesRequest) return;
-    renderTimes(result.slots);
+    state.slots = result.slots;
+    renderTimes();
   } catch (e) {
     if (request !== state.timesRequest) return;
     fill(target, h("p", { class: "field-error" }, e.message));
   }
 }
 
-function renderTimes(slots) {
+function timeModes() {
+  if (!multi()) return null;
+  const mode = (key, label) => h("button", {
+    type: "button", class: "chip", "aria-pressed": String(state.timeMode === key),
+    onclick: () => {
+      if (state.timeMode === key) return;
+      state.timeMode = key;
+      state.slot = null;
+      renderSummary();
+      loadTimes();
+    },
+  }, label);
+  return h("div", { class: "time-modes" },
+    h("div", { class: "chips", role: "group", "aria-label": t("book.time") },
+      mode("suggested", t("book.suggested")), mode("myself", t("book.choose_myself"))),
+    h("p", { class: "step-hint" }, t(state.timeMode === "myself" ? "book.myself_hint" : "book.suggested_hint")));
+}
+
+const serviceName = (id) => state.services.get(id).name;
+
+// "Lena → Sofia" (or "Lena · 15 min break · Sofia"): who does the visit, in order.
+function whoLine(slot) {
+  const parts = [];
+  slot.steps.forEach((step, i) => {
+    if (i === slot.break_before) parts.push(t("book.break"));
+    if (i === 0 || i === slot.break_before || step.therapist_id !== slot.steps[i - 1].therapist_id) parts.push(step.therapist_name);
+  });
+  return parts.join(" → ");
+}
+
+function slotLabel(slot) {
+  return slot.steps.map((s, i) => `${i === slot.break_before ? `${t("book.break")}, ` : ""}${s.time} ${serviceName(s.service_id)}, ${s.therapist_name}`).join("; ");
+}
+
+function renderTimes() {
   const target = $("times");
+  const slots = state.slots;
   if (slots.length === 0) {
-    fill(target,
-      h("p", { class: "notice" }, t("book.no_times")),
-      waitlistBox());
+    fill(target, timeModes(), h("p", { class: "notice" }, t("book.no_times")), waitlistBox());
     return;
   }
-  const showName = state.therapistId === null && state.therapists.length > 1;
-  fill(target, 
-    h("div", { class: "times" },
+  if (multi() && state.timeMode === "myself") {
+    fill(target, timeModes(), ...pickStrips(slots));
+    return;
+  }
+  const showName = multi() || (state.choices.get(state.selectedServices[0]) == null
+    && (state.therapistsByService.get(state.selectedServices[0]) || []).length > 1);
+  fill(target, timeModes(),
+    h("div", { class: multi() ? "times times-chains" : "times" },
       slots.map((slot) =>
         h("button", {
           type: "button", class: "time-btn",
-          "aria-pressed": String(state.slot?.time === slot.time),
+          "aria-pressed": String(state.slot === slot),
+          "aria-label": multi() ? slotLabel(slot) : null,
           onclick: () => {
             state.slot = slot;
-            renderTimes(slots);
+            renderTimes();
             renderSummary();
           },
-        }, slot.time, showName && h("small", {}, slot.therapist_name)),
+        }, slot.time, showName && h("small", {}, multi() ? whoLine(slot) : slot.therapist_name)),
       ),
     ),
   );
+}
+
+// "Choose times myself": the first strip lists every start; each next strip only the times
+// that can follow the treatment before (right after it, or after a 15-minute break).
+function pickStrips(slots) {
+  const strips = [];
+  let matching = slots;
+  for (let i = 0; i < state.selectedServices.length; i += 1) {
+    const labelId = `pick-${i}`;
+    const heading = h("p", { class: "therapist-row-name", id: labelId },
+      h("span", { class: "therapist-row-number" }, `${i + 1}`), serviceName(state.selectedServices[i]));
+    if (i > 0 && state.picks[i - 1] == null) {
+      strips.push(h("div", { class: "pick-strip is-waiting" }, heading,
+        h("p", { class: "step-hint" }, t("book.pick_first", { service: serviceName(state.selectedServices[i - 1]) }))));
+      break;
+    }
+    const options = [];
+    for (const slot of matching) {
+      const same = options.find((o) => o.step.time === slot.steps[i].time);
+      if (!same) options.push({ step: slot.steps[i], slot, names: [slot.steps[i].therapist_name] });
+      else if (!same.names.includes(slot.steps[i].therapist_name)) same.names.push(slot.steps[i].therapist_name);
+    }
+    if (i > 0 && options.length === 1 && state.picks[i] == null) state.picks[i] = options[0].step.time; // nothing to choose
+    strips.push(h("div", { class: "pick-strip" }, heading,
+      h("div", { class: "times", role: "group", "aria-labelledby": labelId },
+        options.map(({ step, slot, names }) => h("button", {
+          type: "button", class: "time-btn", "aria-pressed": String(state.picks[i] === step.time),
+          onclick: () => {
+            state.picks = [...state.picks.slice(0, i), step.time];
+            state.slot = null;
+            renderTimes();
+            renderSummary();
+          },
+        }, step.time, h("small", {}, i > 0 && slot.break_before === i ? `${t("book.break")} · ${step.therapist_name}` : names.join(" / ")))))));
+    matching = matching.filter((slot) => slot.steps[i].time === state.picks[i]);
+  }
+  const done = state.picks.length === state.selectedServices.length && state.picks.every((p) => p != null);
+  const chosen = done ? matching[0] || null : null;
+  if (chosen !== state.slot) {
+    state.slot = chosen;
+    queueMicrotask(renderSummary);
+  }
+  return strips;
 }
 
 // ---------- Waitlist (when a day is full) ----------
@@ -265,7 +387,7 @@ function waitlistBox() {
     try {
       const result = await api("/public/waitlist", { method: "POST", body: {
         service_ids: state.selectedServices, add_on_ids: [...state.selectedAddOns],
-        therapist_id: state.therapistId, preferred_date: state.date,
+        therapist_id: multi() ? null : (state.choices.get(state.selectedServices[0]) ?? null), preferred_date: state.date,
         earliest_time: earliest.value, latest_time: latest.value,
         first_name: form.first_name.value, last_name: form.last_name.value,
         email: form.email.value, phone: form.phone.value,
@@ -310,9 +432,18 @@ function renderSummary() {
   const total = lines.reduce((sum, l) => sum + l.price, 0);
   const when = $("summary-when");
   if (lines.length === 0) when.textContent = t("book.start");
+  else if (state.slot && multi()) when.textContent = t("book.when_chain", { date: longDate.format(asDate(state.date)), time: state.slot.time });
   else if (state.slot) when.textContent = t("book.when", { date: longDate.format(asDate(state.date)), time: state.slot.time, therapist: state.slot.therapist_name });
   else if (state.date) when.textContent = t("book.pick_time", { date: longDate.format(asDate(state.date)) });
   else when.textContent = t("book.pick_day_time");
+
+  // The visit in order, with who does what: "10:00 Deep tissue massage · Lena".
+  const plan = $("summary-plan");
+  plan.hidden = !(state.slot && multi());
+  fill(plan, plan.hidden ? [] : state.slot.steps.flatMap((step, i) => [
+    i === state.slot.break_before && h("li", { class: "plan-break" }, h("span", { class: "plan-time" }, state.slot.steps[i - 1].end_time), t("book.break")),
+    h("li", {}, h("span", { class: "plan-time" }, step.time), h("span", {}, serviceName(step.service_id), h("small", {}, step.therapist_name))),
+  ]));
 
   fill($("summary-lines"), 
     ...lines.map((l) => h("tr", {}, h("td", { class: l.addOn ? "sub" : "" }, l.addOn ? `+ ${l.name}` : l.name), h("td", {}, euros(l.price)))),
@@ -361,7 +492,8 @@ async function confirmBooking(event) {
   const body = {
     service_ids: state.selectedServices,
     add_on_ids: [...state.selectedAddOns],
-    therapist_id: state.therapistId,
+    therapist_choices: Object.fromEntries(state.selectedServices.map((id) => [id, state.choices.get(id) ?? null])),
+    break_before: state.slot.break_before,
     date: state.date,
     start_time: state.slot.time,
     first_name: form.first_name.value,

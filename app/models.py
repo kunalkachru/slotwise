@@ -251,9 +251,12 @@ class Booking(Timestamped, Base):
     therapist: Mapped[Therapist] = relationship()
     def with_one_segment(self) -> "Booking":
         """A single-therapist booking: one segment equal to the booking's own summary."""
-        self.segments = [BookingSegment(
+        segment = BookingSegment(
             position=0, therapist=self.therapist, start_at=self.start_at, end_at=self.end_at,
-            blocked_until=self.blocked_until)]
+            blocked_until=self.blocked_until)
+        self.segments = [segment]
+        for item in self.items:
+            item.segment = segment
         return self
 
     segments: Mapped[list["BookingSegment"]] = relationship(
@@ -298,6 +301,10 @@ class BookingItem(Timestamped, Base):
     item_type: Mapped[str] = mapped_column(String(20))
     service_id: Mapped[int | None] = mapped_column(ForeignKey("services.id"))
     add_on_id: Mapped[int | None] = mapped_column(ForeignKey("add_ons.id"))
+    # The segment (therapist part) the treatment or add-on belongs to; extras added on the
+    # day have none.
+    segment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("booking_segments.id", ondelete="SET NULL"))
     # Snapshots: copied at booking time and never re-read from the menu.
     name_snapshot: Mapped[str] = mapped_column(String(120))
     minutes_snapshot: Mapped[int] = mapped_column(Integer, default=0)
@@ -305,6 +312,7 @@ class BookingItem(Timestamped, Base):
     quantity: Mapped[int] = mapped_column(default=1)
 
     booking: Mapped[Booking] = relationship(back_populates="items")
+    segment: Mapped[BookingSegment | None] = relationship()
 
 
 class WaitlistEntry(Timestamped, Base):

@@ -111,11 +111,36 @@ class TherapistOut(ORMModel):
     short_bio: str | None
 
 
+class StepOut(BaseModel):
+    """One treatment of a chain: when it runs and who does it."""
+    service_id: int
+    therapist_id: int
+    therapist_name: str
+    time: str  # "11:15", Europe/Berlin
+    end_time: str
+    start_at: datetime
+
+
 class SlotOut(BaseModel):
     time: str  # "17:00", Europe/Berlin
     start_at: datetime
-    therapist_id: int
+    therapist_id: int  # the first treatment's therapist
     therapist_name: str
+    steps: list[StepOut] = Field(default_factory=list)
+    break_before: int | None = None  # the treatment that follows a 15-minute break
+
+    @classmethod
+    def from_slot(cls, slot) -> "SlotOut":
+        def hm(moment: datetime) -> str:
+            return moment.astimezone(BERLIN).strftime("%H:%M")
+
+        return cls(
+            time=slot.local_time, start_at=slot.start_at, therapist_id=slot.therapist.id,
+            therapist_name=slot.therapist.display_name, break_before=slot.break_before,
+            steps=[StepOut(service_id=s.service_id, therapist_id=s.therapist.id,
+                           therapist_name=s.therapist.display_name, time=hm(s.start_at),
+                           end_time=hm(s.end_at), start_at=s.start_at) for s in slot.steps],
+        )
 
 
 class AvailabilityOut(BaseModel):
@@ -127,7 +152,10 @@ class AvailabilityOut(BaseModel):
 class BookingIn(BaseModel):
     service_ids: list[int] = Field(min_length=1, max_length=10)
     add_on_ids: list[int] = Field(default_factory=list, max_length=20)
-    therapist_id: int | None = None
+    therapist_id: int | None = None  # one therapist for everything (the old API)
+    # Per treatment: service id -> therapist id, or null for "No preference" (option B).
+    therapist_choices: dict[int, int | None] | None = Field(default=None, max_length=10)
+    break_before: int | None = Field(default=None, ge=1, le=9)
     date: date
     start_time: str = Field(max_length=5)
     first_name: str = Field(max_length=80)

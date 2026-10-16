@@ -27,15 +27,14 @@ from app.errors import (
 )
 from app.logic.availability import (
     BOOKING_HOLD_MINUTES,
+    DayPlanner,
+    Slot,
     booking_limits,
-    bookings_per_therapist,
-    free_slots_by_therapist,
     get_studio,
     local_to_utc,
-    pick_therapist,
 )
-from app.logic.selection import Selection, require_therapists
-from app.models import Booking, Customer, Therapist
+from app.logic.selection import Selection, therapist_candidates
+from app.models import Booking, BookingSegment, Customer, Therapist
 from app.security import new_token
 
 LOCAL_PART_RE = re.compile(r"^[a-z0-9_%+-]+(?:\.[a-z0-9_%+-]+)*$")
@@ -166,7 +165,12 @@ def create_booking(
     details: CustomerDetails,
     source: str = "online",
     language: str = "en",
+    therapist_choices: dict[int, int | None] | None = None,
+    break_before: int | None = None,
 ) -> Booking:
+    """Book a chain: one segment per therapist, back to back (option B). `therapist_id`
+    (old API) means one therapist for everything; `therapist_choices` picks per treatment.
+    `break_before` is the treatment after a 15-minute break, as the chosen slot showed."""
     # Owner phone bookings and claimed waitlist offers skip the notice period, so a
     # late cancellation can still be refilled [decision].
     for_owner = source in ("phone", "waitlist")
@@ -177,31 +181,21 @@ def create_booking(
         raise AppError(422, outside_booking_window(
             studio.min_notice_hours, studio.booking_window_days), field="start_time")
 
-    candidates = require_therapists(db, selection)
-    if therapist_id is not None:
-        candidates = [t for t in candidates if t.id == therapist_id]
-        if not candidates:
-            raise AppError(400, TIME_TAKEN)
+    candidates = therapist_candidates(db, selection, therapist_id, therapist_choices)
+    if not all(candidates.values()):
+        raise AppError(400, TIME_TAKEN)
 
     with _booking_lock:
-        _lock_therapists(db, [t.id for t in candidates])
-        # Re-check inside the lock with the same rules the availability endpoint uses.
-        free = free_slots_by_therapist(db, day, selection, candidates, for_owner)
-        free_now = [t for t in candidates if start_at in free[t.id]]
-        if not free_now:
+        # Lock every therapist who could be part of the chain, then plan it again inside
+        # the lock with the same rules the availability endpoint uses.
+        _lock_therapists(db, sorted({t.id for ts in candidates.values() for t in ts}))
+        slot = DayPlanner(db, day, selection, candidates, for_owner).chain(start_at, break_before)
+        if slot is None:
             db.rollback()
             raise AppError(400, TIME_TAKEN)
-        counts = bookings_per_therapist(db, [t.id for t in free_now], day)
-        therapist = pick_therapist(free_now, counts)
 
-        items = selection.snapshot_items(language)
-        end_at = start_at + timedelta(minutes=selection.total_minutes)
         booking = Booking(
             customer=find_or_create_customer(db, details),
-            therapist=therapist,
-            start_at=start_at,
-            end_at=end_at,
-            blocked_until=end_at + timedelta(minutes=selection.buffer_minutes),
             # Online bookings wait for the email confirmation; phone (owner) and waitlist
             # (offer link came by email) bookings are confirmed already.
             status="pending" if source == "online" else "booked",
@@ -210,12 +204,35 @@ def create_booking(
             manage_token=new_token(),
             customer_note=details.note,
             language=language,
-            items=items,
-        ).with_one_segment()
+        )
+        add_chain(booking, slot, selection, language)
         db.add(booking)
         db.commit()
     db.refresh(booking)
     return booking
+
+
+def add_chain(booking: Booking, slot: Slot, selection: Selection, language: str) -> None:
+    """Segments from a planned slot, with each item linked to its treatment's segment.
+    The booking keeps start, end and first therapist as a summary."""
+    segments = [
+        BookingSegment(position=i, therapist=p.therapist, start_at=p.start_at, end_at=p.end_at,
+                       blocked_until=p.blocked_until)
+        for i, p in enumerate(slot.segments)
+    ]
+    by_service = {sid: seg for seg, p in zip(segments, slot.segments, strict=True)
+                  for sid in p.service_ids}
+    service_of_add_on = {a.id: a.service_id for a in selection.add_ons}
+    items = selection.snapshot_items(language)
+    for item in items:
+        service_id = item.service_id or service_of_add_on.get(item.add_on_id)
+        item.segment = by_service.get(service_id)
+    booking.segments = segments
+    booking.items = items
+    booking.therapist = slot.therapist
+    booking.start_at = slot.start_at
+    booking.end_at = slot.end_at
+    booking.blocked_until = max(p.blocked_until for p in slot.segments)
 
 
 # ---------- Manage link (slice 3) ----------

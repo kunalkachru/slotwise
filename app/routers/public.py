@@ -17,7 +17,7 @@ from app.errors import TOO_MANY_BOOKINGS, AppError
 from app.i18n import category_label, request_lang
 from app.logic import photos as photos_logic
 from app.logic import waitlist
-from app.logic.availability import check_date_in_range, free_slots
+from app.logic.availability import chain_slots, check_date_in_range
 from app.logic.availability import get_studio as load_studio
 from app.logic.booking import (
     CustomerDetails,
@@ -33,7 +33,14 @@ from app.logic.booking import (
     verify_booking,
 )
 from app.logic.calendar import booking_ics
-from app.logic.selection import localized, parse_ids, require_therapists, resolve_selection
+from app.logic.selection import (
+    localized,
+    parse_choices,
+    parse_ids,
+    require_therapists,
+    resolve_selection,
+    therapist_candidates,
+)
 from app.models import CATEGORIES, Service, ServicePhoto, Studio, Therapist
 from app.schemas import (
     AddOnOut,
@@ -129,27 +136,19 @@ def availability(
     service_ids: str = Query(""),
     add_on_ids: str = Query(""),
     therapist_id: int | None = None,
+    therapist_choices: str = Query("", max_length=200),
+    choose_myself: bool = False,
     db: Session = Depends(get_db),
 ):
+    """Free chains: per treatment a therapist ("3:1,5:any"; the old `therapist_id` means one
+    therapist for everything). `choose_myself` adds the chains with a 15-minute break."""
     check_date_in_range(db, date)
     selection = resolve_selection(db, parse_ids(service_ids), parse_ids(add_on_ids))
-    therapists = require_therapists(db, selection)
-    if therapist_id is not None:
-        therapists = [t for t in therapists if t.id == therapist_id]
-    slots = free_slots(db, date, selection, therapists)
-    return AvailabilityOut(
-        date=date,
-        total_minutes=selection.total_minutes,
-        slots=[
-            SlotOut(
-                time=s.local_time,
-                start_at=s.start_at,
-                therapist_id=s.therapist.id,
-                therapist_name=s.therapist.display_name,
-            )
-            for s in slots
-        ],
-    )
+    candidates = therapist_candidates(db, selection, therapist_id,
+                                      parse_choices(therapist_choices))
+    slots = chain_slots(db, date, selection, candidates, choose_myself=choose_myself)
+    return AvailabilityOut(date=date, total_minutes=selection.total_minutes,
+                           slots=[SlotOut.from_slot(s) for s in slots])
 
 
 @router.post("/bookings", response_model=BookingOut)
@@ -180,6 +179,8 @@ def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
             body.therapist_id,
             details,
             language=request_lang(request),
+            therapist_choices=body.therapist_choices,
+            break_before=body.break_before,
         )
     except Exception:
         limiter.release([ip_key, email_key])
