@@ -355,6 +355,16 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
    - Emails go out in the customer's language. That needs a `language` column on customers, so it waits for item 1.
    - Decide whether the owner area is translated too, and whether services get a German name and description field.
 
+### UI redesign "Calm modern" (in progress)
+- The Figma Make prompt, workflow and porting plan are in `doc/design/figma-prompt.md`. The JavaScript hooks that must survive are in `doc/ui-inventory.md`.
+- **Decisions:**
+  - The new look lives in `calm.css` behind a "Classic look / New look" switch, available to customers and the owner. **Classic stays the default.**
+  - Waitlist statuses get their own badge colours.
+  - Owner pages get a real error state (reason, details, workarounds) instead of an endless "Loading…". This ships first.
+- **Figma Make's exported React code** goes into `doc/design/figma-make/` as a **reference-only library**:
+  - CI, deploy, Docker, pytest and ruff all ignore it;
+  - it's never served or built.
+
 ### Open setup tasks (owner)
 - [ ] **X-Forwarded-For check** (slice 1 setup): make one failed login with `X-Forwarded-For: 1.2.3.4`. The Render log line "Failed owner login from …" must show your own public IP.
 - [ ] **Own domain for email:** buy a domain, verify it in Resend (EU region, DNS records), then set `EMAIL_FROM` in Render (Save and deploy). Until then emails only reach the Resend account address.
@@ -376,3 +386,7 @@ Updated 2026-10-11. Version 1 (slices 1–6 plus Studio settings) is live. Items
 - Reviews after a visit.
 - Several studios on one platform.
 - Group classes with a capacity.
+- **React front end, as a separate project.** It would replace the plain HTML/JS pages page by page, starting from the Figma export in `doc/design/figma-make/` and the `calm.css` tokens. It needs:
+  - an agreed change to the "no Node build step" rule in CLAUDE.md;
+  - a Vite build stage in the Dockerfile and CI;
+  - a plan for keeping (or retiring) the Classic look.
