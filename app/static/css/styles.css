@@ -642,6 +642,7 @@ dialog.panel::backdrop { background: rgba(16, 40, 28, 0.35); }
 .receipt .studio { color: var(--muted); font-size: 0.92rem; }
 .receipt .meta { text-align: right; }
 .receipt .meta strong { display: block; font-size: 1.2rem; }
+.receipt .vat-note { margin: 0.35rem 0 0; text-align: right; color: var(--muted); font-size: 0.9rem; } /* VAT rate or the § 19 note (§ 33 UStDV) */
 .no-print { margin: 1rem auto; max-width: 640px; display: flex; gap: 0.5rem; justify-content: flex-end; padding: 0 16px; }
 @media print {
   body { background: #fff; }

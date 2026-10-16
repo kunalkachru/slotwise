@@ -331,7 +331,8 @@ def receipt_email(booking, studio, public_url: str) -> Email:
     number = booking.receipt_number
     intro = _t(lang, "receipt_intro", hello=_hello(lang, booking.customer), studio=studio.name,
                number=number)
-    footer = f"{_t(lang, 'paid')} {_studio_line(studio)}"
+    vat = i18n.vat_line(booking.total_price, studio.vat_mode, lang)
+    footer = f"{_t(lang, 'paid')} {vat} {_studio_line(studio)}"
     links = [(_t(lang, "receipt_link"), f"{public_url}/receipt.html?token={booking.manage_token}")]
     return Email(
         to=booking.customer.email,

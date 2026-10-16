@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.errors import AppError
+from app.i18n import VAT_MODES
 from app.models import CATEGORIES, AddOn, DayOff, Service, Studio, Therapist, WorkingHours
 
 DUPLICATE_SERVICE = "A service with this name already exists."
@@ -238,6 +239,8 @@ class StudioInput:
     waitlist_offer_minutes: int
     receipt_prefix: str
     opening_hours_text_de: str | None = None
+    vat_mode: str = "19"
+    tax_number: str | None = None
 
 
 def save_studio(db: Session, data: StudioInput) -> Studio:
@@ -274,6 +277,12 @@ def save_studio(db: Session, data: StudioInput) -> Studio:
     if not RECEIPT_PREFIX_RE.match(prefix):
         raise AppError(422, "Receipt prefix: 1 to 10 letters or digits.", field="receipt_prefix")
 
+    if data.vat_mode not in VAT_MODES:
+        raise AppError(422, "Please choose how VAT is shown on receipts.", field="vat_mode")
+    tax_number = " ".join((data.tax_number or "").split())
+    if len(tax_number) > 40:
+        raise AppError(422, "Please keep the tax number under 40 characters.", field="tax_number")
+
     studio = db.scalar(select(Studio).limit(1))
     if studio is None:
         raise AppError(404, NOT_FOUND)
@@ -289,6 +298,8 @@ def save_studio(db: Session, data: StudioInput) -> Studio:
     studio.booking_window_days = data.booking_window_days
     studio.waitlist_offer_minutes = data.waitlist_offer_minutes
     studio.receipt_prefix = prefix
+    studio.vat_mode = data.vat_mode
+    studio.tax_number = tax_number or None
     db.commit()
     db.refresh(studio)
     return studio

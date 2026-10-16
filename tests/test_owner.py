@@ -316,3 +316,16 @@ def test_days_off(owner_empty):
     assert client.delete(f"/owner/days-off/{day_off['id']}").status_code == 204
     assert slots(client, ["Relaxation massage"], TUESDAY).json()["slots"]
     assert client.delete(f"/owner/days-off/{day_off['id']}").status_code == 404
+
+
+def test_receipt_email_shows_the_vat_included_or_the_small_business_note(owner_empty, monkeypatch):
+    client = owner_empty
+    booking = jonas_visit(client, monkeypatch)  # Classic facial €59 + Eye mask €9 = €68.00
+    client.post(f"/owner/bookings/{booking['id']}/receipt")
+    assert "incl. 19% VAT: €10.86" in client.app.state.mailer.outbox[-1].text  # 68 × 19/119
+
+    current = client.get("/owner/studio").json()
+    client.put("/owner/studio", json={**current, "vat_mode": "small_business"})
+    client.post(f"/owner/bookings/{booking['id']}/receipt")  # resend
+    assert "No VAT is charged: small business under § 19 UStG." in \
+        client.app.state.mailer.outbox[-1].text

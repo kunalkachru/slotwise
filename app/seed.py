@@ -40,6 +40,7 @@ STUDIO = dict(
     email="hello@isar-wellness.example.com",
     opening_hours_text="Mon 10:00–19:00 · Tue–Fri 9:00–19:00 · Sat 9:00–17:00 · Sun closed",
     opening_hours_text_de="Mo 10–19 Uhr · Di–Fr 9–19 Uhr · Sa 9–17 Uhr · So geschlossen",
+    tax_number="143/000/00000",  # placeholder, like the phone number; the owner sets the real one
 )
 
 # German menu texts (name, description) and add-on names
