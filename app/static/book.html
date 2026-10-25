@@ -72,6 +72,21 @@
       </section>
     </form>
 
+    <p data-testid="booking-help-line" class="muted">Questions? Ask us at the front desk.</p>
+
+    <script>
+      (function(){
+        const el = document.querySelector('[data-testid="booking-help-line"]');
+        if (!el) return;
+        const texts = {
+          en: 'Questions? Ask us at the front desk.',
+          de: 'Fragen? Sprechen Sie uns gerne am Empfang an.'
+        };
+        const lang = document.documentElement.lang === 'de' ? 'de' : 'en';
+        el.textContent = texts[lang];
+      })();
+    </script>
+
     <aside class="summary" aria-labelledby="summary-title">
       <h2 id="summary-title" data-i18n="book.summary">Your booking</h2>
       <p class="summary-when" id="summary-when" data-i18n="book.start">Choose a treatment to start.</p>
