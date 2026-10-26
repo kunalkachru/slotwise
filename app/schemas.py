@@ -32,6 +32,7 @@ class StudioOut(ORMModel):
     booking_window_days: int
     vat_mode: str  # for the receipt: "19", "7" or "small_business"
     tax_number: str | None
+    currency: str = "EUR"
 
 
 class AddOnOut(ORMModel):
