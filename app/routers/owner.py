@@ -162,8 +162,10 @@ def owner_availability(
                                       parse_choices(therapist_choices))
     slots = chain_slots(db, date, selection, candidates, for_owner=True,
                         choose_myself=choose_myself)
-    return AvailabilityOut(date=date, total_minutes=selection.total_minutes,
-                           slots=[SlotOut.from_slot(s) for s in slots])
+    slot_views = [SlotOut.from_slot(s) for s in slots]
+    out = AvailabilityOut(date=date, total_minutes=selection.total_minutes,
+                           slots=slot_views, free_count=len(slot_views))
+    return out.model_dump()
 
 
 @router.post("/bookings", response_model=OwnerBookingOut)

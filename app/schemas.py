@@ -147,6 +147,7 @@ class AvailabilityOut(BaseModel):
     date: date
     total_minutes: int
     slots: list[SlotOut]
+    free_count: int
 
 
 class BookingIn(BaseModel):
