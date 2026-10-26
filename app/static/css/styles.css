@@ -236,6 +236,11 @@ details.manage p { margin: 0.6rem 0 0.2rem; color: var(--muted); }
   justify-content: space-between;
   gap: 0.75rem;
 }
+.site-footer #copyright {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.6rem;
+}
 
 /* ---------- Simple centred pages (login, placeholder) ---------- */
 .center-page {
