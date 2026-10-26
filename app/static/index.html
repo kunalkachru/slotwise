@@ -103,7 +103,29 @@
       try {
         const el = document.getElementById('copyright');
         if (!el) return;
-        el.textContent = '© ' + new Date().getFullYear() + ' Slotwise';
+        const year = new Date().getFullYear();
+        // Initial rendering (before i18n module runs)
+        el.textContent = '© ' + year + ' Slotwise';
+
+        // Update if the html lang attribute changes (i18n.js sets document.documentElement.lang).
+        const update = () => {
+          const lang = document.documentElement.lang || 'en';
+          // Both languages show the same structure: © <year> Slotwise
+          // Kept here so the year is never hardcoded.
+          el.textContent = '© ' + year + ' Slotwise';
+        };
+
+        const obs = new MutationObserver((list) => {
+          for (const mut of list) {
+            if (mut.type === 'attributes' && mut.attributeName === 'lang') {
+              update();
+            }
+          }
+        });
+        obs.observe(document.documentElement, { attributes: true });
+
+        // Also update on DOMContentLoaded in case lang was set before observation started.
+        document.addEventListener('DOMContentLoaded', update);
       } catch (e) { /* ignore */ }
     })();
   </script>
