@@ -149,10 +149,9 @@ def availability(
                                       parse_choices(therapist_choices))
     slots = chain_slots(db, date, selection, candidates, choose_myself=choose_myself)
     slot_views = [SlotOut.from_slot(s) for s in slots]
-    slots_json = [s.model_dump() for s in slot_views]
-    out = dict(date=date, total_minutes=selection.total_minutes,
-               slots=slots_json, free_count=len(slots_json))
-    return out
+    out = AvailabilityOut(date=date, total_minutes=selection.total_minutes,
+                          slots=slot_views, free_count=len(slot_views))
+    return out.model_dump()
 
 
 @router.post("/bookings", response_model=BookingOut)
