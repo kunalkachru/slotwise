@@ -20,6 +20,7 @@ document.documentElement.lang = lang;
 const DICT = {
   en: {
     "brand.by": "Online booking by",
+    "brand.copyright": "© {year} Slotwise",
     "nav.book_now": "Book now", "nav.back_menu": "Back to menu", "nav.studio_login": "Studio login",
     "nav.book_again": "Book again", "nav.back_home": "Back to home", "nav.back": "Back",
     "lang.other": "DE", "lang.other_name": "Deutsch",
@@ -134,6 +135,7 @@ const DICT = {
   },
   de: {
     "brand.by": "Online-Buchung mit",
+    "brand.copyright": "© {year} Slotwise",
     "nav.book_now": "Jetzt buchen", "nav.back_menu": "Zurück zum Menü", "nav.studio_login": "Studio-Login",
     "nav.book_again": "Erneut buchen", "nav.back_home": "Zur Startseite", "nav.back": "Zurück",
     "lang.other": "EN", "lang.other_name": "English",
@@ -258,7 +260,8 @@ export function t(key, vars = {}) {
 // Translate the fixed texts in the page: data-i18n (text), data-i18n-aria (aria-label),
 // data-i18n-title on <html> for the document title.
 export function translatePage() {
-  document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  const year = new Date().getFullYear();
+  document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n, { year }); });
   document.querySelectorAll("[data-i18n-aria]").forEach((el) => el.setAttribute("aria-label", t(el.dataset.i18nAria)));
   const titleKey = document.documentElement.dataset.i18nTitle;
   if (titleKey) document.title = `${t(titleKey)} · Slotwise`;

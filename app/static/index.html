@@ -94,42 +94,9 @@
     <div class="container">
       <span><span data-i18n="brand.by">Online booking by</span> <a class="logo" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#33C375" d="M20 3C10 3 4 8.5 4 15.5c0 1.6.4 3 1 4.2C6.8 13 11 9.6 16 8c-4.3 2.6-7.4 6.6-8.6 12 1.2.6 2.6 1 4.1 1C18.6 21 21 14 20 3z"/></svg> Slotwise</a></span>
       <span class="footer-links"><a href="/impressum.html" data-i18n="legal.imprint">Legal notice</a> <a href="/privacy.html" data-i18n="legal.privacy">Privacy</a> <a href="/owner/login.html" data-i18n="nav.studio_login">Studio login</a></span>
-      <div id="copyright" aria-hidden="true" style="font-size:0.85rem; margin-top:0.25rem; opacity:0.9;"></div>
+      <div id="copyright" aria-hidden="true" data-i18n="brand.copyright" style="font-size:0.85rem; margin-top:0.25rem; opacity:0.9;"></div>
     </div>
   </footer>
-
-  <script>
-    // Copyright line with current year, computed at page load.
-    (function(){
-      try {
-        const el = document.getElementById('copyright');
-        if (!el) return;
-        const year = new Date().getFullYear();
-        // Initial rendering (before i18n module runs)
-        el.textContent = '© ' + year + ' Slotwise';
-
-        // Update if the html lang attribute changes (i18n.js sets document.documentElement.lang).
-        const update = () => {
-          const lang = document.documentElement.lang || 'en';
-          // Both languages show the same structure: © <year> Slotwise
-          // Kept here so the year is never hardcoded.
-          el.textContent = '© ' + year + ' Slotwise';
-        };
-
-        const obs = new MutationObserver((list) => {
-          for (const mut of list) {
-            if (mut.type === 'attributes' && mut.attributeName === 'lang') {
-              update();
-            }
-          }
-        });
-        obs.observe(document.documentElement, { attributes: true });
-
-        // Also update on DOMContentLoaded in case lang was set before observation started.
-        document.addEventListener('DOMContentLoaded', update);
-      } catch (e) { /* ignore */ }
-    })();
-  </script>
 
   <script type="module" src="/js/home.js"></script>
 </body>
