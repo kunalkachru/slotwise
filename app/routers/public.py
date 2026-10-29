@@ -68,7 +68,7 @@ router = APIRouter(prefix="/public", tags=["public"])
 # Booking needs no login and sends an email, so cap how often one visitor or one email
 # address can book (security review, slice 3): limits inbox flooding and calendar filling.
 BOOKINGS_PER_IP_PER_HOUR = 10
-BOOKINGS_PER_EMAIL_PER_DAY = 5
+BOOKINGS_PER_EMAIL_PER_DAY = 3
 
 
 @router.get("/studio", response_model=StudioOut)
@@ -165,10 +165,20 @@ def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
     ).cleaned()
     email_key = "email:" + mailbox_key(details.email)
     # Reserve a place under both limits before booking; give it back if booking fails.
+    # First check which limit (if any) already blocks the request so we can return a
+    # specific, translated message for an email-based block while keeping the old
+    # generic message for IP-based blocks.
+    if limiter.count(ip_key, 3600) >= BOOKINGS_PER_IP_PER_HOUR:
+        raise AppError(429, TOO_MANY_BOOKINGS)
+    if limiter.count(email_key, 86400) >= BOOKINGS_PER_EMAIL_PER_DAY:
+        from app.errors import TOO_MANY_BOOKINGS_EMAIL
+        raise AppError(429, TOO_MANY_BOOKINGS_EMAIL)
     if not limiter.try_acquire([
         (ip_key, BOOKINGS_PER_IP_PER_HOUR, 3600),
         (email_key, BOOKINGS_PER_EMAIL_PER_DAY, 86400),
     ]):
+        # Fallback: if a race caused the atomic acquire to fail, return the generic
+        # message.
         raise AppError(429, TOO_MANY_BOOKINGS)
     try:
         selection = resolve_selection(db, body.service_ids, body.add_on_ids)

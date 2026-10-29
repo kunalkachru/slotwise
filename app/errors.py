@@ -39,6 +39,7 @@ MISSING_LAST_NAME = "Please enter your last name."
 NOTE_TOO_LONG = "Please keep the note under 300 characters."
 NAME_CHARACTERS = "Please use only letters in your name."
 TOO_MANY_BOOKINGS = "Too many bookings in a short time. Please call the studio."
+TOO_MANY_BOOKINGS_EMAIL = "Too many bookings from this email inbox in 24 hours. Please call the studio."
 
 # Waitlist (slice 5)
 OFFER_NOT_FOUND = "Offer not found."
