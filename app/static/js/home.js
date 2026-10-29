@@ -61,6 +61,10 @@ async function loadMenu() {
       ...categories.map((category) =>
         h("section", { class: "menu-category", "aria-label": category.name },
           h("h2", {}, category.label || category.name),
+          // compute the numeric minimum price of the services and always show the line
+          category.services.length > 0 && h("div", { class: "category-from" },
+            t("home.from_price", { price: formatEuro(Math.min(...category.services.map((s) => Number(s.price)))) }),
+          ),
           category.services.map((service) => serviceRow(service, category.name)),
         ),
       ),
