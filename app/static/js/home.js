@@ -65,6 +65,12 @@ async function loadMenu() {
           category.services.length > 0 && h("div", { class: "category-from" },
             t("home.from_price", { price: formatEuro(Math.min(...category.services.map((s) => Number(s.price)))) }),
           ),
+          // render a count line after the heading: singular/plural, omit for zero services
+          category.services.length > 0 && h("div", { class: "category-count" },
+            category.services.length === 1
+              ? t("home.treatment_count_one")
+              : t("home.treatment_count_other", { n: category.services.length }),
+          ),
           category.services.map((service) => serviceRow(service, category.name)),
         ),
       ),
