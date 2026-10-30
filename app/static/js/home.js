@@ -123,7 +123,7 @@ async function loadTeam() {
     }
     fill(list,
       ...team.map((member) =>
-        h("article", { class: "team-card" },
+        h("article", { class: "team-card service" },
           h("h3", { class: "team-name" }, member.first_name),
           h("ul", { class: "team-treatments" },
             member.treatments.map((name) => h("li", {}, name)),

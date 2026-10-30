@@ -251,6 +251,16 @@ input {
   box-shadow: var(--shadow);
   padding: 1rem 1.25rem;
 }
+.menu-category[hidden] { display: none !important; }
+.team-list { grid-column: 1 / -1; }
+/* A team card also carries .service (menu tile look); keep it a plain block card in both looks. */
+:root .menu-category .team-card.service {
+  display: block;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  overflow: visible;
+  transform: none;
+}
 .team-card .team-name { margin: 0 0 0.4rem; font-size: 1.05rem; }
 .team-treatments { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.92rem; }
 
