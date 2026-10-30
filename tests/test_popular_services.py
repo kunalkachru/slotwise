@@ -12,11 +12,13 @@ def test_only_recent_booking_counts(empty_calendar, client, frozen_now, monkeypa
     # old booking (31 days ago)
     monkeypatch.setattr(clock, "now", lambda: FROZEN_NOW - timedelta(days=31))
     # book Deep tissue massage
-    book(client, ["Deep tissue massage"], TUESDAY, "10:00")
+    r1 = book(client, ["Deep tissue massage"], TUESDAY, "10:00")
+    assert r1.status_code == 200
 
     # recent booking (29 days ago)
     monkeypatch.setattr(clock, "now", lambda: FROZEN_NOW - timedelta(days=29))
-    book(client, ["Classic facial"], TUESDAY, "11:00")
+    r2 = book(client, ["Classic facial"], TUESDAY, "11:00")
+    assert r2.status_code == 200
 
     # restore clock
     monkeypatch.setattr(clock, "now", lambda: FROZEN_NOW)
@@ -31,16 +33,21 @@ def test_only_recent_booking_counts(empty_calendar, client, frozen_now, monkeypa
 def test_cancelled_and_expired_do_not_count(empty_calendar, client, frozen_now):
     menu_ids(client)
     # book A twice then cancel both
-    book(client, ["Deep tissue massage"], TUESDAY, "10:00")
+    r1 = book(client, ["Deep tissue massage"], TUESDAY, "10:00")
+    assert r1.status_code == 200
     r2 = book(client, ["Deep tissue massage"], TUESDAY, "11:00", confirm=False)
+    assert r2.status_code in (200, 201)
     # cancel both bookings
     if r2.status_code == 200:
         manage_token(client, r2.json()["id"])  # ensure token exists
     # the first book() call confirmed and returned 200; get its id to cancel as well
     # find all bookings for that service and cancel two of them
-    from app.models import Booking
+    from app.models import Booking, BookingItem
+    ids = menu_ids(client)
+    service_id = ids["Deep tissue massage"]
     with client.app.state.session_factory() as s:
-        b_ids = [b.id for b in s.query(Booking).filter(Booking.status != "expired").all()][:2]
+        # pick two bookings that include the Deep tissue massage service and are not expired
+        b_ids = [b.id for b in s.query(Booking).join(BookingItem).filter(BookingItem.service_id == service_id, Booking.status != "expired").all()][:2]
     for bid in b_ids:
         token = manage_token(client, bid)
         client.post(f"/public/bookings/{token}/cancel")
@@ -57,7 +64,8 @@ def test_cancelled_and_expired_do_not_count(empty_calendar, client, frozen_now):
 
 def test_multi_treatment_booking_counts_for_each(empty_calendar, client, frozen_now):
     # one visit with two services should increment both
-    book(client, ["Deep tissue massage", "Classic facial"], TUESDAY, "14:00")
+    r1 = book(client, ["Deep tissue massage", "Classic facial"], TUESDAY, "14:00")
+    assert r1.status_code == 200
     r = client.get("/public/services")
     services = {s["name"]: s for c in r.json() for s in c["services"]}
     assert services["Deep tissue massage"]["popular"] is True

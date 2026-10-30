@@ -111,7 +111,7 @@ class CustomerDetails:
             raise AppError(422, NAME_CHARACTERS, field="last_name")
         if email is None:
             raise AppError(422, INVALID_EMAIL, field="email")
-        if len(phone) < 1 or len(phone) > 40:
+        if sum(ch.isdigit() for ch in phone) < 6 or len(phone) > 40:
             raise AppError(422, MISSING_PHONE, field="phone")
         if note and len(note) > 300:
             raise AppError(422, NOTE_TOO_LONG, field="note")
