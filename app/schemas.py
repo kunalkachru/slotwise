@@ -50,6 +50,7 @@ class ServiceOut(ORMModel):
     add_ons: list[AddOnOut]
     photo_url: str | None = None  # None: no photo, or photos switched off
     photo_alt: str | None = None  # the owner's description of the photo, in the page language
+    popular: bool = False
 
 
 class CategoryOut(BaseModel):
