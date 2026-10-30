@@ -15,8 +15,8 @@ from app.emails import (
 )
 from app.errors import TOO_MANY_BOOKINGS, AppError
 from app.i18n import category_label, request_lang
+from app.logic import opening_hours, waitlist
 from app.logic import photos as photos_logic
-from app.logic import waitlist
 from app.logic.availability import chain_slots, check_date_in_range
 from app.logic.availability import get_studio as load_studio
 from app.logic.booking import (
@@ -79,6 +79,8 @@ def get_studio(request: Request, db: Session = Depends(get_db)):
     out = StudioOut.model_validate(studio)
     out.opening_hours_text = localized(
         studio.opening_hours_text, studio.opening_hours_text_de, request_lang(request))
+    # Always judged from the English text, so both languages give the same answer.
+    out.open_now = opening_hours.is_open_at(studio.opening_hours_text, clock.now())
     return out
 
 

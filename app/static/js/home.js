@@ -1,9 +1,36 @@
 import { api, fill, formatEuro, formatMinutes, h, treatmentMedia } from "/js/api.js";
 import { t } from "/js/i18n.js";
 
+const BADGE_REFRESH_MS = 60 * 1000;
+
+// Show "Open now" / "Closed now" next to the opening hours. With no open_now value
+// (null or missing) there is no badge at all and the hours stay as they are.
+function renderOpenBadge(openNow) {
+  const hours = document.getElementById("studio-hours");
+  let badge = document.querySelector("[data-testid=open-badge]");
+  if (typeof openNow !== "boolean") {
+    if (badge) badge.remove();
+    return;
+  }
+  if (!badge) {
+    badge = h("span", { class: "open-badge", "data-testid": "open-badge", role: "status" });
+    hours.after(badge);
+  }
+  badge.dataset.state = openNow ? "open" : "closed";
+  badge.textContent = t(openNow ? "home.open_now" : "home.closed_now");
+}
+
+async function refreshOpenBadge() {
+  try {
+    const studio = await api("/public/studio");
+    renderOpenBadge(studio.open_now);
+  } catch { /* keep the last state until the next try */ }
+}
+
 async function loadStudio() {
   try {
     const studio = await api("/public/studio");
+    renderOpenBadge(studio.open_now);
     document.title = `${studio.name} · ${t("home.title")}`;
     document.querySelectorAll("[data-studio-name]").forEach((el) => (el.textContent = studio.name));
     document.getElementById("studio-address").textContent = studio.address;
@@ -85,3 +112,4 @@ async function loadMenu() {
 
 loadStudio();
 loadMenu();
+setInterval(refreshOpenBadge, BADGE_REFRESH_MS);

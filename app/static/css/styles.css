@@ -148,6 +148,12 @@ input {
 .studio-facts li { display: flex; gap: 0.5rem; align-items: baseline; }
 .studio-facts strong { color: var(--ink); font-weight: 600; min-width: 4.5rem; }
 .hours-part { display: block; white-space: nowrap; }
+/* Open / closed badge next to the opening hours (home.js). The selectors are a little
+   long so they also win against the Figma design's generic ".studio-facts span" colours. */
+.open-badge { display: inline-block; padding: 0.06rem 0.55rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+:root .studio-facts li span.open-badge[data-state="open"] { background: var(--success-soft); color: var(--success); }
+:root .studio-facts li span.open-badge[data-state="closed"] { background: var(--danger-soft); color: var(--danger); }
+:root .studio-facts li span.open-badge { justify-self: start; font-size: 0.8rem; font-weight: 700; }
 .policy {
   display: inline-block;
   padding: 0.35rem 0.75rem;
