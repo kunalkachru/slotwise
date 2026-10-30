@@ -60,6 +60,12 @@ class CategoryOut(BaseModel):
     services: list[ServiceOut]
 
 
+class TeamMemberOut(BaseModel):
+    """A therapist on the public team list: first name and treatment names only."""
+    first_name: str
+    treatments: list[str]
+
+
 class LoginIn(BaseModel):
     email: str = Field(min_length=1, max_length=255)
     password: str = Field(min_length=1, max_length=200)
