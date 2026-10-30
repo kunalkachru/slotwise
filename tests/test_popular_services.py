@@ -6,7 +6,7 @@ from tests.conftest import FROZEN_NOW, book, manage_token, menu_ids
 TUESDAY = "2026-10-13"
 
 
-def test_only_recent_booking_counts(client, frozen_now, monkeypatch):
+def test_only_recent_booking_counts(empty_calendar, client, frozen_now, monkeypatch):
     # create one booking created 31 days ago and one created 29 days ago
     # booking creation time is controlled via clock.now
     # old booking (31 days ago)
@@ -28,7 +28,7 @@ def test_only_recent_booking_counts(client, frozen_now, monkeypatch):
     assert len(popular) == 1
 
 
-def test_cancelled_and_expired_do_not_count(client, frozen_now):
+def test_cancelled_and_expired_do_not_count(empty_calendar, client, frozen_now):
     menu_ids(client)
     # book A twice then cancel both
     book(client, ["Deep tissue massage"], TUESDAY, "10:00")
@@ -55,7 +55,7 @@ def test_cancelled_and_expired_do_not_count(client, frozen_now):
     assert services["Deep tissue massage"]["popular"] is False
 
 
-def test_multi_treatment_booking_counts_for_each(client, frozen_now):
+def test_multi_treatment_booking_counts_for_each(empty_calendar, client, frozen_now):
     # one visit with two services should increment both
     book(client, ["Deep tissue massage", "Classic facial"], TUESDAY, "14:00")
     r = client.get("/public/services")
