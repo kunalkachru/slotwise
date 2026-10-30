@@ -252,6 +252,8 @@ input {
   padding: 1rem 1.25rem;
 }
 .menu-category[hidden] { display: none !important; }
+#faq h3 { margin: 1rem 0 0.2rem; font-size: 1.05rem; }
+#faq p { margin: 0 0 0.5rem; color: var(--muted); }
 .team-list { grid-column: 1 / -1; }
 /* A team card also carries .service (menu tile look); keep it a plain block card in both looks. */
 :root .menu-category .team-card.service {
