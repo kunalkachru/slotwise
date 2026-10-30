@@ -94,6 +94,11 @@ def list_services(request: Request, db: Session = Depends(get_db)):
     lang = request_lang(request)
     photos = photos_logic.photos_by_service(db) if photos_logic.shown(db) else {}
     menu = []
+    # Determine popularity once per request
+    from app.logic.popularity import popular_service_ids
+
+    popular_ids = popular_service_ids(db)
+
     for category in CATEGORIES:
         in_category = [
             ServiceOut(
@@ -110,6 +115,7 @@ def list_services(request: Request, db: Session = Depends(get_db)):
                 photo_url=photos_logic.photo_url(photos.get(s.id)),
                 photo_alt=localized(photos[s.id].alt_text, photos[s.id].alt_text_de, lang)
                 if s.id in photos else None,
+                popular=s.id in popular_ids,
             )
             for s in services
             if s.category == category
