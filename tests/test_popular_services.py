@@ -12,15 +12,15 @@ def test_only_recent_booking_counts(empty_calendar, client, frozen_now, monkeypa
     # old booking (31 days ago)
     monkeypatch.setattr(clock, "now", lambda: FROZEN_NOW - timedelta(days=31))
     # pick an available slot for Deep tissue massage
-    s1 = slots(client, ["Deep tissue massage"], TUESDAY).json()
-    start1 = s1[0]["slots"][0]
+    s1 = slots(client, ["Deep tissue massage"], TUESDAY)
+    start1 = s1.json()["slots"][0]["time"]
     r1 = book(client, ["Deep tissue massage"], TUESDAY, start1)
     assert r1.status_code == 200, r1.json()
 
     # recent booking (29 days ago)
     monkeypatch.setattr(clock, "now", lambda: FROZEN_NOW - timedelta(days=29))
-    s2 = slots(client, ["Classic facial"], TUESDAY).json()
-    start2 = s2[0]["slots"][0]
+    s2 = slots(client, ["Classic facial"], TUESDAY)
+    start2 = s2.json()["slots"][0]["time"]
     r2 = book(client, ["Classic facial"], TUESDAY, start2)
     assert r2.status_code == 200, r2.json()
 
@@ -37,14 +37,16 @@ def test_only_recent_booking_counts(empty_calendar, client, frozen_now, monkeypa
 def test_cancelled_and_expired_do_not_count(empty_calendar, client, frozen_now):
     menu_ids(client)
     # book A twice then cancel both
-    s1 = slots(client, ["Deep tissue massage"], TUESDAY).json()
-    start1 = s1[0]["slots"][0]
+    s1 = slots(client, ["Deep tissue massage"], TUESDAY)
+    start1 = s1.json()["slots"][0]["time"]
     r1 = book(client, ["Deep tissue massage"], TUESDAY, start1)
     assert r1.status_code == 200, r1.json()
 
-    s2 = slots(client, ["Deep tissue massage"], TUESDAY).json()
+    s2 = slots(client, ["Deep tissue massage"], TUESDAY)
     # pick a different slot for the second booking
-    start2 = s2[0]["slots"][1] if len(s2[0]["slots"]) > 1 else s2[1]["slots"][0]
+    all_times = [slot["time"] for slot in s2.json()["slots"]]
+    # choose a time at least 2 hours later to avoid overlap
+    start2 = next(t for t in all_times if t >= "12:00")
     r2 = book(client, ["Deep tissue massage"], TUESDAY, start2, confirm=False)
     assert r2.status_code in (200, 201), r2.json()
     # cancel both bookings
@@ -66,8 +68,8 @@ def test_cancelled_and_expired_do_not_count(empty_calendar, client, frozen_now):
         client.post(f"/public/bookings/{token}/cancel")
 
     # book B once (stays booked)
-    s3 = slots(client, ["Classic facial"], TUESDAY).json()
-    start3 = s3[0]["slots"][0]
+    s3 = slots(client, ["Classic facial"], TUESDAY)
+    start3 = s3.json()["slots"][0]["time"]
     r3 = book(client, ["Classic facial"], TUESDAY, start3)
     assert r3.status_code == 200, r3.json()
 
@@ -80,8 +82,8 @@ def test_cancelled_and_expired_do_not_count(empty_calendar, client, frozen_now):
 
 def test_multi_treatment_booking_counts_for_each(empty_calendar, client, frozen_now):
     # one visit with two services should increment both
-    s = slots(client, ["Deep tissue massage", "Classic facial"], TUESDAY).json()
-    start = s[0]["slots"][0]
+    s = slots(client, ["Deep tissue massage", "Classic facial"], TUESDAY)
+    start = s.json()["slots"][0]["time"]
     r1 = book(client, ["Deep tissue massage", "Classic facial"], TUESDAY, start)
     assert r1.status_code == 200, r1.json()
     r = client.get("/public/services")
