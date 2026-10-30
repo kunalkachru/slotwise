@@ -240,6 +240,20 @@ input {
   border-radius: var(--radius);
 }
 
+/* ---------- Our team (home.js loadTeam) ---------- */
+.team { margin: 0.5rem 0 1.5rem; }
+.team[hidden] { display: none; }
+.team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 1rem; }
+.team-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem 1.25rem;
+}
+.team-card .team-name { margin: 0 0 0.4rem; font-size: 1.05rem; }
+.team-treatments { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.92rem; }
+
 details.manage {
   margin: 0.5rem 0 2rem;
   background: var(--card);
