@@ -55,6 +55,7 @@ from app.schemas import (
     ServiceOut,
     SlotOut,
     StudioOut,
+    TeamMemberOut,
     TherapistOut,
     WaitlistConfirmOut,
     WaitlistIn,
@@ -126,6 +127,27 @@ def list_services(request: Request, db: Session = Depends(get_db)):
             menu.append(CategoryOut(name=category, label=category_label(category, lang),
                                     services=in_category))
     return menu
+
+
+@router.get("/team", response_model=list[TeamMemberOut])
+def list_team(request: Request, db: Session = Depends(get_db)):
+    """Active therapists with the names of the public-menu treatments they offer.
+    Therapists with none are left out."""
+    lang = request_lang(request)
+    therapists = db.scalars(
+        select(Therapist)
+        .where(Therapist.active.is_(True))
+        .options(selectinload(Therapist.services))
+        .order_by(Therapist.id)
+    ).all()
+    team = []
+    for therapist in therapists:
+        treatments = [localized(s.name, s.name_de, lang)
+                      for s in sorted(therapist.services, key=lambda s: s.id) if s.active]
+        name_parts = therapist.display_name.split()
+        if treatments and name_parts:
+            team.append(TeamMemberOut(first_name=name_parts[0], treatments=treatments))
+    return team
 
 
 @router.get("/therapists", response_model=list[TherapistOut])

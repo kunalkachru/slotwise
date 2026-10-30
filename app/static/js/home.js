@@ -110,6 +110,34 @@ async function loadMenu() {
   }
 }
 
+// "Our team" below the menu: one card per therapist from /public/team. With no cards
+// (empty list or a failed request) the whole section, heading included, stays hidden.
+async function loadTeam() {
+  const section = document.getElementById("team");
+  const list = document.getElementById("team-list");
+  try {
+    const team = await api("/public/team");
+    if (!Array.isArray(team) || team.length === 0) {
+      section.hidden = true;
+      return;
+    }
+    fill(list,
+      ...team.map((member) =>
+        h("article", { class: "team-card service" },
+          h("h3", { class: "team-name" }, member.first_name),
+          h("ul", { class: "team-treatments" },
+            member.treatments.map((name) => h("li", {}, name)),
+          ),
+        ),
+      ),
+    );
+    section.hidden = false;
+  } catch {
+    section.hidden = true;
+  }
+}
+
 loadStudio();
 loadMenu();
+loadTeam();
 setInterval(refreshOpenBadge, BADGE_REFRESH_MS);
