@@ -68,7 +68,7 @@ router = APIRouter(prefix="/public", tags=["public"])
 # Booking needs no login and sends an email, so cap how often one visitor or one email
 # address can book (security review, slice 3): limits inbox flooding and calendar filling.
 BOOKINGS_PER_IP_PER_HOUR = 10
-BOOKINGS_PER_EMAIL_PER_DAY = 5
+BOOKINGS_PER_EMAIL_PER_DAY = 3
 
 
 @router.get("/studio", response_model=StudioOut)
@@ -175,6 +175,13 @@ def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
         (ip_key, BOOKINGS_PER_IP_PER_HOUR, 3600),
         (email_key, BOOKINGS_PER_EMAIL_PER_DAY, 86400),
     ]):
+        # Distinguish whether the email quota was the limiting factor so we can
+        # return a clearer message to the customer while keeping the generic
+        # message for rate-limited IPs.
+        if limiter.count(email_key, 86400) >= BOOKINGS_PER_EMAIL_PER_DAY:
+            from app.errors import TOO_MANY_BOOKINGS_EMAIL
+
+            raise AppError(429, TOO_MANY_BOOKINGS_EMAIL)
         raise AppError(429, TOO_MANY_BOOKINGS)
     try:
         selection = resolve_selection(db, body.service_ids, body.add_on_ids)

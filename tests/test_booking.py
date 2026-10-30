@@ -208,7 +208,10 @@ def test_booking_limits_per_ip_and_per_email(empty_calendar):
     blocked = book(client, ["Back and neck massage"], TUESDAY, "16:00", "Lena",
                    email="same@example.com")
     assert blocked.status_code == 429
-    assert blocked.json()["detail"] == "Too many bookings in a short time. Please call the studio."
+    assert blocked.json()["detail"] == (
+        "You have reached the limit of 3 bookings per day for this email address. "
+        "Please try again later or call the studio."
+    )
 
     limiter = client.app.state.booking_limiter
     for _ in range(public.BOOKINGS_PER_IP_PER_HOUR):
@@ -231,7 +234,9 @@ def test_plus_addresses_and_gmail_dots_share_one_limit(empty_calendar):
     assert key("a.nna@example.com") == "a.nna@example.com"  # dots only matter at Gmail
 
     client = empty_calendar
-    for hour in range(10, 15):
+    from app.routers import public
+
+    for hour in range(10, 10 + public.BOOKINGS_PER_EMAIL_PER_DAY):
         assert book(client, ["Back and neck massage"], TUESDAY, f"{hour}:00", "Lena",
                     email=f"anna+{hour}@example.com").status_code == 200
     assert book(client, ["Back and neck massage"], TUESDAY, "16:00", "Lena",
