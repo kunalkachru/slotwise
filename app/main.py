@@ -58,6 +58,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
     for module in (health, public, auth, owner, internal):
         app.include_router(module.router)
+
+    @app.get("/api/ping")
+    def ping():
+        return {"pong": True}
+
     # Mounted last so API routes win; html=True serves index.html for "/".
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app

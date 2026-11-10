@@ -143,6 +143,10 @@ MESSAGES_DE = {
     "Please use only letters in your name.": "Bitte verwenden Sie nur Buchstaben im Namen.",
     "Too many bookings in a short time. Please call the studio.":
         "Zu viele Buchungen in kurzer Zeit. Bitte rufen Sie das Studio an.",
+    "You have reached the limit of 3 bookings per day for this email address. "
+    "Please try again later or call the studio.":
+        "Sie haben die Grenze von 3 Buchungen pro Tag für diese E-Mail-Adresse erreicht. "
+        "Bitte versuchen Sie es später erneut oder rufen Sie das Studio an.",
     "Booking not found. Please check the link in your email.":
         "Buchung nicht gefunden. Bitte prüfen Sie den Link in Ihrer E-Mail.",
     "This booking can no longer be confirmed.":
