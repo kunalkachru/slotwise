@@ -12,5 +12,5 @@
 - (none yet)
 
 ## Tasks
-- [ ] T1 Add the lightweight ping endpoint
+- [x] T1 Add the lightweight ping endpoint (ef38378)
 - [ ] T2 Add an automated request test for the ping contract
