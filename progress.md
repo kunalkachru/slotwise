@@ -12,5 +12,5 @@
 - (none yet)
 
 ## Tasks
-- [ ] T1 Add the public version endpoint
+- [x] T1 Add the public version endpoint (bf286d6)
 - [ ] T2 Add the configured-version endpoint test
