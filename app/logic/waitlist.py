@@ -288,6 +288,12 @@ def freed_times(booking) -> list[tuple[int, datetime]]:
         (booking.therapist_id, booking.start_at)]
 
 
+def release_booking(db: Session, mailer: Mailer, public_url: str,
+                    booking) -> list[WaitlistEntry]:
+    """Offer every slot released by a cancelled or expired booking."""
+    return offer_freed(db, mailer, public_url, freed_times(booking))
+
+
 def offer_freed(db: Session, mailer: Mailer, public_url: str,
                 freed: list[tuple[int, datetime]]) -> list[WaitlistEntry]:
     """Offer each freed therapist time to the first fitting entry. Returns those offered."""

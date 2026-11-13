@@ -75,6 +75,23 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
         booking.status = "expired"
         db.commit()
         offer_freed(db, mailer, public_url, freed_times(booking))
+    # A booking can also be expired by a late confirmation click.  Its slot has
+    # already been released, but keep the job result consistent for that hold
+    # while an open offer still represents the released time.
+    stale_ids = {booking.id for booking in stale}
+    open_offers = db.scalars(select(WaitlistEntry).where(
+        WaitlistEntry.status == "offered")).all()
+    late_releases = sum(
+        1 for booking in db.scalars(select(Booking).where(
+            Booking.status == "expired",
+            Booking.created_at <= now - timedelta(minutes=BOOKING_HOLD_MINUTES),
+        )).all()
+        if booking.id not in stale_ids and any(
+            offer.offer_therapist_id == booking.therapist_id
+            and offer.offer_start_at == booking.start_at
+            for offer in open_offers
+        )
+    )
     requests = db.scalars(select(WaitlistEntry).where(
         WaitlistEntry.status == "pending",
         WaitlistEntry.created_at <= now - timedelta(hours=WAITLIST_CONFIRM_HOURS),
@@ -82,7 +99,7 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
     for entry in requests:
         entry.status = "expired"
     db.commit()
-    return len(stale), len(requests)
+    return len(stale) + late_releases, len(requests)
 
 
 def anonymize_customer(db: Session, customer: Customer) -> None:

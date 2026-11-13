@@ -4,6 +4,7 @@ import re
 import threading
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from typing import Callable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -253,7 +254,11 @@ def hold_until(booking: Booking) -> datetime:
     return booking.created_at + timedelta(minutes=BOOKING_HOLD_MINUTES)
 
 
-def verify_booking(db: Session, booking: Booking) -> Booking:
+def verify_booking(
+    db: Session,
+    booking: Booking,
+    on_expire: Callable[[Booking], None] | None = None,
+) -> Booking:
     """The customer clicked the link in the "please confirm" email: the address is theirs.
     Returns the booking; raises 410 when the 30-minute hold has run out."""
     if booking.status != "pending":
@@ -263,6 +268,8 @@ def verify_booking(db: Session, booking: Booking) -> Booking:
     if clock.now() >= hold_until(booking):
         booking.status = "expired"
         db.commit()
+        if on_expire is not None:
+            on_expire(booking)
         raise AppError(410, BOOKING_REQUEST_EXPIRED)
     booking.status = "booked"
     db.commit()

@@ -74,6 +74,7 @@ def test_run_jobs_expires_stale_holds_and_offers_the_slot(empty_calendar, monkey
     assert result["unconfirmed_bookings_expired"] == 1
     db.expire_all()
     assert db.get(Booking, body["id"]).status == "expired"
+    assert db.scalar(select(WaitlistEntry.status)) == "offered"
     assert any(s.startswith("A time is free") for s in subjects(client))
 
 
