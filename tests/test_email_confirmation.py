@@ -83,7 +83,7 @@ def test_run_jobs_expires_stale_holds_and_offers_the_slot(empty_calendar, monkey
 
 def test_late_release_does_not_inflate_stale_hold_expiry_count(empty_calendar, monkeypatch):
     client = empty_calendar
-    stale = book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", confirm=False).json()
+    book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", confirm=False).json()
     late = book(client, ["Classic facial"], TUESDAY, "11:00", "Sofia", confirm=False).json()
 
     at(monkeypatch, 2026, 10, 10, 12, 45)

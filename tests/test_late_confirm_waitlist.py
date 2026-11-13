@@ -1,9 +1,9 @@
 """Regression test for a late booking confirmation releasing a waitlist slot."""
 
+from app.models import Booking
 from tests.conftest import book, manage_token
 from tests.test_email_confirmation import at
 from tests.test_waitlist import JOBS, join
-from app.models import Booking
 
 
 def test_late_confirmation_releases_slot_to_waitlist(empty_calendar, monkeypatch, db):
