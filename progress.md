@@ -12,5 +12,5 @@
 - (none yet)
 
 ## Tasks
-- [ ] T1 Add the public version endpoint
+- [x] T1 Add the public version endpoint (468a743)
 - [ ] T2 Add request-level coverage for the version contract
