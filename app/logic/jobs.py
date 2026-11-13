@@ -80,11 +80,11 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
         Booking.slot_release_pending.is_(True),
     )).all()
     for booking in late:
-        # offer_freed commits the waitlist offer. Clear the marker afterward so a retry
-        # after a partial run is harmless: offer_slot sees the existing open offer.
-        offer_freed(db, mailer, public_url, freed_times(booking))
         booking.slot_release_pending = False
         db.commit()
+        # Record completion before offering so a crash after offer_freed commits cannot
+        # leave the marker armed and repeat the release on the next run.
+        offer_freed(db, mailer, public_url, freed_times(booking))
     requests = db.scalars(select(WaitlistEntry).where(
         WaitlistEntry.status == "pending",
         WaitlistEntry.created_at <= now - timedelta(hours=WAITLIST_CONFIRM_HOURS),
