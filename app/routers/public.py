@@ -72,6 +72,11 @@ BOOKINGS_PER_IP_PER_HOUR = 10
 BOOKINGS_PER_EMAIL_PER_DAY = 5
 
 
+@router.get("/version")
+def version(request: Request):
+    return {"version": request.app.state.settings.version}
+
+
 @router.get("/studio", response_model=StudioOut)
 def get_studio(request: Request, db: Session = Depends(get_db)):
     studio = db.scalar(select(Studio).limit(1))
