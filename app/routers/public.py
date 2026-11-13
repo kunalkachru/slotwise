@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import select
@@ -70,6 +70,13 @@ router = APIRouter(prefix="/public", tags=["public"])
 # address can book (security review, slice 3): limits inbox flooding and calendar filling.
 BOOKINGS_PER_IP_PER_HOUR = 10
 BOOKINGS_PER_EMAIL_PER_DAY = 5
+
+
+@router.get("/time")
+def public_time():
+    return {"utc": clock.now().astimezone(UTC).isoformat(timespec="seconds").replace(
+        "+00:00", "Z"
+    )}
 
 
 @router.get("/studio", response_model=StudioOut)
