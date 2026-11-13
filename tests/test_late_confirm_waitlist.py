@@ -6,7 +6,7 @@ from tests.test_waitlist import JOBS, join
 from app.models import Booking
 
 
-def test_late_confirmation_releases_slot_to_waitlist(empty_calendar, monkeypatch):
+def test_late_confirmation_releases_slot_to_waitlist(empty_calendar, monkeypatch, db):
     client = empty_calendar
     join(client, "Tom", services=("Classic facial",))
     booking = book(client, ["Classic facial"], "2026-10-13", "10:00", "Sofia",
@@ -19,7 +19,12 @@ def test_late_confirmation_releases_slot_to_waitlist(empty_calendar, monkeypatch
 
     result = client.post("/internal/run-jobs", headers=JOBS).json()
     assert result["unconfirmed_bookings_expired"] == 1
-    assert any(mail.subject.startswith("A time is free") for mail in client.app.state.mailer.outbox)
+    [mail] = [mail for mail in client.app.state.mailer.outbox
+              if mail.subject.startswith("A time is free")]
+    assert mail.to == "tom@example.com"
+    assert "Tue 13 Oct, 10:00 with Sofia" in mail.text
+    db.expire_all()
+    assert db.get(Booking, booking["id"]).status == "expired"
 
 
 def test_late_confirmation_release_is_idempotent(empty_calendar, monkeypatch, db):

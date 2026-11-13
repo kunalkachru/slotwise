@@ -15,5 +15,5 @@
 
 ## Tasks
 - [x] T1 Track late-expired booking slot release state (1842ca5)
-- [ ] T2 Process late releases in the jobs flow without duplicating offers
+- [x] T2 Process late releases in the jobs flow without duplicating offers (7709e87)
 - [ ] T3 Lock the regression and compatibility behavior in tests
