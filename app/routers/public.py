@@ -2,6 +2,7 @@
 from datetime import UTC, date
 
 from fastapi import APIRouter, Depends, Query, Request, Response
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -73,7 +74,11 @@ BOOKINGS_PER_IP_PER_HOUR = 10
 BOOKINGS_PER_EMAIL_PER_DAY = 5
 
 
-@router.get("/time")
+class PublicTimeOut(BaseModel):
+    utc: str
+
+
+@router.get("/time", response_model=PublicTimeOut)
 def public_time():
     return {"utc": clock.now().astimezone(UTC).isoformat(timespec="seconds").replace(
         "+00:00", "Z"
