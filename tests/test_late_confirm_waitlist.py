@@ -43,9 +43,11 @@ def test_late_confirmation_release_is_idempotent(empty_calendar, monkeypatch, db
     second = client.post("/internal/run-jobs", headers=JOBS).json()
     second_offers = [mail for mail in client.app.state.mailer.outbox
                      if mail.subject.startswith("A time is free")]
+    repeated_late_click = client.post(f"/public/bookings/{token}/verify")
 
     assert first["unconfirmed_bookings_expired"] == 0
     assert second["unconfirmed_bookings_expired"] == 0
+    assert repeated_late_click.status_code == 410
     assert len(first_offers) == len(second_offers) == 1
     db.expire_all()
     released = db.get(Booking, booking["id"])
