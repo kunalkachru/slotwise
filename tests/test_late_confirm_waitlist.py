@@ -18,7 +18,7 @@ def test_late_confirmation_releases_slot_to_waitlist(empty_calendar, monkeypatch
     assert late.status_code == 410
 
     result = client.post("/internal/run-jobs", headers=JOBS).json()
-    assert result["unconfirmed_bookings_expired"] == 1
+    assert result["unconfirmed_bookings_expired"] == 0
     [mail] = [mail for mail in client.app.state.mailer.outbox
               if mail.subject.startswith("A time is free")]
     assert mail.to == "tom@example.com"
@@ -44,7 +44,7 @@ def test_late_confirmation_release_is_idempotent(empty_calendar, monkeypatch, db
     second_offers = [mail for mail in client.app.state.mailer.outbox
                      if mail.subject.startswith("A time is free")]
 
-    assert first["unconfirmed_bookings_expired"] == 1
+    assert first["unconfirmed_bookings_expired"] == 0
     assert second["unconfirmed_bookings_expired"] == 0
     assert len(first_offers) == len(second_offers) == 1
     db.expire_all()

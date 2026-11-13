@@ -92,7 +92,7 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
     for entry in requests:
         entry.status = "expired"
     db.commit()
-    return len(stale) + len(late), len(requests)
+    return len(stale), len(requests)
 
 
 def anonymize_customer(db: Session, customer: Customer) -> None:

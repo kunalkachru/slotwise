@@ -8,12 +8,16 @@
 - SPEC_GATE 2026-11-13 15:31 UTC
 - TASKS 2026-11-13 15:31 UTC
 - BUILD 2026-11-13 15:32 UTC
+- PROVE 2026-11-13 15:52 UTC
+- REVIEW 2026-11-13 15:54 UTC
+- FIX 2026-11-13 15:54 UTC
 
 ## Decisions, gotchas, what failed and why
+- FIX-1 touched files outside its list: app/logic/jobs.py, tests/test_email_confirmation.py, tests/test_late_confirm_waitlist.py
 - Bug reproduced by the failing test tests/test_late_confirm_waitlist.py::test_late_confirmation_releases_slot_to_waitlist; Cause: Late verification marks the booking expired before jobs run, while `expire_unconfirmed` only processes pending bookings, so the waitlist offer is skipped.
 - T1 touched files outside its list: app/logic/jobs.py
 
 ## Tasks
 - [x] T1 Track late-expired booking slot release state (1842ca5)
 - [x] T2 Process late releases in the jobs flow without duplicating offers (7709e87)
-- [ ] T3 Lock the regression and compatibility behavior in tests
+- [x] T3 Lock the regression and compatibility behavior in tests (4a0c597)
