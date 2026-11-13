@@ -10,9 +10,9 @@
 - BUILD 2026-11-13 14:39 UTC
 
 ## Decisions, gotchas, what failed and why
-- T1 touched files outside its list: app/logic/jobs.py
 - Bug reproduced by the failing test tests/test_s24_late_confirm_waitlist.py::test_late_confirmation_releases_slot_to_waitlist; Cause: The late verify endpoint expires the booking directly without invoking the waitlist slot-offer logic.
+- T1 touched files outside its list: app/logic/jobs.py
 
 ## Tasks
-- [ ] T1 Route late confirmation expiry through the waitlist release path
+- [x] T1 Route late confirmation expiry through the waitlist release path (167155f)
 - [ ] T2 Preserve scheduled-expiry waitlist behavior and regression coverage

@@ -2,8 +2,10 @@
 
 from datetime import datetime
 
+from sqlalchemy import select
+
 from app import clock
-from app.models import Booking
+from app.models import Booking, WaitlistEntry
 from tests.conftest import book, manage_token
 from tests.test_waitlist import JOBS, join
 
@@ -25,8 +27,9 @@ def test_late_confirmation_releases_slot_to_waitlist(empty_calendar, monkeypatch
     assert late.status_code == 410
     db.expire_all()
     assert db.get(Booking, body["id"]).status == "expired"
+    assert db.scalar(select(WaitlistEntry.status)) == "offered"
+    assert any(message.subject.startswith("A time is free")
+               for message in client.app.state.mailer.outbox)
 
     result = client.post("/internal/run-jobs", headers=JOBS).json()
     assert result["unconfirmed_bookings_expired"] == 1
-    assert any(message.subject.startswith("A time is free")
-               for message in client.app.state.mailer.outbox)
