@@ -3,6 +3,7 @@
 from tests.conftest import book, manage_token
 from tests.test_email_confirmation import at
 from tests.test_waitlist import JOBS, join
+from app.models import Booking
 
 
 def test_late_confirmation_releases_slot_to_waitlist(empty_calendar, monkeypatch):
@@ -19,3 +20,29 @@ def test_late_confirmation_releases_slot_to_waitlist(empty_calendar, monkeypatch
     result = client.post("/internal/run-jobs", headers=JOBS).json()
     assert result["unconfirmed_bookings_expired"] == 1
     assert any(mail.subject.startswith("A time is free") for mail in client.app.state.mailer.outbox)
+
+
+def test_late_confirmation_release_is_idempotent(empty_calendar, monkeypatch, db):
+    client = empty_calendar
+    join(client, "Tom", services=("Classic facial",))
+    booking = book(client, ["Classic facial"], "2026-10-13", "10:00", "Sofia",
+                   confirm=False).json()
+
+    at(monkeypatch, 2026, 10, 10, 12, 45)
+    token = manage_token(client, booking["id"])
+    assert client.post(f"/public/bookings/{token}/verify").status_code == 410
+
+    first = client.post("/internal/run-jobs", headers=JOBS).json()
+    first_offers = [mail for mail in client.app.state.mailer.outbox
+                    if mail.subject.startswith("A time is free")]
+    second = client.post("/internal/run-jobs", headers=JOBS).json()
+    second_offers = [mail for mail in client.app.state.mailer.outbox
+                     if mail.subject.startswith("A time is free")]
+
+    assert first["unconfirmed_bookings_expired"] == 1
+    assert second["unconfirmed_bookings_expired"] == 0
+    assert len(first_offers) == len(second_offers) == 1
+    db.expire_all()
+    released = db.get(Booking, booking["id"])
+    assert released.status == "expired"
+    assert released.slot_release_pending is False

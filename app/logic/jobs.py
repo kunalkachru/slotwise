@@ -75,6 +75,16 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
         booking.status = "expired"
         db.commit()
         offer_freed(db, mailer, public_url, freed_times(booking))
+    late = db.scalars(select(Booking).where(
+        Booking.status == "expired",
+        Booking.slot_release_pending.is_(True),
+    )).all()
+    for booking in late:
+        # offer_freed commits the waitlist offer. Clear the marker afterward so a retry
+        # after a partial run is harmless: offer_slot sees the existing open offer.
+        offer_freed(db, mailer, public_url, freed_times(booking))
+        booking.slot_release_pending = False
+        db.commit()
     requests = db.scalars(select(WaitlistEntry).where(
         WaitlistEntry.status == "pending",
         WaitlistEntry.created_at <= now - timedelta(hours=WAITLIST_CONFIRM_HOURS),
@@ -82,7 +92,7 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
     for entry in requests:
         entry.status = "expired"
     db.commit()
-    return len(stale), len(requests)
+    return len(stale) + len(late), len(requests)
 
 
 def anonymize_customer(db: Session, customer: Customer) -> None:

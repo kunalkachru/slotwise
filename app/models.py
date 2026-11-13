@@ -252,6 +252,9 @@ class Booking(Timestamped, Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     late_cancellation: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Set when a confirmation arrives after the hold. Jobs consumes this marker to release
+    # the already-expired booking's slot exactly once.
+    slot_release_pending: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     reminder_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     receipt_number: Mapped[str | None] = mapped_column(String(30), unique=True)
     receipt_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

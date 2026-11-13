@@ -1,16 +1,19 @@
-# Progress: add GET /ping returning {"ok": true} with a test (S-12)
+# Progress: Late confirm click: freed slot never offered to the waitlist (S-26)
 
 ## Stages
-- INTAKE 2026-11-12 18:16 UTC
-- SETUP 2026-11-12 18:16 UTC
-- SPEC 2026-11-12 18:21 UTC
-- SPEC_GATE 2026-11-12 18:21 UTC
-- TASKS 2026-11-12 18:21 UTC
-- BUILD 2026-11-12 18:22 UTC
+- INTAKE 2026-11-13 15:26 UTC
+- SETUP 2026-11-13 15:26 UTC
+- BUG_REPRO 2026-11-13 15:27 UTC
+- SPEC 2026-11-13 15:31 UTC
+- SPEC_GATE 2026-11-13 15:31 UTC
+- TASKS 2026-11-13 15:31 UTC
+- BUILD 2026-11-13 15:32 UTC
 
 ## Decisions, gotchas, what failed and why
-- (none yet)
+- T1 touched files outside its list: app/logic/jobs.py
+- Bug reproduced by the failing test tests/test_late_confirm_waitlist.py::test_late_confirmation_releases_slot_to_waitlist; Cause: Late verification marks the booking expired before jobs run, while `expire_unconfirmed` only processes pending bookings, so the waitlist offer is skipped.
 
 ## Tasks
-- [x] T1 Add the lightweight ping endpoint (ef38378)
-- [ ] T2 Add an automated request test for the ping contract
+- [ ] T1 Track late-expired booking slot release state
+- [ ] T2 Process late releases in the jobs flow without duplicating offers
+- [ ] T3 Lock the regression and compatibility behavior in tests

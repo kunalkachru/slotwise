@@ -262,6 +262,7 @@ def verify_booking(db: Session, booking: Booking) -> Booking:
         return booking  # already confirmed (or later): clicking twice is harmless
     if clock.now() >= hold_until(booking):
         booking.status = "expired"
+        booking.slot_release_pending = True
         db.commit()
         raise AppError(410, BOOKING_REQUEST_EXPIRED)
     booking.status = "booked"
