@@ -21,6 +21,10 @@ class HealthOut(BaseModel):
     version: str
 
 
+class VersionOut(BaseModel):
+    version: str
+
+
 class StudioOut(ORMModel):
     name: str
     address: str

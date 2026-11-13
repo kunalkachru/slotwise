@@ -6,10 +6,15 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.schemas import HealthOut
+from app.schemas import HealthOut, VersionOut
 
 log = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.get("/version", response_model=VersionOut)
+def version(request: Request):
+    return VersionOut(version=request.app.state.settings.version)
 
 
 @router.get("/health", response_model=HealthOut)
