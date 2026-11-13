@@ -25,5 +25,5 @@
 - 565eea75-7e6f-446f-afd2-615de8272a25 answered "What JSON response contract should GET /public/time expose for the UTC server time?": {"utc":"2026-11-13T18:22:00Z"} with an ISO 8601 UTC timestamp
 
 ## Tasks
-- [ ] T1 Add the public UTC time endpoint
+- [x] T1 Add the public UTC time endpoint (e3f711a)
 - [ ] T2 Add request-level tests for the public time contract
