@@ -12,6 +12,11 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/version")
+def version(request: Request) -> dict[str, str]:
+    return {"version": request.app.state.settings.version}
+
+
 @router.get("/health", response_model=HealthOut)
 def health(request: Request, db: Session = Depends(get_db)):
     """Status plus the deployed git commit. deploy.yml waits until `version` == github.sha."""
