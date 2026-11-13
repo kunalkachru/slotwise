@@ -245,7 +245,11 @@ def verify(token: str, request: Request, db: Session = Depends(get_db)):
     """The link in the "please confirm your booking" email."""
     booking = get_by_token(db, token)
     was_pending = booking.status == "pending"
-    booking = verify_booking(db, booking)
+    booking = verify_booking(
+        db, booking,
+        on_expire=lambda expired: waitlist.release_booking(
+            db, request.app.state.mailer, request.app.state.settings.public_url, expired),
+    )
     if was_pending:
         settings = request.app.state.settings
         request.app.state.mailer.send(
