@@ -74,7 +74,25 @@ def test_run_jobs_expires_stale_holds_and_offers_the_slot(empty_calendar, monkey
     assert result["unconfirmed_bookings_expired"] == 1
     db.expire_all()
     assert db.get(Booking, body["id"]).status == "expired"
-    assert any(s.startswith("A time is free") for s in subjects(client))
+    offers = [mail for mail in client.app.state.mailer.outbox
+              if mail.subject.startswith("A time is free")]
+    assert len(offers) == 1
+    assert offers[0].to == "tom@example.com"
+    assert "Tue 13 Oct, 10:00 with Sofia" in offers[0].text
+
+
+def test_late_release_does_not_inflate_stale_hold_expiry_count(empty_calendar, monkeypatch):
+    client = empty_calendar
+    book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia", confirm=False).json()
+    late = book(client, ["Classic facial"], TUESDAY, "11:00", "Sofia", confirm=False).json()
+
+    at(monkeypatch, 2026, 10, 10, 12, 45)
+    token = manage_token(client, late["id"])
+    assert client.post(f"/public/bookings/{token}/verify").status_code == 410
+
+    result = client.post("/internal/run-jobs", headers=JOBS).json()
+
+    assert result["unconfirmed_bookings_expired"] == 1
 
 
 def test_withdrawing_an_unconfirmed_booking_is_not_a_cancellation(empty_calendar, db):

@@ -290,9 +290,15 @@ def freed_times(booking) -> list[tuple[int, datetime]]:
 
 def offer_freed(db: Session, mailer: Mailer, public_url: str,
                 freed: list[tuple[int, datetime]]) -> list[WaitlistEntry]:
-    """Offer each freed therapist time to the first fitting entry. Returns those offered."""
+    """Offer each freed therapist time to the first fitting waiting entry.
+
+    A release may contain repeated segment coordinates after a retry. Keep one
+    offer attempt per coordinate; ``offer_slot`` also guards against offers
+    created by an earlier jobs run.
+    """
+    unique_freed = list(dict.fromkeys(freed))
     offered = [offer_slot(db, mailer, public_url, therapist_id, start_at)
-               for therapist_id, start_at in freed]
+               for therapist_id, start_at in unique_freed]
     return [entry for entry in offered if entry is not None]
 
 

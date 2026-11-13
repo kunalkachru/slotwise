@@ -1,0 +1,85 @@
+"""Regression test for a late booking confirmation releasing a waitlist slot."""
+
+from sqlalchemy import select
+
+from app.models import Booking
+from app.logic import waitlist
+from tests.conftest import book, manage_token
+from tests.test_email_confirmation import at
+from tests.test_waitlist import JOBS, join
+
+
+def test_late_confirmation_releases_slot_to_waitlist(empty_calendar, monkeypatch, db):
+    client = empty_calendar
+    join(client, "Tom", services=("Classic facial",))
+    booking = book(client, ["Classic facial"], "2026-10-13", "10:00", "Sofia",
+                   confirm=False).json()
+
+    at(monkeypatch, 2026, 10, 10, 12, 45)
+    token = manage_token(client, booking["id"])
+    late = client.post(f"/public/bookings/{token}/verify")
+    assert late.status_code == 410
+
+    result = client.post("/internal/run-jobs", headers=JOBS).json()
+    assert result["unconfirmed_bookings_expired"] == 0
+    [mail] = [mail for mail in client.app.state.mailer.outbox
+              if mail.subject.startswith("A time is free")]
+    assert mail.to == "tom@example.com"
+    assert "Tue 13 Oct, 10:00 with Sofia" in mail.text
+    db.expire_all()
+    assert db.get(Booking, booking["id"]).status == "expired"
+
+
+def test_late_confirmation_release_is_idempotent(empty_calendar, monkeypatch, db):
+    client = empty_calendar
+    join(client, "Tom", services=("Classic facial",))
+    booking = book(client, ["Classic facial"], "2026-10-13", "10:00", "Sofia",
+                   confirm=False).json()
+
+    at(monkeypatch, 2026, 10, 10, 12, 45)
+    token = manage_token(client, booking["id"])
+    assert client.post(f"/public/bookings/{token}/verify").status_code == 410
+
+    first = client.post("/internal/run-jobs", headers=JOBS).json()
+    first_offers = [mail for mail in client.app.state.mailer.outbox
+                    if mail.subject.startswith("A time is free")]
+    second = client.post("/internal/run-jobs", headers=JOBS).json()
+    second_offers = [mail for mail in client.app.state.mailer.outbox
+                     if mail.subject.startswith("A time is free")]
+    repeated_late_click = client.post(f"/public/bookings/{token}/verify")
+
+    assert first["unconfirmed_bookings_expired"] == 0
+    assert second["unconfirmed_bookings_expired"] == 0
+    assert repeated_late_click.status_code == 410
+    assert len(first_offers) == len(second_offers) == 1
+    db.expire_all()
+    released = db.get(Booking, booking["id"])
+    assert released.status == "expired"
+    assert released.slot_release_pending is False
+
+
+def test_late_release_records_completion_before_offering_slot(empty_calendar, monkeypatch, db):
+    client = empty_calendar
+    join(client, "Tom", services=("Classic facial",))
+    booking = book(client, ["Classic facial"], "2026-10-13", "10:00", "Sofia",
+                   confirm=False).json()
+
+    at(monkeypatch, 2026, 10, 10, 12, 45)
+    token = manage_token(client, booking["id"])
+    assert client.post(f"/public/bookings/{token}/verify").status_code == 410
+
+    original_offer_freed = waitlist.offer_freed
+    marker_at_offer = []
+
+    def observe_marker(session, mailer, public_url, freed):
+        marker_at_offer.append(session.scalar(select(Booking.slot_release_pending).where(
+            Booking.id == booking["id"])))
+        return original_offer_freed(session, mailer, public_url, freed)
+
+    monkeypatch.setattr(waitlist, "offer_freed", observe_marker)
+    result = client.post("/internal/run-jobs", headers=JOBS)
+
+    assert result.status_code == 200
+    assert marker_at_offer == [False]
+    assert sum(mail.subject.startswith("A time is free")
+               for mail in client.app.state.mailer.outbox) == 1

@@ -256,12 +256,13 @@ def hold_until(booking: Booking) -> datetime:
 def verify_booking(db: Session, booking: Booking) -> Booking:
     """The customer clicked the link in the "please confirm" email: the address is theirs.
     Returns the booking; raises 410 when the 30-minute hold has run out."""
+    if booking.status == "expired":
+        raise AppError(410, BOOKING_REQUEST_EXPIRED)
     if booking.status != "pending":
-        if booking.status == "expired":
-            raise AppError(410, BOOKING_REQUEST_EXPIRED)
         return booking  # already confirmed (or later): clicking twice is harmless
     if clock.now() >= hold_until(booking):
         booking.status = "expired"
+        booking.slot_release_pending = True
         db.commit()
         raise AppError(410, BOOKING_REQUEST_EXPIRED)
     booking.status = "booked"

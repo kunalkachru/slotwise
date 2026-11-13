@@ -177,6 +177,7 @@ def test_only_one_open_offer_per_slot(lena_booked, db):
     again = offer_slot(db, client.app.state.mailer, "http://x", booking.therapist_id,
                        booking.start_at)
     assert again is None
+    assert len(offers_sent(client)) == 1
     assert entry_status(db, "Mia") == "waiting"
 
 
