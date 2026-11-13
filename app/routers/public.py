@@ -1,3 +1,4 @@
+# Public endpoints: no login needed.
 from datetime import UTC, date
 
 from fastapi import APIRouter, Depends, Query, Request, Response
