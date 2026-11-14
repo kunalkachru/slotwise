@@ -8,12 +8,16 @@
 - SPEC_GATE 2026-11-14 01:26 UTC
 - TASKS 2026-11-14 01:27 UTC
 - BUILD 2026-11-14 01:28 UTC
+- PROVE 2026-11-14 01:43 UTC
+- REVIEW 2026-11-14 01:45 UTC
+- FIX 2026-11-14 01:45 UTC
 
 ## Decisions, gotchas, what failed and why
+- FIX-1 touched files outside its list: app/migrations/versions/0009_late_confirmation_handoff.py
 - Bug reproduced by the failing test tests/test_late_confirm_waitlist.py::test_late_confirmation_expiry_offers_the_slot_to_the_waitlist; Cause: The late verification marks the booking expired before `run-jobs`, so the job no longer recognizes it as an unconfirmed booking and never offers its slot to the waitlist.
 - T1 touched files outside its list: app/logic/jobs.py
 
 ## Tasks
 - [x] T1 Persist an explicit unconfirmed-expiry handoff (2200d85)
 - [x] T2 Account for and offer late-expired bookings idempotently in run-jobs (1fa0ad4)
-- [ ] T3 Strengthen the regression and compatibility test coverage
+- [x] T3 Strengthen the regression and compatibility test coverage (7a53e84)
