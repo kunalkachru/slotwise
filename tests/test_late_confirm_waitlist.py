@@ -5,7 +5,7 @@ from datetime import datetime
 from app import clock
 from app.models import Booking
 from tests.conftest import book, manage_token
-from tests.test_waitlist import JOBS, join
+from tests.test_waitlist import JOBS, entry_status, join
 
 TUESDAY = "2026-10-13"
 
@@ -30,9 +30,11 @@ def test_late_confirmation_expiry_offers_the_slot_to_the_waitlist(
 
     result = client.post("/internal/run-jobs", headers=JOBS).json()
     assert result["unconfirmed_bookings_expired"] == 1
-    assert any(
-        mail.subject.startswith("A time is free") for mail in client.app.state.mailer.outbox
-    )
+    offers = [mail for mail in client.app.state.mailer.outbox
+              if mail.subject.startswith("A time is free")]
+    assert len(offers) == 1
+    assert offers[0].to == "tom@example.com"
+    assert entry_status(db, "Tom") == "offered"
 
 
 def test_late_confirmation_expiry_is_idempotent(empty_calendar, monkeypatch, db):
@@ -51,6 +53,9 @@ def test_late_confirmation_expiry_is_idempotent(empty_calendar, monkeypatch, db)
     first = client.post("/internal/run-jobs", headers=JOBS).json()
     sent = sum(mail.subject.startswith("A time is free")
                for mail in client.app.state.mailer.outbox)
+    db.expire_all()
+    assert db.get(Booking, body["id"]).status == "expired"
+    assert db.get(Booking, body["id"]).unconfirmed_expiry_handoff_at is None
     second = client.post("/internal/run-jobs", headers=JOBS).json()
 
     assert first["unconfirmed_bookings_expired"] == 1

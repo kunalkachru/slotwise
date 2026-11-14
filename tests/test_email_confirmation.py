@@ -63,6 +63,7 @@ def test_unconfirmed_hold_expires_and_frees_the_slot(empty_calendar, monkeypatch
     assert late.status_code == 410 and late.json()["detail"] == HOLD_ERROR
     db.expire_all()
     assert db.get(Booking, body["id"]).status == "expired"
+    assert "10:00" in times(client)  # the late click cannot reclaim the expired slot
 
 
 def test_run_jobs_expires_stale_holds_and_offers_the_slot(empty_calendar, monkeypatch, db):
@@ -74,7 +75,9 @@ def test_run_jobs_expires_stale_holds_and_offers_the_slot(empty_calendar, monkey
     assert result["unconfirmed_bookings_expired"] == 1
     db.expire_all()
     assert db.get(Booking, body["id"]).status == "expired"
-    assert any(s.startswith("A time is free") for s in subjects(client))
+    offers = [mail for mail in client.app.state.mailer.outbox
+              if mail.subject.startswith("A time is free")]
+    assert len(offers) == 1 and offers[0].to == "tom@example.com"
 
 
 def test_withdrawing_an_unconfirmed_booking_is_not_a_cancellation(empty_calendar, db):

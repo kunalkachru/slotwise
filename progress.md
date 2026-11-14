@@ -15,5 +15,5 @@
 
 ## Tasks
 - [x] T1 Persist an explicit unconfirmed-expiry handoff (2200d85)
-- [ ] T2 Account for and offer late-expired bookings idempotently in run-jobs
+- [x] T2 Account for and offer late-expired bookings idempotently in run-jobs (1fa0ad4)
 - [ ] T3 Strengthen the regression and compatibility test coverage
