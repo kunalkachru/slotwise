@@ -2,3 +2,4 @@
 - [x] T1 Add the lightweight ping endpoint
 - [x] T2 Add an automated request test for the ping contract
 - [x] T1 Persist an explicit unconfirmed-expiry handoff
+- [x] T2 Account for and offer late-expired bookings idempotently in run-jobs
