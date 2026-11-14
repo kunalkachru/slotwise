@@ -78,10 +78,14 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
     late_expired = db.scalars(select(Booking).where(
         Booking.status == "expired",
         Booking.unconfirmed_expiry_handoff_at.is_not(None),
+    ).order_by(
+        Booking.unconfirmed_expiry_handoff_at,
+        Booking.id,
     )).all()
     for booking in late_expired:
         # Clear the handoff only after the offer flow has accounted for the release.
-        # This makes a repeated job run a no-op for the same late confirmation.
+        # offer_slot ignores an already-open offer, so a retry after the offer commit
+        # is also safe, while a repeated completed run finds no handoff to consume.
         offer_freed(db, mailer, public_url, freed_times(booking))
         booking.unconfirmed_expiry_handoff_at = None
         db.commit()
