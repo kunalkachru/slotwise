@@ -291,8 +291,14 @@ def freed_times(booking) -> list[tuple[int, datetime]]:
 def offer_freed(db: Session, mailer: Mailer, public_url: str,
                 freed: list[tuple[int, datetime]]) -> list[WaitlistEntry]:
     """Offer each freed therapist time to the first fitting entry. Returns those offered."""
-    offered = [offer_slot(db, mailer, public_url, therapist_id, start_at)
-               for therapist_id, start_at in freed]
+    seen = set()
+    offered = []
+    for therapist_id, start_at in freed:
+        release = (therapist_id, start_at)
+        if release in seen:
+            continue
+        seen.add(release)
+        offered.append(offer_slot(db, mailer, public_url, therapist_id, start_at))
     return [entry for entry in offered if entry is not None]
 
 

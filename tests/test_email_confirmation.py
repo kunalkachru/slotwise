@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app import clock
 from app.models import Booking, Customer, WaitlistEntry
 from tests.conftest import book, login, manage_token, slots
-from tests.test_waitlist import JOBS, confirm_waitlist, join
+from tests.test_waitlist import JOBS, confirm_waitlist, entry_status, join
 
 TUESDAY = "2026-10-13"
 HOLD_ERROR = ("This booking request has expired because it wasn't confirmed in time. "
@@ -74,7 +74,10 @@ def test_run_jobs_expires_stale_holds_and_offers_the_slot(empty_calendar, monkey
     assert result["unconfirmed_bookings_expired"] == 1
     db.expire_all()
     assert db.get(Booking, body["id"]).status == "expired"
-    assert any(s.startswith("A time is free") for s in subjects(client))
+    assert entry_status(db, "Tom") == "offered"
+    [mail] = [e for e in client.app.state.mailer.outbox
+              if e.subject.startswith("A time is free")]
+    assert mail.to == "tom@example.com"
 
 
 def test_withdrawing_an_unconfirmed_booking_is_not_a_cancellation(empty_calendar, db):
