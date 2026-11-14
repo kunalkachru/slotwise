@@ -251,6 +251,9 @@ class Booking(Timestamped, Base):
     manage_token: Mapped[str] = mapped_column(String(64), unique=True)
     confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Set when a late email confirmation expires the hold before run-jobs sees it.
+    # The job consumes this handoff after offering the released time.
+    unconfirmed_expiry_handoff_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     late_cancellation: Mapped[bool] = mapped_column(Boolean, default=False)
     reminder_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     receipt_number: Mapped[str | None] = mapped_column(String(30), unique=True)

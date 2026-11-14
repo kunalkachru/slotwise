@@ -75,6 +75,16 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
         booking.status = "expired"
         db.commit()
         offer_freed(db, mailer, public_url, freed_times(booking))
+    late_expired = db.scalars(select(Booking).where(
+        Booking.status == "expired",
+        Booking.unconfirmed_expiry_handoff_at.is_not(None),
+    )).all()
+    for booking in late_expired:
+        # Clear the handoff only after the offer flow has accounted for the release.
+        # This makes a repeated job run a no-op for the same late confirmation.
+        offer_freed(db, mailer, public_url, freed_times(booking))
+        booking.unconfirmed_expiry_handoff_at = None
+        db.commit()
     requests = db.scalars(select(WaitlistEntry).where(
         WaitlistEntry.status == "pending",
         WaitlistEntry.created_at <= now - timedelta(hours=WAITLIST_CONFIRM_HOURS),
@@ -82,7 +92,7 @@ def expire_unconfirmed(db: Session, mailer: Mailer, public_url: str) -> tuple[in
     for entry in requests:
         entry.status = "expired"
     db.commit()
-    return len(stale), len(requests)
+    return len(stale) + len(late_expired), len(requests)
 
 
 def anonymize_customer(db: Session, customer: Customer) -> None:
