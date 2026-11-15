@@ -7,6 +7,7 @@ from app.clock import BERLIN
 from app.logic.owner_bookings import therapist_report
 from app.models import Booking, BookingItem, BookingSegment, Customer, Therapist
 from app.schemas import TherapistReportOut
+from tests.conftest import login
 
 
 def _therapists(db):
@@ -50,7 +51,7 @@ def _json_row(row):
     return TherapistReportOut.model_validate(row).model_dump(mode="json")
 
 
-def test_therapist_report_returns_one_exact_row_per_therapist(db):
+def test_therapist_report_returns_one_exact_row_per_therapist(db, client):
     therapists = _therapists(db)
     _booking(db, therapists, datetime(2026, 10, 10, 12, tzinfo=BERLIN), "12.50")
 
@@ -63,6 +64,17 @@ def test_therapist_report_returns_one_exact_row_per_therapist(db):
         for row in rows
     )
     assert {row["booking_count"] for row in rows} == {0, 1}
+
+    assert login(client).status_code == 200
+    response = client.get("/owner/reports/therapists", params={
+        "from": "2026-10-10", "to": "2026-10-10",
+    })
+    assert response.status_code == 200
+    assert response.json() == [
+        {"therapist_id": row["therapist_id"], "therapist_name": row["therapist_name"],
+         "booking_count": row["booking_count"], "revenue": f"{row['revenue']:.2f}"}
+        for row in rows
+    ]
 
 
 def test_therapist_report_counts_qualifying_bookings_by_segments(db):
@@ -119,3 +131,29 @@ def test_therapist_report_is_deterministically_ordered(db):
 
     assert [row["therapist_id"] for row in rows[:2]] == [therapists[0].id, therapists[1].id]
     assert therapist_report(db, date(2026, 10, 10), date(2026, 10, 10)) == rows
+
+
+def test_therapist_report_requires_owner_session(client):
+    response = client.get("/owner/reports/therapists", params={
+        "from": "2026-10-10", "to": "2026-10-10",
+    })
+
+    assert response.status_code == 401
+
+
+def test_therapist_report_matches_owner_booking_range_rules(client):
+    assert login(client).status_code == 200
+
+    assert client.get("/owner/reports/therapists").status_code == 200
+    assert client.get("/owner/reports/therapists", params={
+        "from": "2026-10-10",
+    }).status_code == 200
+    assert client.get("/owner/reports/therapists", params={
+        "to": "2026-10-16",
+    }).status_code == 200
+    assert client.get("/owner/reports/therapists", params={
+        "from": "2026-10-11", "to": "2026-10-10",
+    }).status_code == 422
+    assert client.get("/owner/reports/therapists", params={
+        "from": "2026-01-01", "to": "2026-12-31",
+    }).status_code == 422
