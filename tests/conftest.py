@@ -63,6 +63,21 @@ def db(client):
         yield session
 
 
+@pytest.fixture
+def report_therapists(db):
+    """Demo therapists with bookings and customers removed for report scenarios."""
+    from sqlalchemy import delete
+
+    from app.models import Booking, BookingItem, BookingSegment, Customer, Therapist
+
+    db.execute(delete(BookingItem))
+    db.execute(delete(BookingSegment))
+    db.execute(delete(Booking))
+    db.execute(delete(Customer))
+    db.commit()
+    return db.query(Therapist).order_by(Therapist.id).all()
+
+
 def login(client: TestClient, email: str = OWNER_EMAIL, password: str = OWNER_PASSWORD):
     return client.post("/auth/login", json={"email": email, "password": password})
 

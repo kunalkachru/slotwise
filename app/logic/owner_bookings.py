@@ -22,6 +22,7 @@ from app.models import (
     BookingSegment,
     Customer,
     Service,
+    Therapist,
 )
 
 STATUS_NOT_ALLOWED = "This status change is not allowed."
@@ -262,3 +263,52 @@ def bookings_csv(bookings: list[Booking]) -> str:
 
 def default_range(today: date) -> tuple[date, date]:
     return today, today + timedelta(days=6)
+
+
+def therapist_report(db: Session, start_day: date, end_day: date) -> list[dict]:
+    """Aggregate qualifying booking totals once for every therapist on a booking."""
+    start, _ = day_bounds_utc(start_day)
+    _, end = day_bounds_utc(end_day)
+
+    qualifying_bookings = (
+        select(BookingSegment.therapist_id, BookingSegment.booking_id)
+        .join(Booking, Booking.id == BookingSegment.booking_id)
+        .where(
+            Booking.start_at >= start,
+            Booking.start_at < end,
+            Booking.status.notin_(('pending', 'expired', 'cancelled')),
+        )
+        .distinct()
+        .subquery()
+    )
+    totals = (
+        select(
+            qualifying_bookings.c.therapist_id,
+            func.count(qualifying_bookings.c.booking_id).label('booking_count'),
+            func.coalesce(func.sum(Booking.total_price), Decimal(0)).label('revenue'),
+        )
+        .join(Booking, Booking.id == qualifying_bookings.c.booking_id)
+        .group_by(qualifying_bookings.c.therapist_id)
+        .subquery()
+    )
+
+    rows = db.execute(
+        select(
+            Therapist.id,
+            Therapist.display_name,
+            func.coalesce(totals.c.booking_count, 0).label('booking_count'),
+            func.coalesce(totals.c.revenue, Decimal(0)).label('revenue'),
+        )
+        .outerjoin(totals, totals.c.therapist_id == Therapist.id)
+    ).all()
+
+    report = [
+        {
+            'therapist_id': therapist_id,
+            'therapist_name': therapist_name,
+            'booking_count': booking_count,
+            'revenue': Decimal(revenue or 0).quantize(Decimal('0.01')),
+        }
+        for therapist_id, therapist_name, booking_count, revenue in rows
+    ]
+    return sorted(report, key=lambda row: (-row['revenue'], row['therapist_id']))

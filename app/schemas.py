@@ -365,6 +365,13 @@ class OwnerBookingOut(BaseModel):
         )
 
 
+class TherapistReportOut(BaseModel):
+    therapist_id: int
+    therapist_name: str
+    booking_count: int
+    revenue: MoneyStr
+
+
 class StatusIn(BaseModel):
     status: str = Field(max_length=20)
 

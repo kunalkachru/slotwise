@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta
+from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import select
@@ -21,10 +21,12 @@ from app.logic.owner_bookings import (
     assign_receipt_number,
     bookings_csv,
     change_status,
+    default_range,
     get_booking,
     has_started,
     list_bookings,
     replace_items,
+    therapist_report,
 )
 from app.logic.selection import (
     parse_choices,
@@ -55,6 +57,7 @@ from app.schemas import (
     StudioSettings,
     TherapistAdminOut,
     TherapistIn,
+    TherapistReportOut,
 )
 
 # Every route here requires the owner session; changes must come from this site.
@@ -99,8 +102,8 @@ def _out(booking) -> OwnerBookingOut:
 
 
 def _range(from_: date | None, to: date | None) -> tuple[date, date]:
-    start = from_ or clock.now().date()
-    end = to or start + timedelta(days=6)
+    start = from_ or default_range(clock.now().date())[0]
+    end = to or default_range(start)[1]
     if end < start or (end - start).days > MAX_RANGE_DAYS:
         from app.errors import AppError
 
@@ -119,6 +122,16 @@ def bookings(
 ):
     start, end = _range(from_, to)
     return [_out(b) for b in list_bookings(db, start, end, therapist_id, status, q)]
+
+
+@router.get("/reports/therapists", response_model=list[TherapistReportOut])
+def therapist_reports(
+    from_: date | None = Query(None, alias="from"),
+    to: date | None = None,
+    db: Session = Depends(get_db),
+):
+    start, end = _range(from_, to)
+    return therapist_report(db, start, end)
 
 
 @router.get("/bookings/export.csv")
