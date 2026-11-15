@@ -1,22 +1,9 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import delete
-
 from app.clock import BERLIN
-from app.logic.owner_bookings import therapist_report
-from app.models import Booking, BookingItem, BookingSegment, Customer, Therapist
-from app.schemas import TherapistReportOut
+from app.models import Booking, BookingSegment, Customer
 from tests.conftest import login
-
-
-def _therapists(db):
-    db.execute(delete(BookingItem))
-    db.execute(delete(BookingSegment))
-    db.execute(delete(Booking))
-    db.execute(delete(Customer))
-    db.commit()
-    return db.query(Therapist).order_by(Therapist.id).all()
 
 
 def _booking(db, therapists, start, price, status="booked", segment_ids=None):
@@ -47,38 +34,31 @@ def _booking(db, therapists, start, price, status="booked", segment_ids=None):
     db.commit()
 
 
-def _json_row(row):
-    return TherapistReportOut.model_validate(row).model_dump(mode="json")
+def _report(client, start="2026-10-10", end="2026-10-10"):
+    assert login(client).status_code == 200
+    return client.get("/owner/reports/therapists", params={"from": start, "to": end})
 
 
-def test_therapist_report_returns_one_exact_row_per_therapist(db, client):
-    therapists = _therapists(db)
+def test_therapist_report_returns_one_exact_row_per_therapist(db, client, report_therapists):
+    therapists = report_therapists
     _booking(db, therapists, datetime(2026, 10, 10, 12, tzinfo=BERLIN), "12.50")
 
-    rows = therapist_report(db, date(2026, 10, 10), date(2026, 10, 10))
+    response = _report(client)
+    assert response.status_code == 200
+    rows = response.json()
 
     assert len(rows) == len(therapists)
-    assert {tuple(row) for row in rows}  # rows are mapping-like report records
     assert all(
         set(row) == {"therapist_id", "therapist_name", "booking_count", "revenue"}
         for row in rows
     )
     assert {row["booking_count"] for row in rows} == {0, 1}
 
-    assert login(client).status_code == 200
-    response = client.get("/owner/reports/therapists", params={
-        "from": "2026-10-10", "to": "2026-10-10",
-    })
-    assert response.status_code == 200
-    assert response.json() == [
-        {"therapist_id": row["therapist_id"], "therapist_name": row["therapist_name"],
-         "booking_count": row["booking_count"], "revenue": f"{row['revenue']:.2f}"}
-        for row in rows
-    ]
 
-
-def test_therapist_report_counts_qualifying_bookings_by_segments(db):
-    therapists = _therapists(db)
+def test_therapist_report_counts_qualifying_bookings_by_segments(
+    db, client, report_therapists
+):
+    therapists = report_therapists
     start = datetime(2026, 10, 10, 12, tzinfo=BERLIN)
     _booking(
         db, therapists, start, "20.00",
@@ -87,7 +67,9 @@ def test_therapist_report_counts_qualifying_bookings_by_segments(db):
     for offset, status in enumerate(("pending", "expired", "cancelled"), 1):
         _booking(db, therapists, start + timedelta(hours=offset), "99.00", status=status)
 
-    rows = therapist_report(db, date(2026, 10, 10), date(2026, 10, 10))
+    response = _report(client)
+    assert response.status_code == 200
+    rows = response.json()
     by_id = {row["therapist_id"]: row for row in rows}
 
     assert by_id[therapists[0].id]["booking_count"] == 1
@@ -95,42 +77,46 @@ def test_therapist_report_counts_qualifying_bookings_by_segments(db):
     assert all(row["booking_count"] == 0 for row in rows[2:])
 
 
-def test_therapist_report_sums_and_formats_revenue(db):
-    therapists = _therapists(db)
+def test_therapist_report_sums_and_formats_revenue(db, client, report_therapists):
+    therapists = report_therapists
     start = datetime(2026, 10, 10, 12, tzinfo=BERLIN)
     _booking(db, therapists, start, "10.10")
     _booking(db, therapists, start + timedelta(hours=1), "2.35")
 
-    row = next(row for row in therapist_report(db, date(2026, 10, 10), date(2026, 10, 10))
-               if row["therapist_id"] == therapists[0].id)
+    response = _report(client)
+    assert response.status_code == 200
+    row = next(row for row in response.json() if row["therapist_id"] == therapists[0].id)
 
     assert row["booking_count"] == 2
-    assert _json_row(row)["revenue"] == "12.45"
+    assert row["revenue"] == "12.45"
 
 
-def test_therapist_report_uses_inclusive_berlin_date_boundaries(db):
-    therapists = _therapists(db)
+def test_therapist_report_uses_inclusive_berlin_date_boundaries(db, client, report_therapists):
+    therapists = report_therapists
     _booking(db, therapists, datetime(2026, 10, 9, 22, tzinfo=UTC), "1.00")
     _booking(db, therapists, datetime(2026, 10, 11, 21, 59, tzinfo=UTC), "2.00")
     _booking(db, therapists, datetime(2026, 10, 11, 22, tzinfo=UTC), "4.00")
 
-    row = next(row for row in therapist_report(db, date(2026, 10, 10), date(2026, 10, 11))
-               if row["therapist_id"] == therapists[0].id)
+    response = _report(client, end="2026-10-11")
+    assert response.status_code == 200
+    row = next(row for row in response.json() if row["therapist_id"] == therapists[0].id)
 
     assert row["booking_count"] == 2
-    assert _json_row(row)["revenue"] == "3.00"
+    assert row["revenue"] == "3.00"
 
 
-def test_therapist_report_is_deterministically_ordered(db):
-    therapists = _therapists(db)
+def test_therapist_report_is_deterministically_ordered(db, client, report_therapists):
+    therapists = report_therapists
     start = datetime(2026, 10, 10, 12, tzinfo=BERLIN)
     _booking(db, therapists, start, "10.00", segment_ids=[therapists[1].id])
     _booking(db, therapists, start + timedelta(hours=1), "10.00", segment_ids=[therapists[0].id])
 
-    rows = therapist_report(db, date(2026, 10, 10), date(2026, 10, 10))
+    first = _report(client)
+    assert first.status_code == 200
+    rows = first.json()
 
     assert [row["therapist_id"] for row in rows[:2]] == [therapists[0].id, therapists[1].id]
-    assert therapist_report(db, date(2026, 10, 10), date(2026, 10, 10)) == rows
+    assert _report(client).json() == rows
 
 
 def test_therapist_report_requires_owner_session(client):
