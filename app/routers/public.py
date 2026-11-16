@@ -1,5 +1,5 @@
 # Public endpoints: no login needed.
-from datetime import UTC, date
+from datetime import UTC, date, time
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel
@@ -15,7 +15,7 @@ from app.emails import (
     waitlist_joined_email,
     waitlist_limit_email,
 )
-from app.errors import TOO_MANY_BOOKINGS, AppError
+from app.errors import END_TIME_BEFORE_START, TOO_MANY_BOOKINGS, AppError
 from app.i18n import category_label, request_lang
 from app.logic import opening_hours, waitlist
 from app.logic import photos as photos_logic
@@ -197,6 +197,16 @@ def availability(
 
 @router.post("/bookings", response_model=BookingOut)
 def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
+    if body.end_time is not None:
+        try:
+            start = time.fromisoformat(body.start_time)
+            end = time.fromisoformat(body.end_time)
+        except ValueError:
+            pass
+        else:
+            if end < start:
+                raise AppError(422, END_TIME_BEFORE_START)
+
     limiter = request.app.state.booking_limiter
     ip_key = "ip:" + client_ip(
         request.client.host if request.client else None, request.headers.get("x-forwarded-for")

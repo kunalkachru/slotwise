@@ -166,6 +166,7 @@ class BookingIn(BaseModel):
     break_before: int | None = Field(default=None, ge=1, le=9)
     date: date
     start_time: str = Field(max_length=5)
+    end_time: str | None = Field(default=None, max_length=5)
     first_name: str = Field(max_length=80)
     last_name: str = Field(max_length=80)
     email: str = Field(max_length=255)
