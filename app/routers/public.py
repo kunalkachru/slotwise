@@ -1,5 +1,6 @@
 # Public endpoints: no login needed.
 from datetime import UTC, date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel
@@ -99,14 +100,21 @@ def get_studio(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/services", response_model=list[CategoryOut])
-def list_services(request: Request, db: Session = Depends(get_db)):
+def list_services(
+    request: Request,
+    max_price: Decimal | None = Query(None, ge=0),
+    db: Session = Depends(get_db),
+):
     """The public menu: active services grouped by category, each with its active add-ons."""
-    services = db.scalars(
+    query = (
         select(Service)
         .where(Service.active.is_(True))
         .options(selectinload(Service.add_ons))
         .order_by(Service.id)
-    ).all()
+    )
+    if max_price is not None:
+        query = query.where(Service.price <= max_price)
+    services = db.scalars(query).all()
     lang = request_lang(request)
     photos = photos_logic.photos_by_service(db) if photos_logic.shown(db) else {}
     menu = []
