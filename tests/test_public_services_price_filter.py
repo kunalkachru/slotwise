@@ -14,10 +14,20 @@ def test_max_price_filters_services_inclusively(client, db):
     response = client.get("/public/services?max_price=50")
 
     assert response.status_code == 200
-    services = services_in(response.json())
-    assert "Deep tissue massage" in {service["name"] for service in services}
-    assert "Relaxation massage" not in {service["name"] for service in services}
+    menu = response.json()
+    assert [category["name"] for category in menu] == ["Massages", "Facials", "Reflexology"]
+    services = services_in(menu)
+    services_by_name = {service["name"]: service for service in services}
+    assert set(services_by_name) == {
+        "Deep tissue massage",
+        "Back and neck massage",
+        "Express facial",
+        "Foot reflexology",
+    }
+    assert services_by_name["Deep tissue massage"]["price"] == "50.00"
     assert all(float(service["price"]) <= 50 for service in services)
+    assert {"id", "name", "description", "duration_minutes", "price", "add_ons",
+            "photo_url", "photo_alt", "popular"} <= services_by_name["Deep tissue massage"].keys()
 
 
 def test_missing_max_price_preserves_unfiltered_menu(client):
