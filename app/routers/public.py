@@ -103,12 +103,15 @@ def get_studio(request: Request, db: Session = Depends(get_db)):
 def list_services(
     request: Request,
     max_price: Decimal | None = Query(None, ge=0),
+    min_duration: int | None = Query(None, ge=0),
     db: Session = Depends(get_db),
 ):
     """The public menu: active services grouped by category, each with its active add-ons."""
     services_query = select(Service).where(Service.active.is_(True))
     if max_price is not None:
         services_query = services_query.where(Service.price <= max_price)
+    if min_duration is not None:
+        services_query = services_query.where(Service.duration_minutes >= min_duration)
     services = db.scalars(
         services_query.options(selectinload(Service.add_ons)).order_by(Service.id)
     ).all()
