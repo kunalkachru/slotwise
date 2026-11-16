@@ -1,3 +1,6 @@
+from app.models import Service
+
+
 def services_from_menu(response):
     return [service for category in response.json() for service in category["services"]]
 
@@ -39,7 +42,10 @@ def test_public_services_without_max_price_returns_complete_menu(client):
     assert any(float(service["price"]) > 50 for service in services)
 
 
-def test_public_services_filters_by_min_duration(client):
+def test_public_services_filters_by_min_duration(client, db):
+    db.query(Service).filter(Service.name == "Express facial").one().duration_minutes = 15
+    db.commit()
+
     complete_response = client.get("/public/services")
     response = client.get("/public/services", params={"min_duration": "30"})
 
@@ -69,14 +75,13 @@ def test_public_services_rejects_non_numeric_min_duration(client):
     assert response.status_code == 422
 
 
-def test_public_services_without_min_duration_returns_complete_menu(client):
+def test_public_services_without_min_duration_returns_complete_menu(client, db):
+    db.query(Service).filter(Service.name == "Express facial").one().duration_minutes = 15
+    db.commit()
+
     complete_response = client.get("/public/services")
-    filtered_response = client.get("/public/services", params={"min_duration": "30"})
 
     assert complete_response.status_code == 200
-    assert filtered_response.status_code == 200
     complete_services = services_from_menu(complete_response)
-    filtered_services = services_from_menu(filtered_response)
-    assert {service["id"] for service in complete_services} >= {
-        service["id"] for service in filtered_services
-    }
+    assert any(service["name"] == "Express facial" and service["duration_minutes"] < 30
+               for service in complete_services)
