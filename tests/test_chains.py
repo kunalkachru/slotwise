@@ -5,6 +5,7 @@ reflexology), Sofia 9–17 (facials, relaxation massage). Buffers are 10 minutes
 import threading
 from datetime import date, time
 
+import pytest
 from sqlalchemy import select
 
 from app.models import Booking, BookingSegment, DayOff, WorkingHours
@@ -283,7 +284,8 @@ def test_a_break_shows_as_its_own_line_in_german_too(empty_calendar, db):
     assert "11:15  Klassische Gesichtsbehandlung — Sofia" in email.text
 
 
-def test_cancelling_frees_every_part(empty_calendar):
+@pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-2")])
+def test_cancelling_frees_every_part(empty_calendar, _ac):
     client = empty_calendar
     _, token = _booked_chain(client)
     assert "10:00" not in [s["time"] for s in chains(client, ["Deep tissue massage"])]

@@ -134,6 +134,13 @@ def manage_token(client, booking_id: int) -> str:
         return session.get(Booking, booking_id).manage_token
 
 
+def customer_bookings(client, token: str) -> list[dict]:
+    """Load the bookings visible through a customer's verified manage link."""
+    response = client.get(f"/public/bookings/{token}/list")
+    assert response.status_code == 200
+    return response.json()["bookings"]
+
+
 def book(client, services, day, start, therapist=None, add_ons=(), confirm=True, **customer):
     """Book online. By default also clicks the "confirm your booking" email link, as a
     real customer would; pass confirm=False to leave the booking pending."""

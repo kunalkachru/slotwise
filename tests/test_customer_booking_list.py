@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from app import clock
-from tests.conftest import book, manage_token, slots
+from tests.conftest import book, customer_bookings, manage_token, slots
 
 TUESDAY = "2026-10-13"
 
@@ -118,3 +118,17 @@ def test_customer_cannot_cancel_cancelled_booking_shows_already_cancelled_messag
     assert "already cancelled" in response.json()["detail"]
     booking = client.get(f"/public/bookings/{token}/list").json()["bookings"][0]
     assert booking["status"] == "cancelled" and booking["can_cancel"] is False
+
+
+@pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-1")])
+def test_manage_token_cannot_list_another_customers_bookings(empty_calendar, _ac):
+    client = empty_calendar
+    own = book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia",
+               email="anna.mueller@example.com").json()
+    another = book(client, ["Deep tissue massage"], TUESDAY, "17:00", "Lena",
+                   email="tom.becker@example.com").json()
+    token = manage_token(client, own["id"])
+
+    assert [booking["id"] for booking in customer_bookings(client, token)] == [own["id"]]
+    response = client.post(f"/public/bookings/{token}/list/{another['id']}/cancel")
+    assert response.status_code == 404
