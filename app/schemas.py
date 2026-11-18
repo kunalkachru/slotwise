@@ -298,6 +298,17 @@ class ManageOut(BaseModel):
     hold_until: datetime | None = None
 
 
+class CustomerBookingOut(ManageOut):
+    """A booking in the token-scoped customer list."""
+
+    id: int
+    cancellation_reason: str | None = None
+
+
+class CustomerBookingsOut(BaseModel):
+    bookings: list[CustomerBookingOut]
+
+
 # ---------- Slice 4: owner area ----------
 
 

@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.errors import (
     ALREADY_CANCELLED_OR_FINISHED,
+    BOOKING_ALREADY_CANCELLED,
+    BOOKING_ALREADY_STARTED,
+    BOOKING_FINISHED,
     BOOKING_NOT_FOUND,
     BOOKING_REQUEST_EXPIRED,
     CANNOT_CONFIRM,
@@ -276,6 +279,38 @@ def can_confirm(booking: Booking) -> bool:
 
 def can_cancel(booking: Booking) -> bool:
     return booking.status in ("pending", "booked", "confirmed") and booking.start_at > clock.now()
+
+
+def customer_bookings(db: Session, token: str) -> list[Booking]:
+    """Return only bookings belonging to the customer proved by this manage token."""
+    access_booking = get_by_token(db, token)
+    return list(db.scalars(
+        select(Booking)
+        .where(Booking.customer_id == access_booking.customer_id)
+        .order_by(Booking.start_at, Booking.id)
+    ).all())
+
+
+def customer_cancellation_reason(booking: Booking) -> str | None:
+    if booking.status == "cancelled":
+        return BOOKING_ALREADY_CANCELLED
+    if booking.status in ("done", "no_show", "expired"):
+        return BOOKING_FINISHED
+    if booking.start_at <= clock.now():
+        return BOOKING_ALREADY_STARTED
+    return None
+
+
+def cancel_customer_booking(db: Session, token: str, booking_id: int) -> Booking:
+    """Cancel a booking only when the token's customer owns it."""
+    access_booking = get_by_token(db, token)
+    booking = db.get(Booking, booking_id)
+    if booking is None or booking.customer_id != access_booking.customer_id:
+        raise AppError(404, BOOKING_NOT_FOUND)
+    reason = customer_cancellation_reason(booking)
+    if reason is not None:
+        raise AppError(400, reason)
+    return cancel_booking(db, booking)
 
 
 def confirm_booking(db: Session, booking: Booking) -> Booking:

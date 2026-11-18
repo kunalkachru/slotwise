@@ -149,6 +149,12 @@ MESSAGES_DE = {
         "Diese Buchung kann nicht mehr bestätigt werden.",
     "This booking is already cancelled or finished.":
         "Diese Buchung ist bereits storniert oder abgeschlossen.",
+    "This booking has already started and cannot be cancelled.":
+        "Diese Buchung hat bereits begonnen und kann nicht storniert werden.",
+    "This booking was already cancelled and cannot be cancelled again.":
+        "Diese Buchung wurde bereits storniert und kann nicht erneut storniert werden.",
+    "This booking is finished and cannot be cancelled.":
+        "Diese Buchung ist abgeschlossen und kann nicht storniert werden.",
     "This booking request has expired because it wasn't confirmed in time. Please book again.":
         "Diese Buchungsanfrage ist abgelaufen, weil sie nicht rechtzeitig bestätigt wurde. "
         "Bitte buchen Sie erneut.",

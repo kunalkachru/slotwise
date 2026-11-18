@@ -27,8 +27,11 @@ from app.logic.booking import (
     can_cancel,
     can_confirm,
     cancel_booking,
+    cancel_customer_booking,
     confirm_booking,
     create_booking,
+    customer_bookings,
+    customer_cancellation_reason,
     free_cancellation_until,
     get_by_token,
     hold_until,
@@ -51,6 +54,8 @@ from app.schemas import (
     BookingIn,
     BookingOut,
     CategoryOut,
+    CustomerBookingOut,
+    CustomerBookingsOut,
     ManageOut,
     OfferLineOut,
     OfferOut,
@@ -287,6 +292,30 @@ def verify(token: str, request: Request, db: Session = Depends(get_db)):
 @router.get("/bookings/{token}", response_model=ManageOut)
 def view_booking(token: str, db: Session = Depends(get_db)):
     return _manage_view(db, get_by_token(db, token))
+
+
+def _customer_booking_view(db: Session, booking) -> CustomerBookingOut:
+    return CustomerBookingOut(
+        id=booking.id,
+        cancellation_reason=customer_cancellation_reason(booking),
+        **_manage_view(db, booking).model_dump(),
+    )
+
+
+@router.get("/bookings/{token}/list", response_model=CustomerBookingsOut)
+def customer_booking_list(token: str, db: Session = Depends(get_db)):
+    return CustomerBookingsOut(
+        bookings=[_customer_booking_view(db, booking) for booking in customer_bookings(db, token)]
+    )
+
+
+@router.post("/bookings/{token}/list/{booking_id}/cancel", response_model=dict)
+def cancel_customer_booking_route(token: str, booking_id: int, request: Request,
+                                 db: Session = Depends(get_db)):
+    booking = cancel_customer_booking(db, token, booking_id)
+    waitlist.offer_freed(db, request.app.state.mailer, request.app.state.settings.public_url,
+                         waitlist.freed_times(booking))
+    return {"booking": _customer_booking_view(db, booking)}
 
 
 @router.get("/services/{service_id}/photo")
