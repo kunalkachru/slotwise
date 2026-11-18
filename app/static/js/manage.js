@@ -4,6 +4,7 @@ import { locale, t } from "/js/i18n.js";
 const params = new URLSearchParams(location.search);
 const token = params.get("token") || "";
 const action = params.get("action"); // "verify" (booking email) | "confirm" | "cancel" (reminder)
+const view = params.get("view"); // "single" keeps the legacy single-booking manage view
 const target = document.getElementById("manage");
 
 const BERLIN = "Europe/Berlin";
@@ -120,7 +121,7 @@ async function load() {
   }
 }
 
-function renderCustomerBooking(booking, listMessage) {
+function renderCustomerBooking(booking, listMessage, isManageBooking = false) {
   const isCancelled = booking.status === "cancelled";
   const cancelAction = booking.can_cancel
     ? h("button", {
@@ -140,16 +141,20 @@ function renderCustomerBooking(booking, listMessage) {
     ).join(" · ")),
     booking.cancellation_reason && h("p", { class: "customer-booking-reason", role: "status" }, booking.cancellation_reason),
     cancelAction && h("div", { class: "customer-booking-actions" }, cancelAction),
+    isManageBooking && h("a", {
+      class: "btn btn-ghost btn-block", href: `${location.pathname}?token=${encodeURIComponent(token)}&view=single`,
+    }, t("manage.view_booking")),
     listMessage && h("p", { class: listMessage.kind === "error" ? "alert" : "success-note", role: "status" }, listMessage.text),
   );
 }
 
-function renderCustomerList(bookings, listMessage = null) {
+function renderCustomerList(bookings, manageBookingId, listMessage = null) {
   fill(target,
     h("h1", {}, t("manage.bookings")),
     h("p", { class: "muted" }, t("manage.bookings_intro")),
     h("div", { class: "customer-bookings" }, bookings.map((booking) =>
-      renderCustomerBooking(booking, listMessage && listMessage.id === booking.id ? listMessage : null))),
+      renderCustomerBooking(booking, listMessage && listMessage.id === booking.id ? listMessage : null,
+        booking.id === manageBookingId))),
   );
 }
 
@@ -158,10 +163,10 @@ async function cancelFromList(booking) {
   try {
     await api(`${bookingUrl()}/list/${booking.id}/cancel`, { method: "POST" });
     const result = await api(bookingsUrl());
-    renderCustomerList(result.bookings, { id: booking.id, text: t("manage.msg_cancel"), kind: "ok" });
+    renderCustomerList(result.bookings, booking.id, { id: booking.id, text: t("manage.msg_cancel"), kind: "ok" });
   } catch (error) {
     const result = await api(bookingsUrl()).catch(() => null);
-    if (result) renderCustomerList(result.bookings, { id: booking.id, text: error.message, kind: "error" });
+    if (result) renderCustomerList(result.bookings, booking.id, { id: booking.id, text: error.message, kind: "error" });
     else showError(error.message);
   }
 }
@@ -172,8 +177,9 @@ async function loadCustomerList() {
     return;
   }
   try {
+    const manageBooking = await api(bookingUrl());
     const result = await api(bookingsUrl());
-    renderCustomerList(result.bookings);
+    renderCustomerList(result.bookings, manageBooking.id);
   } catch (error) {
     showError(error.message);
   }
@@ -182,9 +188,10 @@ async function loadCustomerList() {
 async function init() {
   studio = await api("/public/studio").catch(() => null);
   if (studio) document.querySelectorAll("[data-studio-name]").forEach((el) => (el.textContent = studio.name));
+  const singleView = view === "single" || Boolean(action);
   // Drop ?action= from the address bar so a reload doesn't repeat it.
-  if (action) history.replaceState(null, "", `${location.pathname}?token=${encodeURIComponent(token)}`);
-  if (action === "verify" || action === "confirm" || action === "cancel") {
+  if (action) history.replaceState(null, "", `${location.pathname}?token=${encodeURIComponent(token)}&view=single`);
+  if (singleView) {
     const booking = await load();
     if (booking && action === "verify" && booking.awaiting_email_confirmation) act("verify");
     if (booking && action === "confirm" && booking.can_confirm) act("confirm");

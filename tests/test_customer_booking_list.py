@@ -27,6 +27,22 @@ def test_customer_bookings_list_renders_cancelled_status_after_action():
     assert '"status.cancelled": "Cancelled"' in i18n_js
 
 
+def test_single_booking_manage_view_remains_reachable_from_the_customer_list():
+    manage_js = Path("app/static/js/manage.js").read_text()
+    assert 'params.get("view")' in manage_js
+    assert 'view === "single"' in manage_js
+    assert "manage.view_booking" in manage_js
+    assert "&view=single" in manage_js
+    assert "calendar.ics" in manage_js
+    assert "/receipt.html?token=" in manage_js
+
+
+def test_FIX_1_manage_initialization_preserves_single_booking_actions():
+    manage_js = Path("app/static/js/manage.js").read_text()
+    assert 'const singleView = view === "single" || Boolean(action);' in manage_js
+    assert "if (singleView)" in manage_js
+
+
 @pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-5")])
 def test_customer_manage_list_is_responsive_and_localized(_ac):
     css = Path("app/static/css/styles.css").read_text()
