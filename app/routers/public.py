@@ -31,6 +31,7 @@ from app.logic.booking import (
     create_booking,
     free_cancellation_until,
     get_by_token,
+    get_customer_bookings,
     hold_until,
     mailbox_key,
     verify_booking,
@@ -51,6 +52,7 @@ from app.schemas import (
     BookingIn,
     BookingOut,
     CategoryOut,
+    CustomerBookingOut,
     ManageOut,
     OfferLineOut,
     OfferOut,
@@ -269,6 +271,28 @@ def _manage_view(db: Session, booking) -> ManageOut:
         awaiting_email_confirmation=booking.status == "pending",
         hold_until=hold_until(booking) if booking.status == "pending" else None,
     )
+
+
+def _customer_booking_view(db: Session, booking) -> CustomerBookingOut:
+    return CustomerBookingOut(
+        id=booking.id,
+        **booking_fields(booking),
+        free_cancellation_until=free_cancellation_until(db, booking),
+        late_cancellation=booking.late_cancellation,
+        can_confirm=can_confirm(booking) and booking.status == "booked",
+        can_cancel=can_cancel(booking),
+        confirmed_at=booking.confirmed_at,
+        cancelled_at=booking.cancelled_at,
+        receipt_number=booking.receipt_number if booking.receipt_sent_at else None,
+        receipt_sent_at=booking.receipt_sent_at,
+        awaiting_email_confirmation=booking.status == "pending",
+        hold_until=hold_until(booking) if booking.status == "pending" else None,
+    )
+
+
+@router.get("/bookings", response_model=list[CustomerBookingOut])
+def list_customer_bookings(token: str, db: Session = Depends(get_db)):
+    return [_customer_booking_view(db, booking) for booking in get_customer_bookings(db, token)]
 
 
 @router.post("/bookings/{token}/verify", response_model=ManageOut)

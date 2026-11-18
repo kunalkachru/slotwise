@@ -298,6 +298,12 @@ class ManageOut(BaseModel):
     hold_until: datetime | None = None
 
 
+class CustomerBookingOut(ManageOut):
+    """Safe booking details returned by the token-scoped customer list."""
+
+    id: int
+
+
 # ---------- Slice 4: owner area ----------
 
 
