@@ -127,7 +127,7 @@ function renderCustomerBooking(booking, listMessage, isManageBooking = false) {
     ? h("button", {
         class: "btn btn-danger-ghost", type: "button",
         onclick: () => cancelFromList(booking),
-      }, t("manage.cancel"))
+      }, t("manage.cancel_action"))
     : null;
 
   return h("article", { class: `customer-booking${isCancelled ? " is-cancelled" : ""}` },

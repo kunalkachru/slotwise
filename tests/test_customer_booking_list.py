@@ -44,11 +44,13 @@ def test_FIX_1_manage_initialization_preserves_single_booking_actions():
 
 
 @pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-5")])
-def test_customer_manage_list_is_responsive_and_localized(_ac):
+def test_AC_5_customer_manage_list_is_responsive_and_localized(_ac):
     css = Path("app/static/css/styles.css").read_text()
     i18n_js = Path("app/static/js/i18n.js").read_text()
+    manage_js = Path("app/static/js/manage.js").read_text()
     assert ".customer-bookings" in css
-    assert "manage.cancel" in i18n_js
+    assert 't("manage.cancel_action")' in manage_js
+    assert '"manage.cancel_action": "Cancel"' in i18n_js
     assert "manage.already_started" in i18n_js
     assert "manage.already_cancelled" in i18n_js
 
