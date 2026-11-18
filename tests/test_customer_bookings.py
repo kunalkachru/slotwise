@@ -32,6 +32,18 @@ def test_customer_bookings_page_renders_cancel_action_and_cancelled_state():
     assert 'status.cancelled' in translations
 
 
+@pytest.mark.parametrize(
+    "acceptance", [pytest.param(None, id="AC-2: visible cancelled customer booking state")]
+)
+def test_customer_bookings_render_visible_cancelled_state(acceptance):
+    """AC-2: the list renders the cancelled response as the visible status label."""
+    javascript = (Path(__file__).parents[1] / "app" / "static" / "js" / "manage.js").read_text()
+
+    assert 'const label = booking.status === "cancelled"' in javascript
+    assert '? t("status.cancelled")' in javascript
+    assert "renderCustomerBookings(customerBookings)" in javascript
+
+
 def test_customer_bookings_list_is_scoped_and_hides_tokens(empty_calendar):
     customer_booking = book(
         empty_calendar, ["Classic facial"], TUESDAY, "10:00", "Sofia",

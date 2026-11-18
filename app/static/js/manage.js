@@ -40,6 +40,9 @@ function bookingDetails(booking) {
 }
 
 function renderCustomerBooking(booking) {
+  const label = booking.status === "cancelled"
+    ? t("status.cancelled")
+    : statusLabel(booking.status);
   const cancel = booking.can_cancel
     ? h("button", {
         class: "btn btn-danger-ghost btn-block", type: "button",
@@ -52,7 +55,7 @@ function renderCustomerBooking(booking) {
 
   return h("article", { class: "booking-list-item", "data-booking-id": booking.id },
     h("div", { class: "booking-list-head" },
-      h("span", { class: `status-badge ${booking.status}` }, statusLabel(booking.status)),
+      h("span", { class: `status-badge ${booking.status}` }, label),
       h("h2", {}, t("manage.booking_on", { date: longDate.format(new Date(`${booking.date}T12:00:00Z`)) }))),
     bookingDetails(booking),
     h("ul", { class: "booking-list-services" }, booking.items.map((item) =>
