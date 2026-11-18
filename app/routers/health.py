@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/ping")
 def ping():
-    return {"ok": True}
+    return {"pong": True}
 
 
 @router.get("/health", response_model=HealthOut)
