@@ -111,6 +111,11 @@ def test_started_booking_cannot_be_cancelled_from_customer_list(empty_calendar, 
     at = datetime(2026, 10, 13, 10, 30, tzinfo=clock.BERLIN)
     monkeypatch.setattr("app.clock.now", lambda: at)
 
+    listed = empty_calendar.get("/public/bookings", params={"token": token})
+
+    assert listed.status_code == 200
+    assert [booking["id"] for booking in listed.json()] == [booking_id]
+
     rejected = empty_calendar.post(
         f"/public/bookings/{booking_id}/cancel", params={"token": token}
     )

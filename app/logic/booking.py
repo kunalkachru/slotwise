@@ -248,13 +248,14 @@ def get_by_token(db: Session, token: str) -> Booking:
 
 
 def get_customer_bookings(db: Session, token: str) -> list[Booking]:
-    """Return the token owner's future bookings without trusting a customer-supplied id."""
+    """Return the token owner's current and future bookings without trusting a
+    customer-supplied id."""
     booking = get_by_token(db, token)
     return db.scalars(
         select(Booking)
         .where(
             Booking.customer_id == booking.customer_id,
-            Booking.start_at > clock.now(),
+            Booking.end_at > clock.now(),
             Booking.status != "expired",
         )
         .order_by(Booking.start_at)
