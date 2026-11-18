@@ -295,8 +295,8 @@ def list_customer_bookings(token: str, db: Session = Depends(get_db)):
     return [_customer_booking_view(db, booking) for booking in get_customer_bookings(db, token)]
 
 
-def _cancel_and_offer(db: Session, request: Request, booking):
-    booking = cancel_booking(db, booking)
+def _cancel_and_offer(db: Session, request: Request, booking, *, pending_status: str = "expired"):
+    booking = cancel_booking(db, booking, pending_status=pending_status)
     # The freed time (every part of the visit) goes to the first fitting person waiting.
     waitlist.offer_freed(db, request.app.state.mailer, request.app.state.settings.public_url,
                          waitlist.freed_times(booking))
@@ -315,7 +315,9 @@ def cancel_customer_booking(
     booking = db.get(Booking, int(booking_id))
     if booking is None or booking.customer_id != token_booking.customer_id:
         raise AppError(404, BOOKING_NOT_FOUND)
-    return _customer_booking_view(db, _cancel_and_offer(db, request, booking))
+    return _customer_booking_view(
+        db, _cancel_and_offer(db, request, booking, pending_status="cancelled")
+    )
 
 
 @router.post("/bookings/{token}/verify", response_model=ManageOut)

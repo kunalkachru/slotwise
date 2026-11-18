@@ -24,6 +24,7 @@ def test_customer_bookings_page_renders_cancel_action_and_cancelled_state():
     assert 'booking.can_cancel' in javascript
     assert 'cancelled' in javascript
     assert 'public/bookings/${booking.id}/cancel' in javascript
+    assert 'window.confirm' not in javascript
     assert 'status.cancelled' in translations
 
 
@@ -52,6 +53,23 @@ def test_customer_bookings_list_is_scoped_and_hides_tokens(empty_calendar):
     assert "Müller" not in response.text
     assert "Tom" not in response.text
     assert "Becker" not in response.text
+
+
+def test_customer_list_cancellation_shows_cancelled_for_pending_booking(empty_calendar):
+    response = book(
+        empty_calendar, ["Classic facial"], TUESDAY, "10:00", "Sofia", confirm=False,
+    )
+    booking_id = response.json()["id"]
+    token = manage_token(empty_calendar, booking_id)
+
+    cancelled = empty_calendar.post(
+        f"/public/bookings/{booking_id}/cancel", params={"token": token}
+    )
+
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+    listed = empty_calendar.get("/public/bookings", params={"token": token})
+    assert listed.json()[0]["status"] == "cancelled"
 
 
 @pytest.mark.parametrize(

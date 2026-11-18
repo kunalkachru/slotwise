@@ -304,7 +304,7 @@ def confirm_booking(db: Session, booking: Booking) -> Booking:
     return booking
 
 
-def cancel_booking(db: Session, booking: Booking) -> Booking:
+def cancel_booking(db: Session, booking: Booking, *, pending_status: str = "expired") -> Booking:
     """Free up to `free_cancellation_hours` before the start; later is allowed but flagged."""
     if booking.status == "cancelled":
         raise AppError(400, BOOKING_ALREADY_CANCELLED)
@@ -314,8 +314,9 @@ def cancel_booking(db: Session, booking: Booking) -> Booking:
         raise AppError(400, ALREADY_CANCELLED_OR_FINISHED)
     now = clock.now()
     if booking.status == "pending":
-        # Never confirmed: withdrawn, not a cancellation (keeps the dashboard honest).
-        booking.status = "expired"
+        # The email-token flow withdraws an unconfirmed request. The customer list has
+        # an explicit cancellation action, so it keeps the requested Cancelled state.
+        booking.status = pending_status
         booking.cancelled_at = now
         db.commit()
         return booking

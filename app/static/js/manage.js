@@ -42,9 +42,7 @@ function renderCustomerBooking(booking) {
   const cancel = booking.can_cancel
     ? h("button", {
         class: "btn btn-danger-ghost btn-block", type: "button",
-        onclick: () => {
-          if (window.confirm(t("manage.confirm_cancel"))) cancelCustomerBooking(booking);
-        },
+        onclick: () => cancelCustomerBooking(booking),
       }, t("manage.cancel"))
     : h("p", { class: "muted booking-list-reason", role: "status" },
         booking.status === "cancelled"
