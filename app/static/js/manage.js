@@ -19,6 +19,7 @@ let studio = null;
 let message = null; // { text, kind } shown above the booking after an action
 let askingToCancel = action === "cancel";
 let listMode = !action;
+let customerBookings = [];
 
 const bookingUrl = () => `/public/bookings/${encodeURIComponent(token)}`;
 
@@ -152,8 +153,8 @@ async function cancelCustomerBooking(booking) {
   try {
     const cancelled = await api(`/public/bookings/${booking.id}/cancel?token=${encodeURIComponent(token)}`, { method: "POST" });
     message = { text: t(cancelled.late_cancellation ? "manage.msg_cancel_late" : "manage.msg_cancel"), kind: "ok" };
-    const bookings = await api(`/public/bookings?token=${encodeURIComponent(token)}`);
-    renderCustomerBookings(bookings);
+    customerBookings = customerBookings.map((booking) => booking.id === cancelled.id ? cancelled : booking);
+    renderCustomerBookings(customerBookings);
   } catch (error) {
     message = { text: error.message, kind: "error" };
     loadCustomerBookings();
@@ -181,9 +182,9 @@ async function loadCustomerBookings() {
     return;
   }
   try {
-    const bookings = await api(`/public/bookings?token=${encodeURIComponent(token)}`);
-    renderCustomerBookings(bookings);
-    return bookings;
+    customerBookings = await api(`/public/bookings?token=${encodeURIComponent(token)}`);
+    renderCustomerBookings(customerBookings);
+    return customerBookings;
   } catch (error) {
     showError(error.message);
     return null;

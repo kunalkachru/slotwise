@@ -24,6 +24,10 @@ def test_customer_bookings_page_renders_cancel_action_and_cancelled_state():
     assert 'booking.can_cancel' in javascript
     assert 'cancelled' in javascript
     assert 'public/bookings/${booking.id}/cancel' in javascript
+    assert (
+        'customerBookings.map((booking) => booking.id === cancelled.id ? cancelled : booking)'
+        in javascript
+    )
     assert 'window.confirm' not in javascript
     assert 'status.cancelled' in translations
 
