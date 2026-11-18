@@ -53,6 +53,16 @@ def test_AC_5_customer_manage_list_is_responsive_and_localized(_ac):
     assert '"manage.cancel_action": "Cancel"' in i18n_js
     assert "manage.already_started" in i18n_js
     assert "manage.already_cancelled" in i18n_js
+    assert 'disabled: true' in manage_js
+    assert 't("manage.cancel_action")' in manage_js
+
+
+@pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-5")])
+def test_AC_5_manage_list_derives_ineligible_cancellation_message_from_booking_state(_ac):
+    manage_js = Path("app/static/js/manage.js").read_text()
+    assert 't("manage.already_cancelled")' in manage_js
+    assert 't("manage.already_started")' in manage_js
+    assert "booking.cancellation_reason ||" in manage_js
 
 
 @pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-6")])

@@ -123,10 +123,22 @@ async function load() {
 
 function renderCustomerBooking(booking, listMessage, isManageBooking = false) {
   const isCancelled = booking.status === "cancelled";
+  const cancellationReason = booking.cancellation_reason || (
+    isCancelled
+      ? t("manage.already_cancelled")
+      : !booking.can_cancel
+      ? t("manage.already_started")
+      : null
+  );
   const cancelAction = booking.can_cancel
     ? h("button", {
         class: "btn btn-danger-ghost", type: "button",
         onclick: () => cancelFromList(booking),
+      }, t("manage.cancel_action"))
+    : cancellationReason
+    ? h("button", {
+        class: "btn btn-danger-ghost", type: "button", disabled: true,
+        "aria-label": cancellationReason,
       }, t("manage.cancel_action"))
     : null;
 
@@ -139,7 +151,7 @@ function renderCustomerBooking(booking, listMessage, isManageBooking = false) {
     h("p", { class: "customer-booking-services" }, booking.items.map((item) =>
       `${item.item_type === "add_on" ? "+ " : ""}${item.name}${item.quantity > 1 ? ` × ${item.quantity}` : ""}`
     ).join(" · ")),
-    booking.cancellation_reason && h("p", { class: "customer-booking-reason", role: "status" }, booking.cancellation_reason),
+    cancellationReason && h("p", { class: "customer-booking-reason", role: "status" }, cancellationReason),
     cancelAction && h("div", { class: "customer-booking-actions" }, cancelAction),
     isManageBooking && h("a", {
       class: "btn btn-ghost btn-block", href: `${location.pathname}?token=${encodeURIComponent(token)}&view=single`,
