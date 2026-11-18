@@ -102,6 +102,14 @@ input {
 .alert[hidden] { display: none; }
 .muted { color: var(--muted); }
 
+.booking-list { display: grid; gap: 1rem; }
+.booking-list-item { padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.booking-list-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
+.booking-list-head h2 { margin: 0; font-size: 1.1rem; }
+.booking-list-item .facts { margin: 0 0 0.75rem; }
+.booking-list-services { margin: 0 0 1rem; padding-left: 1.25rem; color: var(--muted); }
+.booking-list-reason { margin: 0; }
+
 /* ---------- Logo ---------- */
 .logo {
   display: inline-flex;

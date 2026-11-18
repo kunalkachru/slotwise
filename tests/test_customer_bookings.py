@@ -1,6 +1,7 @@
 """Customer bookings-list contract (S-118, T1)."""
 
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -8,6 +9,22 @@ from app import clock
 from tests.conftest import book, manage_token, slots
 
 TUESDAY = "2026-10-13"
+
+
+def test_customer_bookings_page_renders_cancel_action_and_cancelled_state():
+    """The manage page must render the token-scoped list and its cancellation states."""
+    root = Path(__file__).parents[1] / "app" / "static"
+    html = (root / "manage.html").read_text()
+    javascript = (root / "js" / "manage.js").read_text()
+    translations = (root / "js" / "i18n.js").read_text()
+
+    assert 'id="manage"' in html
+    assert 'id: "manage-bookings"' in javascript
+    assert 'api(`/public/bookings?token=' in javascript
+    assert 'booking.can_cancel' in javascript
+    assert 'cancelled' in javascript
+    assert 'public/bookings/${booking.id}/cancel' in javascript
+    assert 'status.cancelled' in translations
 
 
 def test_customer_bookings_list_is_scoped_and_hides_tokens(empty_calendar):
