@@ -20,6 +20,7 @@ let message = null; // { text, kind } shown above the booking after an action
 let askingToCancel = action === "cancel";
 
 const bookingUrl = () => `/public/bookings/${encodeURIComponent(token)}`;
+const bookingsUrl = () => `${bookingUrl()}/list`;
 
 function showError(text) {
   fill(target, 
@@ -119,14 +120,78 @@ async function load() {
   }
 }
 
+function renderCustomerBooking(booking, listMessage) {
+  const isCancelled = booking.status === "cancelled";
+  const cancelAction = booking.can_cancel
+    ? h("button", {
+        class: "btn btn-danger-ghost", type: "button",
+        onclick: () => cancelFromList(booking),
+      }, t("manage.cancel"))
+    : null;
+
+  return h("article", { class: `customer-booking${isCancelled ? " is-cancelled" : ""}` },
+    h("div", { class: "customer-booking-head" },
+      h("div", {},
+        h("h2", {}, longDate.format(new Date(`${booking.date}T12:00:00Z`))),
+        h("p", { class: "customer-booking-time" }, `${booking.time} · ${booking.therapist_name}`)),
+      h("span", { class: `status-badge ${booking.status}` }, statusLabel(booking.status))),
+    h("p", { class: "customer-booking-services" }, booking.items.map((item) =>
+      `${item.item_type === "add_on" ? "+ " : ""}${item.name}${item.quantity > 1 ? ` × ${item.quantity}` : ""}`
+    ).join(" · ")),
+    booking.cancellation_reason && h("p", { class: "customer-booking-reason", role: "status" }, booking.cancellation_reason),
+    cancelAction && h("div", { class: "customer-booking-actions" }, cancelAction),
+    listMessage && h("p", { class: listMessage.kind === "error" ? "alert" : "success-note", role: "status" }, listMessage.text),
+  );
+}
+
+function renderCustomerList(bookings, listMessage = null) {
+  fill(target,
+    h("h1", {}, t("manage.bookings")),
+    h("p", { class: "muted" }, t("manage.bookings_intro")),
+    h("div", { class: "customer-bookings" }, bookings.map((booking) =>
+      renderCustomerBooking(booking, listMessage && listMessage.id === booking.id ? listMessage : null))),
+  );
+}
+
+async function cancelFromList(booking) {
+  target.querySelectorAll("button").forEach((button) => (button.disabled = true));
+  try {
+    await api(`${bookingUrl()}/list/${booking.id}/cancel`, { method: "POST" });
+    const result = await api(bookingsUrl());
+    renderCustomerList(result.bookings, { id: booking.id, text: t("manage.msg_cancel"), kind: "ok" });
+  } catch (error) {
+    const result = await api(bookingsUrl()).catch(() => null);
+    if (result) renderCustomerList(result.bookings, { id: booking.id, text: error.message, kind: "error" });
+    else showError(error.message);
+  }
+}
+
+async function loadCustomerList() {
+  if (!token) {
+    showError(t("manage.incomplete"));
+    return;
+  }
+  try {
+    const result = await api(bookingsUrl());
+    renderCustomerList(result.bookings);
+  } catch (error) {
+    showError(error.message);
+  }
+}
+
 async function init() {
   studio = await api("/public/studio").catch(() => null);
   if (studio) document.querySelectorAll("[data-studio-name]").forEach((el) => (el.textContent = studio.name));
   // Drop ?action= from the address bar so a reload doesn't repeat it.
   if (action) history.replaceState(null, "", `${location.pathname}?token=${encodeURIComponent(token)}`);
-  const booking = await load();
-  if (booking && action === "verify" && booking.awaiting_email_confirmation) act("verify");
-  if (booking && action === "confirm" && booking.can_confirm) act("confirm");
+  if (action === "verify" || action === "confirm" || action === "cancel") {
+    const booking = await load();
+    if (booking && action === "verify" && booking.awaiting_email_confirmation) act("verify");
+    if (booking && action === "confirm" && booking.can_confirm) act("confirm");
+    if (booking && action === "cancel" && booking.can_cancel) act("cancel");
+    return;
+  }
+  await loadCustomerList();
 }
 
 init();

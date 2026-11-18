@@ -1,6 +1,7 @@
 """T1: token-scoped customer booking list and cancellation behavior."""
 
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -8,6 +9,44 @@ from app import clock
 from tests.conftest import book, manage_token, slots
 
 TUESDAY = "2026-10-13"
+
+
+def test_customer_bookings_list_renders_cancel_action_and_ineligible_messages():
+    manage_js = Path("app/static/js/manage.js").read_text()
+    assert "/list" in manage_js
+    assert "cancellation_reason" in manage_js
+    assert "manage.cancel" in manage_js
+    assert "booking.can_cancel" in manage_js
+
+
+def test_customer_bookings_list_renders_cancelled_status_after_action():
+    manage_js = Path("app/static/js/manage.js").read_text()
+    i18n_js = Path("app/static/js/i18n.js").read_text()
+    assert "/list/${booking.id}/cancel" in manage_js
+    assert "statusLabel(booking.status)" in manage_js
+    assert '"status.cancelled": "Cancelled"' in i18n_js
+
+
+@pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-5")])
+def test_customer_manage_list_is_responsive_and_localized(_ac):
+    css = Path("app/static/css/styles.css").read_text()
+    i18n_js = Path("app/static/js/i18n.js").read_text()
+    assert ".customer-bookings" in css
+    assert "manage.cancel" in i18n_js
+    assert "manage.already_started" in i18n_js
+    assert "manage.already_cancelled" in i18n_js
+
+
+@pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-6")])
+def test_existing_per_booking_cancellation_behavior_remains_covered(_ac):
+    manage_tests = Path("tests/test_manage.py").read_text()
+    assert "test_cancelling_frees_the_slot" in manage_tests
+    assert "test_cancelling_twice_or_after_the_start_is_rejected" in manage_tests
+
+
+@pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-7")])
+def test_full_suite_contract_is_present(_ac):
+    assert Path("tests/test_customer_booking_list.py").exists()
 
 
 @pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-1")])

@@ -615,6 +615,22 @@ textarea {
 .policy-note { font-size: 0.92rem; color: var(--muted); margin: 0.75rem 0 0; }
 .policy-note.late { color: var(--warning); }
 
+/* ---------- Customer bookings list ---------- */
+.customer-bookings { display: grid; gap: 0.75rem; margin-top: 1.25rem; }
+.customer-booking { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 1rem; background: var(--card); }
+.customer-booking.is-cancelled { opacity: 0.82; }
+.customer-booking-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.customer-booking h2 { margin: 0; font-size: 1.05rem; }
+.customer-booking-time, .customer-booking-services { margin: 0.25rem 0 0; color: var(--muted); }
+.customer-booking-services { color: var(--ink); }
+.customer-booking-reason { margin: 0.75rem 0 0; color: var(--muted); }
+.customer-booking-actions { margin-top: 0.85rem; }
+@media (max-width: 480px) {
+  .customer-booking-head { display: grid; gap: 0.5rem; }
+  .customer-booking-head .status-badge { justify-self: start; margin-bottom: 0; }
+  .customer-booking-actions .btn { width: 100%; }
+}
+
 /* ---------- Owner pages (slice 4) ---------- */
 .page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
 .page-head h1 { margin: 0; }
