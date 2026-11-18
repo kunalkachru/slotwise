@@ -18,6 +18,8 @@ const statusLabel = (status) => t(`status.${status}`);
 let studio = null;
 let message = null; // { text, kind } shown above the booking after an action
 let askingToCancel = action === "cancel";
+let listMode = !action;
+let customerBookings = [];
 
 const bookingUrl = () => `/public/bookings/${encodeURIComponent(token)}`;
 
@@ -26,6 +28,51 @@ function showError(text) {
     h("h1", {}, t("manage.not_found")),
     h("p", { class: "muted" }, text),
     h("a", { class: "btn btn-block", href: "/" }, t("nav.back_home")),
+  );
+}
+
+function bookingDetails(booking) {
+  return h("dl", { class: "facts" },
+    fact(t("common.date"), longDate.format(new Date(`${booking.date}T12:00:00Z`))),
+    fact(t("common.time"), `${t("common.at_time", { time: booking.time })} (${formatMinutes(booking.total_minutes)})`),
+    visitFact(booking, { therapist: t("common.therapist"), visit: t("common.your_visit"), break: t("book.break") }),
+  );
+}
+
+function renderCustomerBooking(booking) {
+  const label = booking.status === "cancelled"
+    ? t("status.cancelled")
+    : statusLabel(booking.status);
+  const cancel = booking.can_cancel
+    ? h("button", {
+        class: "btn btn-danger-ghost btn-block", type: "button",
+        onclick: () => cancelCustomerBooking(booking),
+      }, t("manage.cancel"))
+    : h("p", { class: "muted booking-list-reason", role: "status" },
+        booking.status === "cancelled"
+          ? t("manage.already_cancelled")
+          : t("manage.already_started"));
+
+  return h("article", { class: "booking-list-item", "data-booking-id": booking.id },
+    h("div", { class: "booking-list-head" },
+      h("span", { class: `status-badge ${booking.status}` }, label),
+      h("h2", {}, t("manage.booking_on", { date: longDate.format(new Date(`${booking.date}T12:00:00Z`)) }))),
+    bookingDetails(booking),
+    h("ul", { class: "booking-list-services" }, booking.items.map((item) =>
+      h("li", {}, item.item_type === "add_on" ? `+ ${item.name}` : item.name))),
+    booking.status === "cancelled" && h("p", { class: "muted" },
+      t(booking.late_cancellation ? "manage.was_cancelled_late" : "manage.was_cancelled")),
+    cancel,
+  );
+}
+
+function renderCustomerBookings(bookings) {
+  fill(target,
+    message && h("p", { class: message.kind === "error" ? "alert" : "success-note", role: "status" }, message.text),
+    h("h1", {}, t("manage.bookings_h1")),
+    bookings.length
+      ? h("div", { id: "manage-bookings", class: "booking-list" }, bookings.map(renderCustomerBooking))
+      : h("p", { class: "muted" }, t("manage.no_bookings")),
   );
 }
 
@@ -104,6 +151,19 @@ async function act(kind) {
   }
 }
 
+async function cancelCustomerBooking(booking) {
+  target.querySelectorAll("button").forEach((button) => (button.disabled = true));
+  try {
+    const cancelled = await api(`/public/bookings/${booking.id}/cancel?token=${encodeURIComponent(token)}`, { method: "POST" });
+    message = { text: t(cancelled.late_cancellation ? "manage.msg_cancel_late" : "manage.msg_cancel"), kind: "ok" };
+    customerBookings = customerBookings.map((booking) => booking.id === cancelled.id ? cancelled : booking);
+    renderCustomerBookings(customerBookings);
+  } catch (error) {
+    message = { text: error.message, kind: "error" };
+    loadCustomerBookings();
+  }
+}
+
 async function load() {
   if (!token) {
     showError(t("manage.incomplete"));
@@ -119,12 +179,28 @@ async function load() {
   }
 }
 
+async function loadCustomerBookings() {
+  if (!token) {
+    showError(t("manage.incomplete"));
+    return;
+  }
+  try {
+    customerBookings = await api(`/public/bookings?token=${encodeURIComponent(token)}`);
+    renderCustomerBookings(customerBookings);
+    return customerBookings;
+  } catch (error) {
+    showError(error.message);
+    return null;
+  }
+}
+
 async function init() {
   studio = await api("/public/studio").catch(() => null);
   if (studio) document.querySelectorAll("[data-studio-name]").forEach((el) => (el.textContent = studio.name));
   // Drop ?action= from the address bar so a reload doesn't repeat it.
   if (action) history.replaceState(null, "", `${location.pathname}?token=${encodeURIComponent(token)}`);
-  const booking = await load();
+  const booking = listMode ? await loadCustomerBookings() : await load();
+  if (listMode) return;
   if (booking && action === "verify" && booking.awaiting_email_confirmation) act("verify");
   if (booking && action === "confirm" && booking.can_confirm) act("confirm");
 }

@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.errors import (
     ALREADY_CANCELLED_OR_FINISHED,
+    BOOKING_ALREADY_CANCELLED,
+    BOOKING_ALREADY_STARTED,
     BOOKING_NOT_FOUND,
     BOOKING_REQUEST_EXPIRED,
     CANNOT_CONFIRM,
@@ -245,6 +247,21 @@ def get_by_token(db: Session, token: str) -> Booking:
     return booking
 
 
+def get_customer_bookings(db: Session, token: str) -> list[Booking]:
+    """Return the token owner's current and future bookings without trusting a
+    customer-supplied id."""
+    booking = get_by_token(db, token)
+    return db.scalars(
+        select(Booking)
+        .where(
+            Booking.customer_id == booking.customer_id,
+            Booking.end_at > clock.now(),
+            Booking.status != "expired",
+        )
+        .order_by(Booking.start_at)
+    ).all()
+
+
 def free_cancellation_until(db: Session, booking: Booking) -> datetime:
     return booking.start_at - timedelta(hours=get_studio(db).free_cancellation_hours)
 
@@ -288,14 +305,19 @@ def confirm_booking(db: Session, booking: Booking) -> Booking:
     return booking
 
 
-def cancel_booking(db: Session, booking: Booking) -> Booking:
+def cancel_booking(db: Session, booking: Booking, *, pending_status: str = "expired") -> Booking:
     """Free up to `free_cancellation_hours` before the start; later is allowed but flagged."""
+    if booking.status == "cancelled":
+        raise AppError(400, BOOKING_ALREADY_CANCELLED)
+    if booking.start_at <= clock.now():
+        raise AppError(400, BOOKING_ALREADY_STARTED)
     if not can_cancel(booking):
         raise AppError(400, ALREADY_CANCELLED_OR_FINISHED)
     now = clock.now()
     if booking.status == "pending":
-        # Never confirmed: withdrawn, not a cancellation (keeps the dashboard honest).
-        booking.status = "expired"
+        # The email-token flow withdraws an unconfirmed request. The customer list has
+        # an explicit cancellation action, so it keeps the requested Cancelled state.
+        booking.status = pending_status
         booking.cancelled_at = now
         db.commit()
         return booking

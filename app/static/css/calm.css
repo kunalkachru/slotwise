@@ -712,6 +712,11 @@
 [data-theme="calm"] .confirm-cancel .row { gap: var(--space-2); flex-wrap: nowrap; }
 [data-theme="calm"] .confirm-cancel .btn { flex: 1; }
 [data-theme="calm"] .confirm-card .success-note a { color: inherit; }
+[data-theme="calm"] .booking-list { gap: var(--space-4); }
+[data-theme="calm"] .booking-list-item { padding: var(--space-5); box-shadow: var(--shadow); }
+[data-theme="calm"] .booking-list-head { margin-bottom: var(--space-3); }
+[data-theme="calm"] .booking-list-item .facts { padding: var(--space-3) 0; }
+[data-theme="calm"] .booking-list-services { margin-bottom: var(--space-4); }
 @media (max-width: 600px) {
   [data-theme="calm"] .confirm-card { margin: var(--space-6) auto; padding: var(--space-4); }
   [data-theme="calm"] .confirm-card .facts { grid-template-columns: 1fr; }

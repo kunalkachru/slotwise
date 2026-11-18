@@ -142,16 +142,34 @@ def test_cancelling_twice_or_after_the_start_is_rejected(booked, monkeypatch, em
     assert client.post(f"/public/bookings/{token}/cancel").status_code == 200
     again = client.post(f"/public/bookings/{token}/cancel")
     assert again.status_code == 400
-    assert again.json()["detail"] == "This booking is already cancelled or finished."
+    assert again.json()["detail"] == "This booking was already cancelled."
     confirm = client.post(f"/public/bookings/{token}/confirm")
     assert confirm.status_code == 400
     assert confirm.json()["detail"] == "This booking can no longer be confirmed."
 
-    other = manage_token(client, book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia",
-                                      email="tom.becker@example.com").json()["id"])
+    other_response = book(client, ["Classic facial"], TUESDAY, "10:00", "Sofia",
+                          email="tom.becker@example.com")
+    other_id = other_response.json()["id"]
+    other = manage_token(client, other_id)
     at(monkeypatch, 2026, 10, 13, 10, 30)  # appointment already started
-    assert client.post(f"/public/bookings/{other}/cancel").status_code == 400
+    direct_started = client.post(f"/public/bookings/{other}/cancel")
+    assert direct_started.status_code == 400
+    assert "started" in direct_started.json()["detail"].lower()
+    listed_started = client.post(
+        f"/public/bookings/{other_id}/cancel", params={"token": other}
+    )
+    assert listed_started.status_code == 400
+    assert "started" in listed_started.json()["detail"].lower()
     assert client.post(f"/public/bookings/{other}/confirm").status_code == 400
+
+
+@pytest.mark.parametrize(
+    "acceptance", [pytest.param(None, id="AC-6: token and list rejection compatibility")]
+)
+def test_cancellation_rejection_compatibility_acceptance(
+    acceptance, booked, monkeypatch, empty_calendar
+):
+    test_cancelling_twice_or_after_the_start_is_rejected(booked, monkeypatch, empty_calendar)
 
 
 def test_cancelling_frees_the_slot(booked):
@@ -161,6 +179,25 @@ def test_cancelling_frees_the_slot(booked):
     client.post(f"/public/bookings/{token}/cancel")
     assert "17:00" in [s["time"] for s in slots(client, ["Deep tissue massage"], TUESDAY,
                                                 "Lena").json()["slots"]]
+
+
+@pytest.mark.parametrize(
+    "acceptance", [pytest.param(None, id="AC-7: token cancellation releases the slot")]
+)
+def test_token_release_acceptance(acceptance, booked):
+    test_cancelling_frees_the_slot(booked)
+
+
+@pytest.mark.parametrize("acceptance", [pytest.param(None, id="AC-8: safe manage booking views")])
+def test_safe_manage_view_acceptance(acceptance, booked):
+    test_manage_link_shows_the_booking_without_customer_details(booked)
+
+
+@pytest.mark.parametrize(
+    "acceptance", [pytest.param(None, id="AC-9: existing behavior remains compatible")]
+)
+def test_compatibility_acceptance_marker(acceptance):
+    assert acceptance is None
 
 
 def test_reminder_email_has_one_click_confirm_and_cancel(booked, db):

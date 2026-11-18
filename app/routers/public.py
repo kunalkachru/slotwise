@@ -16,7 +16,7 @@ from app.emails import (
     waitlist_joined_email,
     waitlist_limit_email,
 )
-from app.errors import END_TIME_BEFORE_START, TOO_MANY_BOOKINGS, AppError
+from app.errors import BOOKING_NOT_FOUND, END_TIME_BEFORE_START, TOO_MANY_BOOKINGS, AppError
 from app.i18n import category_label, request_lang
 from app.logic import opening_hours, waitlist
 from app.logic import photos as photos_logic
@@ -31,6 +31,7 @@ from app.logic.booking import (
     create_booking,
     free_cancellation_until,
     get_by_token,
+    get_customer_bookings,
     hold_until,
     mailbox_key,
     verify_booking,
@@ -44,13 +45,14 @@ from app.logic.selection import (
     resolve_selection,
     therapist_candidates,
 )
-from app.models import CATEGORIES, Service, ServicePhoto, Studio, Therapist
+from app.models import CATEGORIES, Booking, Service, ServicePhoto, Studio, Therapist
 from app.schemas import (
     AddOnOut,
     AvailabilityOut,
     BookingIn,
     BookingOut,
     CategoryOut,
+    CustomerBookingOut,
     ManageOut,
     OfferLineOut,
     OfferOut,
@@ -271,6 +273,53 @@ def _manage_view(db: Session, booking) -> ManageOut:
     )
 
 
+def _customer_booking_view(db: Session, booking) -> CustomerBookingOut:
+    return CustomerBookingOut(
+        id=booking.id,
+        **booking_fields(booking),
+        free_cancellation_until=free_cancellation_until(db, booking),
+        late_cancellation=booking.late_cancellation,
+        can_confirm=can_confirm(booking) and booking.status == "booked",
+        can_cancel=can_cancel(booking),
+        confirmed_at=booking.confirmed_at,
+        cancelled_at=booking.cancelled_at,
+        receipt_number=booking.receipt_number if booking.receipt_sent_at else None,
+        receipt_sent_at=booking.receipt_sent_at,
+        awaiting_email_confirmation=booking.status == "pending",
+        hold_until=hold_until(booking) if booking.status == "pending" else None,
+    )
+
+
+@router.get("/bookings", response_model=list[CustomerBookingOut])
+def list_customer_bookings(token: str, db: Session = Depends(get_db)):
+    return [_customer_booking_view(db, booking) for booking in get_customer_bookings(db, token)]
+
+
+def _cancel_and_offer(db: Session, request: Request, booking, *, pending_status: str = "expired"):
+    booking = cancel_booking(db, booking, pending_status=pending_status)
+    # The freed time (every part of the visit) goes to the first fitting person waiting.
+    waitlist.offer_freed(db, request.app.state.mailer, request.app.state.settings.public_url,
+                         waitlist.freed_times(booking))
+    return booking
+
+
+@router.post("/bookings/{booking_id}/cancel")
+def cancel_customer_booking(
+    booking_id: str, token: str | None = None, request: Request = None,
+    db: Session = Depends(get_db)
+):
+    if not booking_id.isdecimal():
+        booking = _cancel_and_offer(db, request, get_by_token(db, booking_id))
+        return _manage_view(db, booking)
+    token_booking = get_by_token(db, token)
+    booking = db.get(Booking, int(booking_id))
+    if booking is None or booking.customer_id != token_booking.customer_id:
+        raise AppError(404, BOOKING_NOT_FOUND)
+    return _customer_booking_view(
+        db, _cancel_and_offer(db, request, booking, pending_status="cancelled")
+    )
+
+
 @router.post("/bookings/{token}/verify", response_model=ManageOut)
 def verify(token: str, request: Request, db: Session = Depends(get_db)):
     """The link in the "please confirm your booking" email."""
@@ -318,15 +367,6 @@ def booking_calendar(token: str, request: Request, db: Session = Depends(get_db)
 @router.post("/bookings/{token}/confirm", response_model=ManageOut)
 def confirm(token: str, db: Session = Depends(get_db)):
     return _manage_view(db, confirm_booking(db, get_by_token(db, token)))
-
-
-@router.post("/bookings/{token}/cancel", response_model=ManageOut)
-def cancel(token: str, request: Request, db: Session = Depends(get_db)):
-    booking = cancel_booking(db, get_by_token(db, token))
-    # The freed time (every part of the visit) goes to the first fitting person waiting.
-    waitlist.offer_freed(db, request.app.state.mailer, request.app.state.settings.public_url,
-                         waitlist.freed_times(booking))
-    return _manage_view(db, booking)
 
 
 # ---------- Waitlist (slice 5) ----------
