@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.errors import (
     ALREADY_CANCELLED_OR_FINISHED,
+    BOOKING_ALREADY_CANCELLED,
+    BOOKING_ALREADY_STARTED,
     BOOKING_NOT_FOUND,
     BOOKING_REQUEST_EXPIRED,
     CANNOT_CONFIRM,
@@ -304,6 +306,10 @@ def confirm_booking(db: Session, booking: Booking) -> Booking:
 
 def cancel_booking(db: Session, booking: Booking) -> Booking:
     """Free up to `free_cancellation_hours` before the start; later is allowed but flagged."""
+    if booking.status == "cancelled":
+        raise AppError(400, BOOKING_ALREADY_CANCELLED)
+    if booking.start_at <= clock.now():
+        raise AppError(400, BOOKING_ALREADY_STARTED)
     if not can_cancel(booking):
         raise AppError(400, ALREADY_CANCELLED_OR_FINISHED)
     now = clock.now()

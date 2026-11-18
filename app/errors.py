@@ -51,6 +51,8 @@ INVALID_TIME_WINDOW = "Please choose an earliest time before the latest time."
 BOOKING_NOT_FOUND = "Booking not found. Please check the link in your email."
 CANNOT_CONFIRM = "This booking can no longer be confirmed."
 ALREADY_CANCELLED_OR_FINISHED = "This booking is already cancelled or finished."
+BOOKING_ALREADY_CANCELLED = "This booking was already cancelled."
+BOOKING_ALREADY_STARTED = "This booking has already started and cannot be cancelled."
 BOOKING_REQUEST_EXPIRED = (
     "This booking request has expired because it wasn't confirmed in time. Please book again."
 )
