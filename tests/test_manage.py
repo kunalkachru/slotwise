@@ -137,7 +137,10 @@ def test_later_cancellation_is_allowed_but_flagged_late(booked, monkeypatch):
     assert response.json()["late_cancellation"] is True
 
 
-def test_cancelling_twice_or_after_the_start_is_rejected(booked, monkeypatch, empty_calendar):
+@pytest.mark.parametrize("_ac", [pytest.param(None, id="AC-6")])
+def test_cancelling_twice_or_after_the_start_is_rejected(
+    booked, monkeypatch, empty_calendar, _ac
+):
     client, token = booked
     assert client.post(f"/public/bookings/{token}/cancel").status_code == 200
     again = client.post(f"/public/bookings/{token}/cancel")
