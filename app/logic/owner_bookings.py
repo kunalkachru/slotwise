@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app import clock
@@ -286,6 +286,8 @@ def therapist_report(db: Session, start_day: date, end_day: date) -> list[dict]:
             qualifying_bookings.c.therapist_id,
             func.count(qualifying_bookings.c.booking_id).label('booking_count'),
             func.coalesce(func.sum(Booking.total_price), Decimal(0)).label('revenue'),
+            func.sum(case((Booking.status == 'no_show', 1), else_=0)).label('no_show_count'),
+            func.sum(case((Booking.status == 'done', 1), else_=0)).label('done_count'),
         )
         .join(Booking, Booking.id == qualifying_bookings.c.booking_id)
         .group_by(qualifying_bookings.c.therapist_id)
@@ -298,6 +300,8 @@ def therapist_report(db: Session, start_day: date, end_day: date) -> list[dict]:
             Therapist.display_name,
             func.coalesce(totals.c.booking_count, 0).label('booking_count'),
             func.coalesce(totals.c.revenue, Decimal(0)).label('revenue'),
+            func.coalesce(totals.c.no_show_count, 0).label('no_show_count'),
+            func.coalesce(totals.c.done_count, 0).label('done_count'),
         )
         .outerjoin(totals, totals.c.therapist_id == Therapist.id)
     ).all()
@@ -308,7 +312,21 @@ def therapist_report(db: Session, start_day: date, end_day: date) -> list[dict]:
             'therapist_name': therapist_name,
             'booking_count': booking_count,
             'revenue': Decimal(revenue or 0).quantize(Decimal('0.01')),
+            'no_show_count': no_show_count or 0,
+            'done_count': done_count or 0,
         }
-        for therapist_id, therapist_name, booking_count, revenue in rows
+        for therapist_id, therapist_name, booking_count, revenue, no_show_count, done_count in rows
     ]
+    for row in report:
+        row['no_show_rate'] = (
+            row['no_show_count'] / (row['done_count'] + row['no_show_count'])
+            if row['done_count'] + row['no_show_count']
+            else None
+        )
+        row['average_booking_value'] = (
+            (row['revenue'] / row['booking_count']).quantize(Decimal('0.01'))
+            if row['booking_count']
+            else None
+        )
+        del row['done_count']
     return sorted(report, key=lambda row: (-row['revenue'], row['therapist_id']))

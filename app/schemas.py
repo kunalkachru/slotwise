@@ -377,6 +377,9 @@ class TherapistReportOut(BaseModel):
     therapist_name: str
     booking_count: int
     revenue: MoneyStr
+    no_show_count: int
+    no_show_rate: float | None
+    average_booking_value: MoneyStr | None
 
 
 class StatusIn(BaseModel):

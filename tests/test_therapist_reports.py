@@ -49,7 +49,10 @@ def test_therapist_report_returns_one_exact_row_per_therapist(db, client, report
 
     assert len(rows) == len(therapists)
     assert all(
-        set(row) == {"therapist_id", "therapist_name", "booking_count", "revenue"}
+        set(row) == {
+            "therapist_id", "therapist_name", "booking_count", "revenue",
+            "no_show_count", "no_show_rate", "average_booking_value",
+        }
         for row in rows
     )
     assert {row["booking_count"] for row in rows} == {0, 1}
@@ -74,7 +77,40 @@ def test_therapist_report_counts_qualifying_bookings_by_segments(
 
     assert by_id[therapists[0].id]["booking_count"] == 1
     assert by_id[therapists[1].id]["booking_count"] == 1
+    assert by_id[therapists[0].id]["no_show_count"] == 0
+    assert by_id[therapists[1].id]["no_show_count"] == 0
     assert all(row["booking_count"] == 0 for row in rows[2:])
+
+
+def test_therapist_report_no_show_metrics(db, client, report_therapists):
+    therapists = report_therapists
+    start = datetime(2026, 10, 10, 12, tzinfo=BERLIN)
+    _booking(db, therapists, start, "20.00", status="done")
+    _booking(db, therapists, start + timedelta(hours=1), "30.00", status="no_show")
+    _booking(db, therapists, start + timedelta(hours=2), "40.00", status="no_show")
+
+    response = _report(client)
+    assert response.status_code == 200
+    by_id = {row["therapist_id"]: row for row in response.json()}
+
+    assert by_id[therapists[0].id]["no_show_count"] == 2
+    assert by_id[therapists[0].id]["no_show_rate"] == 2 / 3
+    assert by_id[therapists[1].id]["no_show_count"] == 0
+    assert by_id[therapists[1].id]["no_show_rate"] is None
+
+
+def test_therapist_report_average_booking_value(db, client, report_therapists):
+    therapists = report_therapists
+    start = datetime(2026, 10, 10, 12, tzinfo=BERLIN)
+    _booking(db, therapists, start, "10.11")
+    _booking(db, therapists, start + timedelta(hours=1), "2.35")
+
+    response = _report(client)
+    assert response.status_code == 200
+    by_id = {row["therapist_id"]: row for row in response.json()}
+
+    assert by_id[therapists[0].id]["average_booking_value"] == "6.23"
+    assert by_id[therapists[1].id]["average_booking_value"] is None
 
 
 def test_therapist_report_sums_and_formats_revenue(db, client, report_therapists):
