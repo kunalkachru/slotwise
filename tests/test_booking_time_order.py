@@ -1,9 +1,12 @@
 """Regression test for bookings with an end time before their start time."""
 
+import pytest
+
 from tests.conftest import CUSTOMER, menu_ids
 
 
-def test_booking_rejects_end_time_before_start_time(empty_calendar):
+@pytest.mark.parametrize("acceptance_check", ["AC-3"], ids=["AC-3"])
+def test_booking_rejects_end_time_before_start_time(empty_calendar, acceptance_check):
     client = empty_calendar
     ids = menu_ids(client)
 

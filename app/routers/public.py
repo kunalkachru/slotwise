@@ -214,7 +214,7 @@ def book(body: BookingIn, request: Request, db: Session = Depends(get_db)):
         except ValueError:
             pass
         else:
-            if end < start:
+            if end <= start:
                 raise AppError(422, END_TIME_BEFORE_START)
 
     limiter = request.app.state.booking_limiter

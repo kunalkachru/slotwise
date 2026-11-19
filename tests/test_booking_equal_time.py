@@ -1,9 +1,14 @@
 """Regression test for bookings whose end time equals their start time."""
 
+import pytest
+from sqlalchemy import select
+
+from app.models import Booking
 from tests.conftest import CUSTOMER, menu_ids
 
 
-def test_booking_rejects_end_time_equal_to_start_time(empty_calendar):
+@pytest.mark.parametrize("acceptance_check", ["AC-1"], ids=["AC-1"])
+def test_booking_rejects_end_time_equal_to_start_time(empty_calendar, db, acceptance_check):
     client = empty_calendar
     ids = menu_ids(client)
 
@@ -19,3 +24,4 @@ def test_booking_rejects_end_time_equal_to_start_time(empty_calendar):
 
     assert response.status_code == 422
     assert response.json()["detail"] == "End time must be after start time."
+    assert db.scalar(select(Booking.id)) is None
