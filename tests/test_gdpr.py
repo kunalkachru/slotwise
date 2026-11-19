@@ -1,10 +1,12 @@
 """GDPR requests: the owner can export a customer's data or erase it."""
 
 import json
+from decimal import Decimal
 
 import pytest
 
 from tests.conftest import book, login, manage_token
+from app.models import Booking
 
 TUESDAY = "2026-10-13"
 
@@ -31,7 +33,42 @@ def test_export_has_the_customers_data_but_no_link_tokens(booked):
     assert entry["start"] == "2026-10-13T17:00+02:00" and entry["total_price"] == "82.00"
     assert [i["name"] for i in entry["items"]] == ["Deep tissue massage", "Hot stones"]
     assert entry["note"] == "Shoulders, please"
+    assert data["summary"] == {
+        "total_bookings": 1,
+        "completed_visits": 0,
+        "no_shows": 0,
+        "total_spent_on_completed_bookings": "0.00",
+        "last_completed_visit": None,
+    }
     assert manage_token(client, booking["id"]) not in response.text  # keys aren't data
+
+
+def test_export_includes_customer_booking_summary(booked):
+    client, booking, customer_id = booked
+    second = book(client, ["Deep tissue massage"], "2026-10-14", "17:00", "Lena").json()
+    third = book(client, ["Deep tissue massage"], "2026-10-15", "17:00", "Lena").json()
+
+    with client.app.state.session_factory() as session:
+        first_booking = session.get(Booking, booking["id"])
+        second_booking = session.get(Booking, second["id"])
+        third_booking = session.get(Booking, third["id"])
+        first_booking.status = "done"
+        first_booking.total_price = Decimal("82.00")
+        second_booking.status = "no_show"
+        second_booking.total_price = Decimal("50.00")
+        third_booking.status = "done"
+        third_booking.total_price = Decimal("99.00")
+        session.commit()
+
+    data = client.get(f"/owner/customers/{customer_id}/export").json()
+
+    assert data["summary"] == {
+        "total_bookings": 3,
+        "completed_visits": 2,
+        "no_shows": 1,
+        "total_spent_on_completed_bookings": "181.00",
+        "last_completed_visit": "2026-10-15",
+    }
 
 
 def test_erase_anonymizes_but_keeps_amounts_and_is_idempotent(booked):
