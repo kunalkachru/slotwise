@@ -65,6 +65,7 @@ def test_therapist_report_counts_qualifying_bookings_by_segments(
     start = datetime(2026, 10, 10, 12, tzinfo=BERLIN)
     _booking(
         db, therapists, start, "20.00",
+        status="no_show",
         segment_ids=[therapists[0].id, therapists[1].id, therapists[0].id],
     )
     for offset, status in enumerate(("pending", "expired", "cancelled"), 1):
@@ -77,9 +78,13 @@ def test_therapist_report_counts_qualifying_bookings_by_segments(
 
     assert by_id[therapists[0].id]["booking_count"] == 1
     assert by_id[therapists[1].id]["booking_count"] == 1
-    assert by_id[therapists[0].id]["no_show_count"] == 0
-    assert by_id[therapists[1].id]["no_show_count"] == 0
-    assert all(row["booking_count"] == 0 for row in rows[2:])
+    assert by_id[therapists[0].id]["no_show_count"] == 1
+    assert by_id[therapists[1].id]["no_show_count"] == 1
+    assert all(
+        by_id[therapist.id]["booking_count"] == 0
+        and by_id[therapist.id]["no_show_count"] == 0
+        for therapist in therapists[2:]
+    )
 
 
 def test_therapist_report_no_show_metrics(db, client, report_therapists):
