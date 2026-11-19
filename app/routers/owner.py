@@ -128,6 +128,7 @@ def bookings(
 def therapist_reports(
     from_: date | None = Query(None, alias="from"),
     to: date | None = None,
+    owner: Owner = Depends(current_owner),
     db: Session = Depends(get_db),
 ):
     start, end = _range(from_, to)
