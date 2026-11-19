@@ -3,6 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
+import pytest
 from sqlalchemy import select
 
 from app import clock
@@ -68,6 +69,14 @@ def test_error_messages_are_translated(empty_calendar):
     assert missing.json()["detail"] == "Bitte prüfen Sie die markierten Felder."
     english = client.post("/public/bookings", json={})
     assert english.json()["detail"] == "Please check the highlighted fields."
+
+
+@pytest.mark.parametrize("acceptance_check", ["AC-2"], ids=["AC-2"])
+def test_equal_booking_time_error_is_translated(empty_calendar, acceptance_check):
+    response = book_de(empty_calendar, start="12:00", end_time="12:00")
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Die Endzeit muss nach der Startzeit liegen."
 
 
 def test_a_german_booking_gets_german_emails_and_items(empty_calendar, db, monkeypatch):
