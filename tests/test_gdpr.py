@@ -28,11 +28,34 @@ def test_export_has_the_customers_data_but_no_link_tokens(booked):
     assert 'filename="customer-' in response.headers["content-disposition"]
     assert response.headers["cache-control"] == "no-store"
     data = json.loads(response.text)
-    assert data["customer"]["email"] == "anna.mueller@example.com"
+    assert data["customer"] == {
+        "first_name": "Anna",
+        "last_name": "Müller",
+        "email": "anna.mueller@example.com",
+        "phone": "+49 151 0000 0001",
+        "no_shows": 0,
+        "anonymized_at": None,
+    }
     [entry] = data["bookings"]
-    assert entry["start"] == "2026-10-13T17:00+02:00" and entry["total_price"] == "82.00"
+    booked_at = entry["booked_at"]
+    assert entry == {
+        "start": "2026-10-13T17:00+02:00",
+        "end": "2026-10-13T18:15+02:00",
+        "status": "booked",
+        "therapist": "Lena",
+        "source": "online",
+        "items": [
+            {"name": "Deep tissue massage", "quantity": 1, "unit_price": "70.00"},
+            {"name": "Hot stones", "quantity": 1, "unit_price": "12.00"},
+        ],
+        "total_price": "82.00",
+        "receipt_number": None,
+        "note": "Shoulders, please",
+        "booked_at": booked_at,
+    }
     assert [i["name"] for i in entry["items"]] == ["Deep tissue massage", "Hot stones"]
     assert entry["note"] == "Shoulders, please"
+    assert data["waitlist"] == []
     assert data["summary"] == {
         "total_bookings": 1,
         "completed_visits": 0,
