@@ -276,7 +276,9 @@ def test_owner_waitlist_page_data_and_removal(lena_booked, db):
 
 
 def test_owner_waitlist_page_renders_wait_duration():
-    javascript = (Path(__file__).parents[1] / "app" / "static" / "js" / "owner-waitlist.js").read_text()
+    javascript = (
+        Path(__file__).parents[1] / "app" / "static" / "js" / "owner-waitlist.js"
+    ).read_text()
 
     assert '"Waiting"' in javascript
     assert 'e.waiting_for' in javascript
