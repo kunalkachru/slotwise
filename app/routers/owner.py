@@ -314,6 +314,7 @@ def _waitlist_out(db: Session, e) -> OwnerWaitlistOut:
         latest_time=e.latest_time.strftime("%H:%M"),
         therapist_name=", ".join(t.display_name for t in therapists if t) or None,
         joined_at=e.created_at, status=e.status, offered_at=e.offered_at,
+        waiting_for=waitlist.wait_duration(e),
         offer_expires_at=e.offer_expires_at,
         offer_time=e.offer_start_at.astimezone(clock.BERLIN).strftime("%a %-d %b %H:%M")
         if e.offer_start_at else None,

@@ -221,6 +221,19 @@ def _iso(moment: datetime) -> str:
     return moment.isoformat()
 
 
+def wait_duration(entry: WaitlistEntry) -> str:
+    elapsed = max(clock.now() - entry.created_at, timedelta())
+    minutes = int(elapsed.total_seconds() // 60)
+    days, remainder = divmod(minutes, 24 * 60)
+    hours, minutes = divmod(remainder, 60)
+    if days:
+        result = f"{days} day" if days == 1 else f"{days} days"
+        return f"{result} {hours} h" if hours else result
+    if hours:
+        return f"{hours} h"
+    return f"{minutes} min"
+
+
 def _plan_of(slot: Slot) -> dict:
     return {
         "choices": {str(step.service_id): step.therapist.id for step in slot.steps},
@@ -423,8 +436,7 @@ def remove_entry(db: Session, entry_id: int) -> None:
 
 
 def list_entries(db: Session, day: date | None) -> list[WaitlistEntry]:
-    stmt = select(WaitlistEntry).order_by(
-        WaitlistEntry.preferred_date, WaitlistEntry.created_at, WaitlistEntry.id)
+    stmt = select(WaitlistEntry).order_by(WaitlistEntry.created_at, WaitlistEntry.id)
     if day is not None:
         stmt = stmt.where(WaitlistEntry.preferred_date == day)
     else:

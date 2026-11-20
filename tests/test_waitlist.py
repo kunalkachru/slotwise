@@ -1,6 +1,9 @@
 """Slice 5: waitlist join, offers on cancellation, claim/decline/expiry, run-jobs."""
 
+import json
+import subprocess
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 from sqlalchemy import select
@@ -272,6 +275,118 @@ def test_owner_waitlist_page_data_and_removal(lena_booked, db):
         ("Tom Waiting", ["Foot reflexology"], "waiting")]
     assert client.delete(f"/owner/waitlist/{entries[0]['id']}").status_code == 204
     assert entry_status(db, "Tom") == "removed"
+
+
+def test_owner_waitlist_page_renders_wait_duration():
+    root = Path(__file__).parents[1] / "app" / "static" / "js"
+    api_source = (root / "api.js").read_text().replace("export ", "")
+    waitlist_source = (root / "owner-waitlist.js").read_text()
+    waitlist_source = waitlist_source.replace(
+        "init().catch((error) => showPageError(error));", ""
+    )
+    waitlist_source = "\n".join(
+        line for line in waitlist_source.splitlines() if not line.startswith("import ")
+    )
+
+    entries = [
+        {"id": 1, "customer_name": "Older Waiting", "email": "older@example.com",
+         "phone": "", "services": ["Foot reflexology"], "preferred_date": "2026-10-13",
+         "earliest_time": "09:00", "latest_time": "18:00", "therapist_name": None,
+         "joined_at": "2026-10-08T12:00:00+02:00", "waiting_for": "2 days 3 h",
+         "status": "waiting"},
+        {"id": 2, "customer_name": "Short Waiting", "email": "short@example.com",
+         "phone": "", "services": ["Foot reflexology"], "preferred_date": "2026-10-14",
+         "earliest_time": "09:00", "latest_time": "18:00", "therapist_name": None,
+         "joined_at": "2026-10-10T11:15:00+02:00", "waiting_for": "45 min",
+         "status": "waiting"},
+    ]
+    script = f"""
+const vm = require("node:vm");
+class Node {{}}
+class TextNode extends Node {{ constructor(text) {{ super(); this.textContent = text; }} }}
+class Element extends Node {{
+  constructor(tag) {{ super(); this.tagName = tag; this.children = []; this.attributes = {{}}; }}
+  append(...children) {{ this.children.push(...children); }}
+  replaceChildren(...children) {{ this.children = children; }}
+  setAttribute(name, value) {{ this.attributes[name] = String(value); }}
+  addEventListener() {{}}
+  get textContent() {{ return this.children.map((child) => child.textContent).join(""); }}
+  set textContent(value) {{ this.children = [new TextNode(String(value))]; }}
+  querySelectorAll(selector) {{
+    const matches = [];
+    const visit = (node) => {{
+      if (node.tagName === selector) matches.push(node);
+      for (const child of node.children || []) visit(child);
+    }};
+    visit(this);
+    return matches;
+  }}
+}}
+const elements = {{ "wl-date": new Element("input"), waitlist: new Element("section") }};
+globalThis.Node = Node;
+globalThis.document = {{
+  createElement: (tag) => new Element(tag),
+  createTextNode: (text) => new TextNode(text),
+  getElementById: (id) => elements[id],
+}};
+globalThis.ownerApi = async () => {json.dumps(entries)};
+globalThis.showPageError = () => {{ throw new Error("unexpected page error"); }};
+globalThis.startOwnerPage = async () => {{}};
+globalThis.toast = () => {{}};
+vm.runInThisContext({json.dumps(api_source)});
+    vm.runInThisContext({json.dumps(waitlist_source + "\nglobalThis.renderWaitlist = load;")});
+(async () => {{
+  await globalThis.renderWaitlist();
+  const rows = elements.waitlist.querySelectorAll("tr").slice(1);
+  console.log(JSON.stringify(rows.map((row) => row.querySelectorAll("td")[5].textContent)));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+    result = subprocess.run(["node", "--input-type=commonjs"], input=script, text=True,
+                            capture_output=True, check=True)
+
+    assert json.loads(result.stdout) == ["2 days 3 h", "45 min"]
+
+
+def test_owner_waitlist_returns_wait_duration_and_oldest_first(empty_calendar, db):
+    client = empty_calendar
+    login(client)
+    join(client, "Newer", day="2026-10-14")
+    join(client, "Older", day=TUESDAY)
+
+    entries = db.scalars(select(WaitlistEntry).order_by(WaitlistEntry.id)).all()
+    entries[0].created_at = clock.now() - timedelta(hours=3)
+    entries[1].created_at = clock.now() - timedelta(days=2, hours=3)
+    db.commit()
+
+    response = client.get("/owner/waitlist")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [entry["customer_name"] for entry in body] == ["Older Waiting", "Newer Waiting"]
+    assert body[0]["waiting_for"] == "2 days 3 h"
+    assert {"id", "customer_name", "preferred_date", "joined_at", "waiting_for"} <= body[0].keys()
+
+    filtered = client.get("/owner/waitlist", params={"date": TUESDAY})
+    assert [entry["customer_name"] for entry in filtered.json()] == ["Older Waiting"]
+
+
+def test_owner_waitlist_formats_elapsed_wait_duration(empty_calendar, db):
+    client = empty_calendar
+    login(client)
+    join(client, "Long", day=TUESDAY)
+    join(client, "Short", day="2026-10-14")
+
+    entries = db.scalars(select(WaitlistEntry).order_by(WaitlistEntry.id)).all()
+    entries[0].created_at = clock.now() - timedelta(days=2, hours=3)
+    entries[1].created_at = clock.now() - timedelta(minutes=45)
+    db.commit()
+
+    body = client.get("/owner/waitlist").json()
+
+    assert {entry["customer_name"]: entry["waiting_for"] for entry in body} == {
+        "Long Waiting": "2 days 3 h",
+        "Short Waiting": "45 min",
+    }
 
 
 # ---------- run-jobs ----------
