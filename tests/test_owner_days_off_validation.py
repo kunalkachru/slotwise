@@ -26,6 +26,7 @@ def test_owner_rejects_past_and_booked_therapist_days_off(empty_calendar):
         and booked.status_code == 422
         and "booking" in booked.json().get("detail", "").lower()
     )
+    assert client.get("/owner/days-off").json() == []
 
 
 def test_owner_rejects_studio_day_off_with_affected_booking_count(empty_calendar):
