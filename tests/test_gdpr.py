@@ -5,8 +5,8 @@ from decimal import Decimal
 
 import pytest
 
-from tests.conftest import book, login, manage_token
 from app.models import Booking
+from tests.conftest import book, login, manage_token
 
 TUESDAY = "2026-10-13"
 
