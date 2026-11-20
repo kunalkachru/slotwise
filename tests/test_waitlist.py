@@ -274,6 +274,48 @@ def test_owner_waitlist_page_data_and_removal(lena_booked, db):
     assert entry_status(db, "Tom") == "removed"
 
 
+def test_owner_waitlist_returns_wait_duration_and_oldest_first(empty_calendar, db):
+    client = empty_calendar
+    login(client)
+    join(client, "Newer", day="2026-10-14")
+    join(client, "Older", day=TUESDAY)
+
+    entries = db.scalars(select(WaitlistEntry).order_by(WaitlistEntry.id)).all()
+    entries[0].created_at = clock.now() - timedelta(hours=3)
+    entries[1].created_at = clock.now() - timedelta(days=2, hours=3)
+    db.commit()
+
+    response = client.get("/owner/waitlist")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [entry["customer_name"] for entry in body] == ["Older Waiting", "Newer Waiting"]
+    assert body[0]["waiting_for"] == "2 days 3 h"
+    assert {"id", "customer_name", "preferred_date", "joined_at", "waiting_for"} <= body[0].keys()
+
+    filtered = client.get("/owner/waitlist", params={"date": TUESDAY})
+    assert [entry["customer_name"] for entry in filtered.json()] == ["Older Waiting"]
+
+
+def test_owner_waitlist_formats_elapsed_wait_duration(empty_calendar, db):
+    client = empty_calendar
+    login(client)
+    join(client, "Long", day=TUESDAY)
+    join(client, "Short", day="2026-10-14")
+
+    entries = db.scalars(select(WaitlistEntry).order_by(WaitlistEntry.id)).all()
+    entries[0].created_at = clock.now() - timedelta(days=2, hours=3)
+    entries[1].created_at = clock.now() - timedelta(minutes=45)
+    db.commit()
+
+    body = client.get("/owner/waitlist").json()
+
+    assert {entry["customer_name"]: entry["waiting_for"] for entry in body} == {
+        "Long Waiting": "2 days 3 h",
+        "Short Waiting": "45 min",
+    }
+
+
 # ---------- run-jobs ----------
 
 def test_run_jobs_needs_the_secret(empty_calendar):

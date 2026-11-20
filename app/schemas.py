@@ -568,6 +568,7 @@ class OwnerWaitlistOut(BaseModel):
     latest_time: str
     therapist_name: str | None
     joined_at: datetime
+    waiting_for: str
     status: str
     offered_at: datetime | None
     offer_expires_at: datetime | None
