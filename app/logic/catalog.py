@@ -9,9 +9,21 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app import clock
 from app.errors import AppError
 from app.i18n import VAT_MODES
-from app.models import CATEGORIES, AddOn, DayOff, Service, Studio, Therapist, WorkingHours
+from app.logic.availability import day_bounds_utc
+from app.models import (
+    CATEGORIES,
+    AddOn,
+    Booking,
+    BookingSegment,
+    DayOff,
+    Service,
+    Studio,
+    Therapist,
+    WorkingHours,
+)
 
 DUPLICATE_SERVICE = "A service with this name already exists."
 DUPLICATE_THERAPIST = "A therapist with this name already exists."
@@ -206,8 +218,31 @@ def list_days_off(db: Session, from_day: date) -> list[DayOff]:
 
 
 def add_day_off(db: Session, therapist_id: int | None, day: date, reason: str | None) -> DayOff:
+    if day < clock.now().astimezone(clock.BERLIN).date():
+        raise AppError(422, "A day off cannot be added for a past date.", field="date")
     if therapist_id is not None:
         _get(db, Therapist, therapist_id)
+
+    start, end = day_bounds_utc(day)
+    affected = select(func.count(func.distinct(BookingSegment.booking_id))).join(
+        Booking, Booking.id == BookingSegment.booking_id
+    ).where(
+        Booking.status.notin_(("cancelled", "expired")),
+        BookingSegment.start_at >= start,
+        BookingSegment.start_at < end,
+    )
+    if therapist_id is not None:
+        affected = affected.where(BookingSegment.therapist_id == therapist_id)
+    booking_count = db.scalar(affected) or 0
+    if booking_count:
+        if therapist_id is not None:
+            message = "This therapist has a booking on that date and cannot take the day off."
+        else:
+            noun = "booking" if booking_count == 1 else "bookings"
+            verb = "is" if booking_count == 1 else "are"
+            message = f"{booking_count} {noun} {verb} affected by this studio day off."
+        raise AppError(422, message, field="date")
+
     reason = (reason or "").strip()[:120] or None
     day_off = DayOff(therapist_id=therapist_id, date=day, reason=reason)
     db.add(day_off)

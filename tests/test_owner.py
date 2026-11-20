@@ -310,7 +310,9 @@ def test_days_off(owner_empty):
                                                  "reason": "Team training"})
     assert added.status_code == 200
     day_off = added.json()
+    assert day_off["date"] == TUESDAY
     assert day_off["therapist_name"] is None
+    assert day_off["reason"] == "Team training"
     assert slots(client, ["Relaxation massage"], TUESDAY).json()["slots"] == []
     assert [d["id"] for d in client.get("/owner/days-off").json()] == [day_off["id"]]
     assert client.delete(f"/owner/days-off/{day_off['id']}").status_code == 204
