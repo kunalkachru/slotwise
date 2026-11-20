@@ -14,7 +14,14 @@ from app.errors import AppError
 from app.i18n import VAT_MODES
 from app.logic.availability import day_bounds_utc
 from app.models import (
-    CATEGORIES, AddOn, Booking, BookingSegment, DayOff, Service, Studio, Therapist,
+    CATEGORIES,
+    AddOn,
+    Booking,
+    BookingSegment,
+    DayOff,
+    Service,
+    Studio,
+    Therapist,
     WorkingHours,
 )
 
