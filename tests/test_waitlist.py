@@ -1,6 +1,7 @@
 """Slice 5: waitlist join, offers on cancellation, claim/decline/expiry, run-jobs."""
 
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 from sqlalchemy import select
@@ -272,6 +273,13 @@ def test_owner_waitlist_page_data_and_removal(lena_booked, db):
         ("Tom Waiting", ["Foot reflexology"], "waiting")]
     assert client.delete(f"/owner/waitlist/{entries[0]['id']}").status_code == 204
     assert entry_status(db, "Tom") == "removed"
+
+
+def test_owner_waitlist_page_renders_wait_duration():
+    javascript = (Path(__file__).parents[1] / "app" / "static" / "js" / "owner-waitlist.js").read_text()
+
+    assert '"Waiting"' in javascript
+    assert 'e.waiting_for' in javascript
 
 
 def test_owner_waitlist_returns_wait_duration_and_oldest_first(empty_calendar, db):

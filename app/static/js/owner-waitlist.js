@@ -23,13 +23,14 @@ async function load() {
   }
   if (!entries.length) return fill(target, h("p", { class: "state" }, day ? "Nobody is waiting for this day." : "Nobody is on the waitlist."));
   fill(target, h("div", { class: "table-wrap" }, h("table", { class: "data" },
-    h("thead", {}, h("tr", {}, ["Customer", "Services", "Day and window", "Therapist", "Joined", "Status", ""].map((c) => h("th", { scope: "col" }, c)))),
+    h("thead", {}, h("tr", {}, ["Customer", "Services", "Day and window", "Therapist", "Joined", "Waiting", "Status", ""].map((c) => h("th", { scope: "col" }, c)))),
     h("tbody", {}, entries.map((e) => h("tr", {},
       h("td", {}, h("strong", {}, e.customer_name), h("div", { class: "field-hint" }, e.email), h("div", { class: "field-hint" }, e.phone)),
       h("td", {}, e.services.join(", ")),
       h("td", {}, `${dayLabel.format(new Date(`${e.preferred_date}T12:00:00Z`))}, ${e.earliest_time}–${e.latest_time}`),
       h("td", {}, e.therapist_name || "Any"),
       h("td", {}, timeLabel.format(new Date(e.joined_at))),
+      h("td", {}, e.waiting_for),
       h("td", {},
         h("span", { class: `status-badge ${BADGE[e.status]}` }, STATUS[e.status]),
         e.offer_time && h("div", { class: "field-hint" }, `Offered ${e.offer_time}`),
