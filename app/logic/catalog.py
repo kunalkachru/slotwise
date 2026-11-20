@@ -218,7 +218,7 @@ def list_days_off(db: Session, from_day: date) -> list[DayOff]:
 
 
 def add_day_off(db: Session, therapist_id: int | None, day: date, reason: str | None) -> DayOff:
-    if day < clock.now().date():
+    if day < clock.now().astimezone(clock.BERLIN).date():
         raise AppError(422, "A day off cannot be added for a past date.", field="date")
     if therapist_id is not None:
         _get(db, Therapist, therapist_id)
