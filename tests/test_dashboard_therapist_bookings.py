@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app import clock
 from app.logic.dashboard import build
-from app.models import Booking, BookingItem, Customer, Service, Therapist
+from app.models import Booking, BookingItem, BookingSegment, Customer, Service, Therapist
 from tests.conftest import login
 
 ANCHOR = date(2026, 10, 10)
@@ -56,6 +56,8 @@ def test_dashboard_returns_seven_day_counts_for_every_active_therapist(empty_cal
     assert all([day["date"] for day in row["days"]] == [
         (ANCHOR + timedelta(days=i)).isoformat() for i in range(7)
     ] for row in dashboard["therapist_bookings"])
+    assert dashboard["therapist_bookings"][0]["days"][0]["count"] == 1
+    assert all(day["count"] == 0 for day in dashboard["therapist_bookings"][1]["days"])
 
 
 def test_dashboard_counts_qualifying_bookings_by_therapist_and_local_date(empty_calendar, db):
@@ -69,6 +71,22 @@ def test_dashboard_counts_qualifying_bookings_by_therapist_and_local_date(empty_
     row = build(db, ANCHOR).therapist_bookings.rows[0]
 
     assert [day.count for day in row.days] == [1, 1, 0, 0, 0, 0, 0]
+
+    # A chain booking is counted once for each participating therapist.
+    booking = db.scalar(select(Booking).where(Booking.manage_token.startswith("dashboard-token-2-")))
+    therapists, _ = roster(db)
+    booking.segments = [
+        BookingSegment(position=0, therapist_id=therapists[0].id,
+                       start_at=booking.start_at, end_at=booking.end_at,
+                       blocked_until=booking.blocked_until),
+        BookingSegment(position=1, therapist_id=therapists[1].id,
+                       start_at=booking.start_at, end_at=booking.end_at,
+                       blocked_until=booking.blocked_until),
+    ]
+    db.commit()
+    schedule = build(db, ANCHOR).therapist_bookings
+    assert schedule.rows[0].days[0].count == 1
+    assert schedule.rows[1].days[0].count == 1
 
 
 def test_dashboard_service_filter_limits_therapist_counts(empty_calendar, db):
@@ -88,6 +106,12 @@ def test_dashboard_service_filter_limits_therapist_counts(empty_calendar, db):
 
     assert [day["count"] for day in all_services["days"]][:2] == [1, 1]
     assert [day["count"] for day in filtered["days"]][:2] == [1, 0]
+    assert empty_calendar.get(
+        "/owner/dashboard", params={"date": ANCHOR.isoformat()}
+    ).json()["weekly_total"] == 2
+    assert empty_calendar.get(
+        "/owner/dashboard", params={"date": ANCHOR.isoformat(), "service_id": services[0].id}
+    ).json()["weekly_total"] == 1
 
 
 def test_dashboard_uses_inclusive_seven_day_local_date_window(empty_calendar, db):
@@ -104,7 +128,10 @@ def test_dashboard_uses_inclusive_seven_day_local_date_window(empty_calendar, db
     assert [day["date"] for day in row["days"]] == [
         (ANCHOR + timedelta(days=i)).isoformat() for i in range(7)
     ]
-    assert row["days"][0]["count"] == 1 and row["days"][-1]["count"] == 1
+    assert [day["count"] for day in row["days"]] == [1, 0, 0, 0, 0, 0, 1]
+    assert empty_calendar.get(
+        "/owner/dashboard", params={"date": (ANCHOR + timedelta(days=7)).isoformat()}
+    ).json()["therapist_bookings"][0]["days"][0]["count"] == 1
 
 
 def test_dashboard_therapist_schedule_requires_owner_session(empty_calendar):
@@ -124,6 +151,10 @@ def test_dashboard_includes_combined_weekly_total(empty_calendar, db):
     assert dashboard.weekly_total == 2
     assert dashboard.weekly_total == sum(day.count for row in dashboard.rows for day in row.days)
 
+    login(empty_calendar)
+    response = empty_calendar.get("/owner/dashboard", params={"date": ANCHOR.isoformat()})
+    assert response.json()["weekly_total"] == 2
+
 
 def test_dashboard_renders_no_bookings_state_for_zero_cells():
     root = Path(__file__).parents[1] / "app" / "static"
@@ -132,6 +163,7 @@ def test_dashboard_renders_no_bookings_state_for_zero_cells():
     assert '"No bookings"' in javascript
     assert 'day.count === 0' in javascript
     assert "no-bookings" in javascript
+    assert 'aria-label' in javascript
 
 
 def test_dashboard_page_renders_service_filter_and_applies_it():
@@ -144,3 +176,4 @@ def test_dashboard_page_renders_service_filter_and_applies_it():
     assert "service_id" in javascript
     assert "weekly_total" in javascript
     assert "selected" in javascript
+    assert 'service.onchange = () => load()' in javascript

@@ -35,6 +35,12 @@ def frozen_now(monkeypatch):
 
 
 @pytest.fixture
+def dashboard_anchor(frozen_now):
+    """The application-local date used by dashboard acceptance scenarios."""
+    return frozen_now.date()
+
+
+@pytest.fixture
 def make_client():
     """Factory: make_client(seed_demo_data=False, peer="93.184.216.34", ...) -> started client."""
     clients = []
