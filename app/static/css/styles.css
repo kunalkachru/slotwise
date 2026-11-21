@@ -759,6 +759,8 @@ table.data .btn { white-space: nowrap; }
 table.schedule { min-width: 760px; }
 table.schedule th, table.schedule td { vertical-align: middle; }
 table.schedule thead th { white-space: nowrap; }
+table.schedule th.today, table.schedule td.today { background: var(--accent-soft); }
+table.schedule thead th.today { font-weight: 700; }
 .schedule-cell.no-bookings { color: var(--muted); font-size: 0.8rem; font-weight: 500; }
 .tile-value.live { color: var(--ink); font-variant-numeric: tabular-nums; }
 .tile-note { font-size: 0.82rem; color: var(--muted); margin-top: 0.15rem; }

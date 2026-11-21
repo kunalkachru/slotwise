@@ -118,6 +118,7 @@ function appointments(rows) {
 // ---------- Therapist schedule ----------
 function therapistSchedule(schedule, weeklyTotal, anchorDate) {
   const days = schedule[0]?.days || [];
+  const today = isoDay.format(new Date());
   const dayLabel = (day) => `${weekday.format(asDate(day.date))} ${shortDay.format(asDate(day.date))}`;
   const rangeDays = days.length
     ? [days[0], days[days.length - 1]]
@@ -134,11 +135,13 @@ function therapistSchedule(schedule, weeklyTotal, anchorDate) {
       ? h("div", { class: "table-wrap schedule-wrap" }, h("table", { class: "data schedule" },
           h("thead", {}, h("tr", {},
             h("th", { scope: "col" }, "Therapist"),
-            days.map((day) => h("th", { scope: "col", class: "num" }, dayLabel(day))))),
+            days.map((day) => h("th", {
+              scope: "col", class: `num${day.date === today ? " today" : ""}`,
+            }, dayLabel(day))))),
           h("tbody", {}, schedule.map((row) => h("tr", {},
             h("th", { scope: "row" }, row.therapist_name),
             row.days.map((day) => h("td", {
-              class: `num schedule-cell${day.count === 0 ? " no-bookings" : ""}`,
+              class: `num schedule-cell${day.count === 0 ? " no-bookings" : ""}${day.date === today ? " today" : ""}`,
               "aria-label": `${dayLabel(day)}: ${day.count === 0 ? "No bookings" : `${day.count} bookings`}`,
             }, day.count === 0 ? "No bookings" : String(day.count))))))))
       : h("p", { class: "state" }, "No active therapists."),
