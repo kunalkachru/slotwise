@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app import clock
 from app.logic.dashboard import build
 from app.models import Booking, BookingItem, Customer, Service, Therapist
+from tests.conftest import login
 
 ANCHOR = date(2026, 10, 10)
 
@@ -43,13 +44,17 @@ def roster(db):
 def test_dashboard_returns_seven_day_counts_for_every_active_therapist(empty_calendar, db):
     therapists, services = roster(db)
     add_booking(db, 1, ANCHOR, therapists[0], services[0])
+    login(empty_calendar)
 
-    dashboard = build(db, ANCHOR).therapist_bookings
+    response = empty_calendar.get("/owner/dashboard", params={"date": ANCHOR.isoformat()})
+    assert response.status_code == 200
+    dashboard = response.json()
 
-    assert [row.therapist_id for row in dashboard.rows] == [t.id for t in therapists]
-    assert all(len(row.days) == 7 for row in dashboard.rows)
-    assert all([day.date for day in row.days] == [ANCHOR + timedelta(days=i) for i in range(7)]
-               for row in dashboard.rows)
+    assert [row["therapist_id"] for row in dashboard["therapist_bookings"]] == [t.id for t in therapists]
+    assert all(len(row["days"]) == 7 for row in dashboard["therapist_bookings"])
+    assert all([day["date"] for day in row["days"]] == [
+        (ANCHOR + timedelta(days=i)).isoformat() for i in range(7)
+    ] for row in dashboard["therapist_bookings"])
 
 
 def test_dashboard_counts_qualifying_bookings_by_therapist_and_local_date(empty_calendar, db):
@@ -70,11 +75,18 @@ def test_dashboard_service_filter_limits_therapist_counts(empty_calendar, db):
     add_booking(db, 7, ANCHOR, therapists[0], services[0])
     add_booking(db, 8, ANCHOR + timedelta(days=1), therapists[0], services[1])
 
-    all_services = build(db, ANCHOR).therapist_bookings.rows[0]
-    filtered = build(db, ANCHOR, services[0].id).therapist_bookings.rows[0]
+    login(empty_calendar)
+    all_services = empty_calendar.get(
+        "/owner/dashboard", params={"date": ANCHOR.isoformat()}
+    ).json()
+    filtered = empty_calendar.get(
+        "/owner/dashboard", params={"date": ANCHOR.isoformat(), "service_id": services[0].id}
+    ).json()
+    all_services = all_services["therapist_bookings"][0]
+    filtered = filtered["therapist_bookings"][0]
 
-    assert [day.count for day in all_services.days][:2] == [1, 1]
-    assert [day.count for day in filtered.days][:2] == [1, 0]
+    assert [day["count"] for day in all_services["days"]][:2] == [1, 1]
+    assert [day["count"] for day in filtered["days"]][:2] == [1, 0]
 
 
 def test_dashboard_uses_inclusive_seven_day_local_date_window(empty_calendar, db):
@@ -83,10 +95,22 @@ def test_dashboard_uses_inclusive_seven_day_local_date_window(empty_calendar, db
     add_booking(db, 10, ANCHOR + timedelta(days=6), therapists[0], services[0])
     add_booking(db, 11, ANCHOR + timedelta(days=7), therapists[0], services[0])
 
-    row = build(db, ANCHOR).therapist_bookings.rows[0]
+    login(empty_calendar)
+    row = empty_calendar.get(
+        "/owner/dashboard", params={"date": ANCHOR.isoformat()}
+    ).json()["therapist_bookings"][0]
 
-    assert [day.date for day in row.days] == [ANCHOR + timedelta(days=i) for i in range(7)]
-    assert row.days[0].count == 1 and row.days[-1].count == 1
+    assert [day["date"] for day in row["days"]] == [
+        (ANCHOR + timedelta(days=i)).isoformat() for i in range(7)
+    ]
+    assert row["days"][0]["count"] == 1 and row["days"][-1]["count"] == 1
+
+
+def test_dashboard_therapist_schedule_requires_owner_session(empty_calendar):
+    response = empty_calendar.get("/owner/dashboard", params={"date": ANCHOR.isoformat()})
+
+    assert response.status_code == 401
+    assert "therapist_bookings" not in response.json()
 
 
 def test_dashboard_includes_combined_weekly_total(empty_calendar, db):
