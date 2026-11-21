@@ -71,11 +71,12 @@ MAX_RANGE_DAYS = 92
 @router.get("/dashboard", response_model=DashboardOut)
 def dashboard(
     date: date | None = None,
+    service_id: int | None = None,
     owner: Owner = Depends(current_owner),
     db: Session = Depends(get_db),
 ):
     day = date or clock.now().date()
-    d = dashboard_logic.build(db, day)
+    d = dashboard_logic.build(db, day, service_id)
     return DashboardOut(
         date=day.isoformat(),
         owner_name=owner.full_name,
@@ -91,6 +92,12 @@ def dashboard(
         weeks=[{"week_start": w.week_start, "no_shows": w.no_shows,
                 "late_cancellations": w.late_cancellations} for w in d.weeks],
         appointments=dashboard_logic.appointment_rows(d),
+        therapist_bookings=[
+            {"therapist_id": row.therapist_id, "therapist_name": row.therapist_name,
+             "days": [{"date": item.date, "count": item.count} for item in row.days]}
+            for row in d.therapist_bookings.rows
+        ],
+        weekly_total=d.therapist_bookings.weekly_total,
     )
 
 

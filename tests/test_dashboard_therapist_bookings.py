@@ -1,0 +1,100 @@
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+
+from sqlalchemy import select
+
+from app import clock
+from app.logic.dashboard import build
+from app.models import Booking, BookingItem, Customer, Service, Therapist
+
+ANCHOR = date(2026, 10, 10)
+
+
+def add_booking(db, number, day, therapist, service, status="booked"):
+    start = datetime.combine(day, time(10), clock.BERLIN)
+    customer = Customer(
+        first_name="Guest", last_name=str(number), email=f"guest-{number}@example.com",
+        phone="+49 151 0000 0000",
+    )
+    booking = Booking(
+        customer=customer, therapist_id=therapist.id, start_at=start,
+        end_at=start + timedelta(minutes=30), blocked_until=start + timedelta(minutes=40),
+        status=status, source="online", total_price=Decimal("50.00"),
+        manage_token=f"dashboard-token-{number}-" + "x" * 20,
+        items=[BookingItem(
+            item_type="service", service_id=service.id, name_snapshot=service.name,
+            minutes_snapshot=30, unit_price_snapshot=Decimal("50.00"), quantity=1,
+        )],
+    )
+    db.add(booking)
+    db.commit()
+
+
+def roster(db):
+    therapists = db.scalars(
+        select(Therapist).where(Therapist.active.is_(True)).order_by(Therapist.id)
+    ).all()
+    services = db.scalars(
+        select(Service).where(Service.active.is_(True)).order_by(Service.id)
+    ).all()
+    return therapists, services
+
+
+def test_dashboard_returns_seven_day_counts_for_every_active_therapist(empty_calendar, db):
+    therapists, services = roster(db)
+    add_booking(db, 1, ANCHOR, therapists[0], services[0])
+
+    dashboard = build(db, ANCHOR).therapist_bookings
+
+    assert [row.therapist_id for row in dashboard.rows] == [t.id for t in therapists]
+    assert all(len(row.days) == 7 for row in dashboard.rows)
+    assert all([day.date for day in row.days] == [ANCHOR + timedelta(days=i) for i in range(7)]
+               for row in dashboard.rows)
+
+
+def test_dashboard_counts_qualifying_bookings_by_therapist_and_local_date(empty_calendar, db):
+    therapists, services = roster(db)
+    add_booking(db, 2, ANCHOR, therapists[0], services[0], "confirmed")
+    add_booking(db, 3, ANCHOR + timedelta(days=1), therapists[0], services[0], "done")
+    add_booking(db, 4, ANCHOR + timedelta(days=2), therapists[0], services[0], "cancelled")
+    add_booking(db, 5, ANCHOR + timedelta(days=3), therapists[0], services[0], "pending")
+    add_booking(db, 6, ANCHOR + timedelta(days=4), therapists[0], services[0], "expired")
+
+    row = build(db, ANCHOR).therapist_bookings.rows[0]
+
+    assert [day.count for day in row.days] == [1, 1, 0, 0, 0, 0, 0]
+
+
+def test_dashboard_service_filter_limits_therapist_counts(empty_calendar, db):
+    therapists, services = roster(db)
+    add_booking(db, 7, ANCHOR, therapists[0], services[0])
+    add_booking(db, 8, ANCHOR + timedelta(days=1), therapists[0], services[1])
+
+    all_services = build(db, ANCHOR).therapist_bookings.rows[0]
+    filtered = build(db, ANCHOR, services[0].id).therapist_bookings.rows[0]
+
+    assert [day.count for day in all_services.days][:2] == [1, 1]
+    assert [day.count for day in filtered.days][:2] == [1, 0]
+
+
+def test_dashboard_uses_inclusive_seven_day_local_date_window(empty_calendar, db):
+    therapists, services = roster(db)
+    add_booking(db, 9, ANCHOR, therapists[0], services[0])
+    add_booking(db, 10, ANCHOR + timedelta(days=6), therapists[0], services[0])
+    add_booking(db, 11, ANCHOR + timedelta(days=7), therapists[0], services[0])
+
+    row = build(db, ANCHOR).therapist_bookings.rows[0]
+
+    assert [day.date for day in row.days] == [ANCHOR + timedelta(days=i) for i in range(7)]
+    assert row.days[0].count == 1 and row.days[-1].count == 1
+
+
+def test_dashboard_includes_combined_weekly_total(empty_calendar, db):
+    therapists, services = roster(db)
+    add_booking(db, 12, ANCHOR, therapists[0], services[0])
+    add_booking(db, 13, ANCHOR + timedelta(days=1), therapists[1], services[0])
+
+    dashboard = build(db, ANCHOR).therapist_bookings
+
+    assert dashboard.weekly_total == 2
+    assert dashboard.weekly_total == sum(day.count for row in dashboard.rows for day in row.days)
