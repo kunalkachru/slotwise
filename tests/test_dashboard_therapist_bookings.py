@@ -51,7 +51,9 @@ def test_dashboard_returns_seven_day_counts_for_every_active_therapist(empty_cal
     assert response.status_code == 200
     dashboard = response.json()
 
-    assert [row["therapist_id"] for row in dashboard["therapist_bookings"]] == [t.id for t in therapists]
+    assert [row["therapist_id"] for row in dashboard["therapist_bookings"]] == [
+        therapist.id for therapist in therapists
+    ]
     assert all(len(row["days"]) == 7 for row in dashboard["therapist_bookings"])
     assert all([day["date"] for day in row["days"]] == [
         (ANCHOR + timedelta(days=i)).isoformat() for i in range(7)
@@ -73,7 +75,9 @@ def test_dashboard_counts_qualifying_bookings_by_therapist_and_local_date(empty_
     assert [day.count for day in row.days] == [1, 1, 0, 0, 0, 0, 0]
 
     # A chain booking is counted once for each participating therapist.
-    booking = db.scalar(select(Booking).where(Booking.manage_token.startswith("dashboard-token-2-")))
+    booking = db.scalar(
+        select(Booking).where(Booking.manage_token.startswith("dashboard-token-2-"))
+    )
     therapists, _ = roster(db)
     booking.segments = [
         BookingSegment(position=0, therapist_id=therapists[0].id,
