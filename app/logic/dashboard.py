@@ -1,3 +1,4 @@
+# Owner dashboard counts: bookings per therapist per day for the next 7 days.
 """Owner dashboard numbers (slice 6). Definitions (PLAN.md slice 6):
 
 - pending (awaiting email confirmation) and expired requests are left out everywhere.
