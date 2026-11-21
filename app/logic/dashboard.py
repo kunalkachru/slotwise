@@ -1,3 +1,4 @@
+# Owner dashboard counts: bookings per therapist per day for the next 7 days.
 """Owner dashboard numbers (slice 6). Definitions (PLAN.md slice 6):
 
 - pending (awaiting email confirmation) and expired requests are left out everywhere.
@@ -24,7 +25,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.logic.availability import day_bounds_utc
 from app.logic.owner_bookings import REPEAT_NO_SHOW_THRESHOLD
-from app.models import Booking
+from app.models import Booking, BookingSegment, Therapist
 
 WINDOW_DAYS = 30
 CHART_WEEKS = 8
@@ -36,6 +37,25 @@ class WeekCounts:
     week_start: date
     no_shows: int = 0
     late_cancellations: int = 0
+
+
+@dataclass
+class TherapistBookingDay:
+    date: date
+    count: int = 0
+
+
+@dataclass
+class TherapistBookingRow:
+    therapist_id: int
+    therapist_name: str
+    days: list[TherapistBookingDay]
+
+
+@dataclass
+class TherapistBookingSchedule:
+    rows: list[TherapistBookingRow]
+    weekly_total: int
 
 
 @dataclass
@@ -51,6 +71,9 @@ class Dashboard:
     revenue_recovered: Decimal
     online_share: float | None
     weeks: list[WeekCounts] = field(default_factory=list)
+    therapist_bookings: TherapistBookingSchedule = field(
+        default_factory=lambda: TherapistBookingSchedule([], 0)
+    )
 
 
 def _rate(part: int, whole: int) -> float | None:
@@ -64,9 +87,47 @@ def _bookings_between(db: Session, first: date, last: date) -> list[Booking]:
         select(Booking)
         .where(Booking.start_at >= start, Booking.start_at < end)
         .options(selectinload(Booking.items), selectinload(Booking.customer),
-                 selectinload(Booking.therapist))
+                 selectinload(Booking.therapist),
+                 selectinload(Booking.segments).selectinload(BookingSegment.therapist))
         .order_by(Booking.start_at, Booking.therapist_id)
     ).all())
+
+
+def _therapist_booking_schedule(
+    db: Session, anchor: date, service_id: int | None = None
+) -> TherapistBookingSchedule:
+    last = anchor + timedelta(days=6)
+    therapists = list(db.scalars(
+        select(Therapist).where(Therapist.active.is_(True)).order_by(Therapist.id)
+    ).all())
+    days = [anchor + timedelta(days=i) for i in range(7)]
+    counts = {therapist.id: {day: 0 for day in days} for therapist in therapists}
+    for booking in _bookings_between(db, anchor, last):
+        if booking.status in ("pending", "expired", "cancelled"):
+            continue
+        if service_id is not None and not any(
+            item.item_type == "service" and item.service_id == service_id
+            for item in booking.items
+        ):
+            continue
+        local_day = _local_day(booking)
+        if local_day not in days:
+            continue
+        participants = booking.segments or []
+        participant_ids = {segment.therapist_id for segment in participants}
+        if not participant_ids:
+            participant_ids = {booking.therapist_id}
+        for therapist_id in participant_ids & counts.keys():
+            counts[therapist_id][local_day] += 1
+    rows = [
+        TherapistBookingRow(
+            therapist_id=therapist.id,
+            therapist_name=therapist.display_name,
+            days=[TherapistBookingDay(day, counts[therapist.id][day]) for day in days],
+        )
+        for therapist in therapists
+    ]
+    return TherapistBookingSchedule(rows, sum(day.count for row in rows for day in row.days))
 
 
 def _local_day(booking: Booking) -> date:
@@ -75,7 +136,7 @@ def _local_day(booking: Booking) -> date:
     return booking.start_at.astimezone(clock.BERLIN).date()
 
 
-def build(db: Session, day: date) -> Dashboard:
+def build(db: Session, day: date, service_id: int | None = None) -> Dashboard:
     window_start = day - timedelta(days=WINDOW_DAYS - 1)
     first_week = day - timedelta(days=day.weekday()) - timedelta(weeks=CHART_WEEKS - 1)
     bookings = _bookings_between(db, min(window_start, first_week), day)
@@ -117,6 +178,7 @@ def build(db: Session, day: date) -> Dashboard:
         revenue_recovered=sum((b.total_price for b in from_waitlist), Decimal(0)),
         online_share=_rate(sum(b.source == "online" for b in active), len(active)),
         weeks=weeks,
+        therapist_bookings=_therapist_booking_schedule(db, day, service_id),
     )
 
 

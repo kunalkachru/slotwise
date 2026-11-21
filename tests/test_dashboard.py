@@ -99,9 +99,10 @@ def test_refill_rate_is_capped_at_100_percent(empty_calendar, db):
     assert empty_calendar.get("/owner/dashboard").json()["refill_rate"] == 1.0
 
 
-def test_empty_data_gives_no_rates_and_no_errors(empty_calendar):
+def test_empty_data_gives_no_rates_and_no_errors(empty_calendar, dashboard_anchor):
     login(empty_calendar)
     body = empty_calendar.get("/owner/dashboard").json()
+    assert body["date"] == dashboard_anchor.isoformat()
     assert body["today_bookings"] == 0 and body["expected_revenue_today"] == "0.00"
     for rate in ("confirmation_rate_today", "no_show_rate", "refill_rate", "online_share"):
         assert body[rate] is None, rate
@@ -116,3 +117,17 @@ def test_dashboard_for_another_day_and_needs_login(scenario):
     assert [a["status"] for a in other["appointments"]] == ["done", "cancelled"]
     scenario.post("/auth/logout")
     assert scenario.get("/owner/dashboard").status_code == 401
+
+
+def test_existing_dashboard_metrics_and_appointments_survive_therapist_schedule(scenario):
+    body = scenario.get("/owner/dashboard", params={"date": "2026-10-10"}).json()
+
+    assert body["today_bookings"] == 2
+    assert body["expected_revenue_today"] == "98.00"
+    assert [(a["time"], a["status"]) for a in body["appointments"]] == [
+        ("13:00", "confirmed"), ("15:00", "booked"), ("16:00", "cancelled")
+    ]
+    assert "therapist_bookings" in body
+    assert body["weekly_total"] == sum(
+        day["count"] for row in body["therapist_bookings"] for day in row["days"]
+    )

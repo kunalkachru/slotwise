@@ -444,6 +444,9 @@
 
 /* ---------- Data tables (owner area) ---------- */
 [data-theme="calm"] .table-wrap { overflow-x: auto; }
+[data-theme="calm"] .schedule-head { align-items: start; }
+[data-theme="calm"] .weekly-total { padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+[data-theme="calm"] .schedule-cell.no-bookings { background: var(--bg); }
 [data-theme="calm"] table.data { min-width: 760px; font-size: var(--text-sm); } /* narrower screens scroll the table inside its card (Figma) */
 [data-theme="calm"] table.data th {
   height: var(--control-height);

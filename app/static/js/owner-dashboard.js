@@ -5,6 +5,7 @@ const BERLIN = "Europe/Berlin";
 const isoDay = new Intl.DateTimeFormat("en-CA", { timeZone: BERLIN });
 const longDay = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 const shortDay = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "UTC" });
 const asDate = (iso) => new Date(`${iso}T12:00:00Z`);
 const percent = (rate) => (rate === null || rate === undefined ? "–" : `${Math.round(rate * 1000) / 10}%`);
 const STATUS = { pending: "Awaiting email", expired: "Not confirmed", booked: "Booked", confirmed: "Confirmed", done: "Done", no_show: "No-show", cancelled: "Cancelled" };
@@ -114,10 +115,41 @@ function appointments(rows) {
   ));
 }
 
+// ---------- Therapist schedule ----------
+function therapistSchedule(schedule, weeklyTotal) {
+  const days = schedule[0]?.days || [];
+  const dayLabel = (day) => `${weekday.format(asDate(day.date))} ${shortDay.format(asDate(day.date))}`;
+  return h("section", { class: "dash-section" },
+    h("div", { class: "schedule-head" },
+      h("div", {}, h("h2", {}, "Therapist bookings"),
+        h("p", { class: "muted" }, "Bookings for the next seven days, by therapist.")),
+      h("div", { class: "weekly-total", "aria-label": `Total bookings this week: ${weeklyTotal}` },
+        h("span", { class: "weekly-total-label" }, "Total this week"),
+        h("strong", {}, String(weeklyTotal)))),
+    schedule.length
+      ? h("div", { class: "table-wrap schedule-wrap" }, h("table", { class: "data schedule" },
+          h("thead", {}, h("tr", {},
+            h("th", { scope: "col" }, "Therapist"),
+            days.map((day) => h("th", { scope: "col", class: "num" }, dayLabel(day))))),
+          h("tbody", {}, schedule.map((row) => h("tr", {},
+            h("th", { scope: "row" }, row.therapist_name),
+            row.days.map((day) => h("td", {
+              class: `num schedule-cell${day.count === 0 ? " no-bookings" : ""}`,
+              "aria-label": `${dayLabel(day)}: ${day.count === 0 ? "No bookings" : `${day.count} bookings`}`,
+            }, day.count === 0 ? "No bookings" : String(day.count))))))))
+      : h("p", { class: "state" }, "No active therapists."),
+  );
+}
+
 // ---------- Page ----------
 async function load() {
   const input = document.getElementById("dash-date");
-  const d = await ownerApi(`/owner/dashboard${input.value ? `?date=${input.value}` : ""}`);
+  const service = document.getElementById("dash-service");
+  const params = new URLSearchParams();
+  if (input.value) params.set("date", input.value);
+  if (service.value) params.set("service_id", service.value);
+  const query = params.toString();
+  const d = await ownerApi(`/owner/dashboard${query ? `?${query}` : ""}`);
   document.getElementById("welcome").textContent = `Welcome back, ${d.owner_name}`;
   document.getElementById("today").textContent = longDay.format(asDate(d.date));
   input.value = d.date;
@@ -140,6 +172,7 @@ async function load() {
     h("section", { class: "dash-section" },
       h("h2", {}, "Appointments on this day"),
       appointments(d.appointments)),
+    therapistSchedule(d.therapist_bookings, d.weekly_total),
     h("section", { class: "dash-section" },
       h("h2", {}, "No-shows and late cancellations per week"),
       h("p", { class: "muted" }, "The last 8 weeks. Hover or focus a week for the numbers."),
@@ -150,8 +183,13 @@ async function load() {
 async function init() {
   await startOwnerPage("dashboard");
   const input = document.getElementById("dash-date");
+  const service = document.getElementById("dash-service");
+  const services = await ownerApi("/owner/services");
+  fill(service, h("option", { value: "", selected: true }, "All services"),
+    services.filter((item) => item.active).map((item) => h("option", { value: item.id }, item.name)));
   input.value = isoDay.format(new Date());
   input.onchange = () => load().catch((error) => showPageError(error, document.getElementById("dashboard")));
+  service.onchange = () => load().catch((error) => showPageError(error, document.getElementById("dashboard")));
   await load();
 }
 

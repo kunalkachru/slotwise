@@ -83,6 +83,17 @@ class WeekOut(BaseModel):
     late_cancellations: int
 
 
+class TherapistBookingDayOut(BaseModel):
+    date: date
+    count: int
+
+
+class TherapistBookingRowOut(BaseModel):
+    therapist_id: int
+    therapist_name: str
+    days: list[TherapistBookingDayOut]
+
+
 class DashboardAppointmentOut(BaseModel):
     id: int
     time: str
@@ -108,6 +119,8 @@ class DashboardOut(BaseModel):
     targets: dict[str, float] = Field(default_factory=dict)
     weeks: list[WeekOut] = Field(default_factory=list)
     appointments: list[DashboardAppointmentOut] = Field(default_factory=list)
+    therapist_bookings: list[TherapistBookingRowOut] = Field(default_factory=list)
+    weekly_total: int = 0
 
 
 # ---------- Slice 2: availability and booking ----------
