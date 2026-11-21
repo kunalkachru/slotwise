@@ -131,3 +131,14 @@ def test_existing_dashboard_metrics_and_appointments_survive_therapist_schedule(
     assert body["weekly_total"] == sum(
         day["count"] for row in body["therapist_bookings"] for day in row["days"]
     )
+
+
+def test_dashboard_service_filter_preserves_schedule_total_and_owner_content(scenario):
+    body = scenario.get("/owner/dashboard", params={"date": "2026-10-10"}).json()
+
+    assert body["therapist_bookings"]
+    assert all(len(row["days"]) == 7 for row in body["therapist_bookings"])
+    assert body["weekly_total"] == sum(
+        day["count"] for row in body["therapist_bookings"] for day in row["days"]
+    )
+    assert body["appointments"][0]["customer_name"] == "Guest NL"

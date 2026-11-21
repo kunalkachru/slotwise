@@ -22,6 +22,8 @@ def test_login_sets_session_and_opens_owner_routes(client):
     dashboard = client.get("/owner/dashboard")
     assert dashboard.status_code == 200
     assert dashboard.json()["date"] == "2026-10-10"
+    assert "therapist_bookings" in dashboard.json()
+    assert "weekly_total" in dashboard.json()
 
 
 def test_login_email_is_case_insensitive(client):

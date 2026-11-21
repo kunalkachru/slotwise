@@ -138,6 +138,25 @@ def test_dashboard_uses_inclusive_seven_day_local_date_window(empty_calendar, db
     ).json()["therapist_bookings"][0]["days"][0]["count"] == 1
 
 
+def test_dashboard_schedule_preserves_anchor_date_and_selected_day_content(empty_calendar, db):
+    therapists, services = roster(db)
+    add_booking(db, 14, ANCHOR + timedelta(days=1), therapists[0], services[0])
+    login(empty_calendar)
+
+    response = empty_calendar.get(
+        "/owner/dashboard", params={"date": (ANCHOR + timedelta(days=1)).isoformat()}
+    )
+
+    assert response.status_code == 200
+    dashboard = response.json()
+    assert dashboard["date"] == (ANCHOR + timedelta(days=1)).isoformat()
+    assert dashboard["appointments"][0]["time"] == "10:00"
+    assert [day["date"] for day in dashboard["therapist_bookings"][0]["days"]] == [
+        (ANCHOR + timedelta(days=1 + i)).isoformat() for i in range(7)
+    ]
+    assert dashboard["therapist_bookings"][0]["days"][0]["count"] == 1
+
+
 def test_dashboard_therapist_schedule_requires_owner_session(empty_calendar):
     response = empty_calendar.get("/owner/dashboard", params={"date": ANCHOR.isoformat()})
 
@@ -181,3 +200,39 @@ def test_dashboard_page_renders_service_filter_and_applies_it():
     assert "weekly_total" in javascript
     assert "selected" in javascript
     assert 'service.onchange = () => load()' in javascript
+
+
+def test_dashboard_page_renders_seven_day_schedule_date_range_heading():
+    root = Path(__file__).parents[1] / "app" / "static"
+    javascript = (root / "js" / "owner-dashboard.js").read_text(encoding="utf-8")
+
+    assert "Therapist bookings" in javascript
+    assert "[days[0], days[days.length - 1]]" in javascript
+    assert "const dateRange = `${dayLabel(rangeDays[0])} – ${dayLabel(rangeDays[1])}`" in javascript
+    assert " – " in javascript
+    assert "therapistSchedule(d.therapist_bookings, d.weekly_total, d.date)" in javascript
+
+
+def test_dashboard_schedule_date_range_data_matches_two_anchor_dates(empty_calendar):
+    login(empty_calendar)
+    weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
+
+    def day_label(day):
+        return f"{weekdays[day.weekday()]} {day.day} {months[day.month - 1]}"
+
+    for anchor in (ANCHOR, ANCHOR + timedelta(days=3)):
+        dashboard = empty_calendar.get(
+            "/owner/dashboard", params={"date": anchor.isoformat()}
+        ).json()
+        days = dashboard["therapist_bookings"][0]["days"]
+        expected_days = [anchor + timedelta(days=i) for i in range(7)]
+
+        actual_days = [date.fromisoformat(day["date"]) for day in days]
+        assert actual_days == expected_days
+        assert f"{day_label(actual_days[0])} – {day_label(actual_days[-1])}" == (
+            f"{day_label(anchor)} – {day_label(anchor + timedelta(days=6))}"
+        )
