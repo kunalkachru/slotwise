@@ -211,3 +211,28 @@ def test_dashboard_page_renders_seven_day_schedule_date_range_heading():
     assert "const dateRange = `${dayLabel(rangeDays[0])} – ${dayLabel(rangeDays[1])}`" in javascript
     assert " – " in javascript
     assert "therapistSchedule(d.therapist_bookings, d.weekly_total, d.date)" in javascript
+
+
+def test_dashboard_schedule_date_range_data_matches_two_anchor_dates(empty_calendar):
+    login(empty_calendar)
+    weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
+
+    def day_label(day):
+        return f"{weekdays[day.weekday()]} {day.day} {months[day.month - 1]}"
+
+    for anchor in (ANCHOR, ANCHOR + timedelta(days=3)):
+        dashboard = empty_calendar.get(
+            "/owner/dashboard", params={"date": anchor.isoformat()}
+        ).json()
+        days = dashboard["therapist_bookings"][0]["days"]
+        expected_days = [anchor + timedelta(days=i) for i in range(7)]
+
+        actual_days = [date.fromisoformat(day["date"]) for day in days]
+        assert actual_days == expected_days
+        assert f"{day_label(actual_days[0])} – {day_label(actual_days[-1])}" == (
+            f"{day_label(anchor)} – {day_label(anchor + timedelta(days=6))}"
+        )
