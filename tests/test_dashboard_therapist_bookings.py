@@ -1,5 +1,6 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from sqlalchemy import select
 
@@ -122,3 +123,24 @@ def test_dashboard_includes_combined_weekly_total(empty_calendar, db):
 
     assert dashboard.weekly_total == 2
     assert dashboard.weekly_total == sum(day.count for row in dashboard.rows for day in row.days)
+
+
+def test_dashboard_renders_no_bookings_state_for_zero_cells():
+    root = Path(__file__).parents[1] / "app" / "static"
+    javascript = (root / "js" / "owner-dashboard.js").read_text(encoding="utf-8")
+
+    assert '"No bookings"' in javascript
+    assert 'day.count === 0' in javascript
+    assert "no-bookings" in javascript
+
+
+def test_dashboard_page_renders_service_filter_and_applies_it():
+    root = Path(__file__).parents[1] / "app" / "static"
+    html = (root / "owner" / "dashboard.html").read_text(encoding="utf-8")
+    javascript = (root / "js" / "owner-dashboard.js").read_text(encoding="utf-8")
+
+    assert 'id="dash-service"' in html
+    assert 'ownerApi("/owner/services")' in javascript
+    assert "service_id" in javascript
+    assert "weekly_total" in javascript
+    assert "selected" in javascript
