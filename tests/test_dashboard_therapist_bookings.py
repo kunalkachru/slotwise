@@ -213,6 +213,30 @@ def test_dashboard_page_renders_seven_day_schedule_date_range_heading():
     assert "therapistSchedule(d.therapist_bookings, d.weekly_total, d.date)" in javascript
 
 
+def test_dashboard_highlights_today_column():
+    root = Path(__file__).parents[1] / "app" / "static"
+    javascript = (root / "js" / "owner-dashboard.js").read_text(encoding="utf-8")
+    styles = (root / "css" / "styles.css").read_text(encoding="utf-8")
+    calm = (root / "css" / "calm.css").read_text(encoding="utf-8")
+
+    assert 'const today = isoDay.format(new Date())' in javascript
+    assert 'day.date === today ? " today" : ""' in javascript
+    assert "table.schedule th.today" in styles
+    assert "table.schedule td.today" in styles
+    assert "table.schedule th.today" in calm
+    assert "table.schedule td.today" in calm
+    assert "font-weight: 700" in styles
+
+
+def test_dashboard_highlight_uses_current_local_date_not_anchor():
+    root = Path(__file__).parents[1] / "app" / "static"
+    javascript = (root / "js" / "owner-dashboard.js").read_text(encoding="utf-8")
+
+    assert 'const today = isoDay.format(new Date())' in javascript
+    assert 'day.date === today ? " today" : ""' in javascript
+    assert 'day.date === anchorDate' not in javascript
+
+
 def test_dashboard_schedule_date_range_data_matches_two_anchor_dates(empty_calendar):
     login(empty_calendar)
     weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
