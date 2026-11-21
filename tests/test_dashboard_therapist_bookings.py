@@ -181,3 +181,14 @@ def test_dashboard_page_renders_service_filter_and_applies_it():
     assert "weekly_total" in javascript
     assert "selected" in javascript
     assert 'service.onchange = () => load()' in javascript
+
+
+def test_dashboard_page_renders_seven_day_schedule_date_range_heading():
+    root = Path(__file__).parents[1] / "app" / "static"
+    javascript = (root / "js" / "owner-dashboard.js").read_text(encoding="utf-8")
+
+    assert "Therapist bookings" in javascript
+    assert "[days[0], days[days.length - 1]]" in javascript
+    assert "const dateRange = `${dayLabel(rangeDays[0])} – ${dayLabel(rangeDays[1])}`" in javascript
+    assert " – " in javascript
+    assert "therapistSchedule(d.therapist_bookings, d.weekly_total, d.date)" in javascript

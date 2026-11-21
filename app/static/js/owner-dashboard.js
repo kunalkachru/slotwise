@@ -116,12 +116,16 @@ function appointments(rows) {
 }
 
 // ---------- Therapist schedule ----------
-function therapistSchedule(schedule, weeklyTotal) {
+function therapistSchedule(schedule, weeklyTotal, anchorDate) {
   const days = schedule[0]?.days || [];
   const dayLabel = (day) => `${weekday.format(asDate(day.date))} ${shortDay.format(asDate(day.date))}`;
+  const rangeDays = days.length
+    ? [days[0], days[days.length - 1]]
+    : [{ date: anchorDate }, { date: new Date(asDate(anchorDate).getTime() + 6 * 86400000).toISOString().slice(0, 10) }];
+  const dateRange = `${dayLabel(rangeDays[0])} – ${dayLabel(rangeDays[1])}`;
   return h("section", { class: "dash-section" },
     h("div", { class: "schedule-head" },
-      h("div", {}, h("h2", {}, "Therapist bookings"),
+      h("div", {}, h("h2", {}, `Therapist bookings · ${dateRange}`),
         h("p", { class: "muted" }, "Bookings for the next seven days, by therapist.")),
       h("div", { class: "weekly-total", "aria-label": `Total bookings this week: ${weeklyTotal}` },
         h("span", { class: "weekly-total-label" }, "Total this week"),
@@ -172,7 +176,7 @@ async function load() {
     h("section", { class: "dash-section" },
       h("h2", {}, "Appointments on this day"),
       appointments(d.appointments)),
-    therapistSchedule(d.therapist_bookings, d.weekly_total),
+    therapistSchedule(d.therapist_bookings, d.weekly_total, d.date),
     h("section", { class: "dash-section" },
       h("h2", {}, "No-shows and late cancellations per week"),
       h("p", { class: "muted" }, "The last 8 weeks. Hover or focus a week for the numbers."),
