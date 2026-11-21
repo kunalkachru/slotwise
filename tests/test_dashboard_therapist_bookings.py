@@ -138,6 +138,25 @@ def test_dashboard_uses_inclusive_seven_day_local_date_window(empty_calendar, db
     ).json()["therapist_bookings"][0]["days"][0]["count"] == 1
 
 
+def test_dashboard_schedule_preserves_anchor_date_and_selected_day_content(empty_calendar, db):
+    therapists, services = roster(db)
+    add_booking(db, 14, ANCHOR + timedelta(days=1), therapists[0], services[0])
+    login(empty_calendar)
+
+    response = empty_calendar.get(
+        "/owner/dashboard", params={"date": (ANCHOR + timedelta(days=1)).isoformat()}
+    )
+
+    assert response.status_code == 200
+    dashboard = response.json()
+    assert dashboard["date"] == (ANCHOR + timedelta(days=1)).isoformat()
+    assert dashboard["appointments"][0]["time"] == "10:00"
+    assert [day["date"] for day in dashboard["therapist_bookings"][0]["days"]] == [
+        (ANCHOR + timedelta(days=1 + i)).isoformat() for i in range(7)
+    ]
+    assert dashboard["therapist_bookings"][0]["days"][0]["count"] == 1
+
+
 def test_dashboard_therapist_schedule_requires_owner_session(empty_calendar):
     response = empty_calendar.get("/owner/dashboard", params={"date": ANCHOR.isoformat()})
 
