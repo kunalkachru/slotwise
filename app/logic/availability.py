@@ -91,6 +91,11 @@ def _closed_therapist_ids(db: Session, day: date) -> tuple[bool, set[int]]:
     return studio_closed, {r.therapist_id for r in rows if r.therapist_id is not None}
 
 
+def therapist_day_off_ids(db: Session, day: date) -> set[int]:
+    """Return therapists whose marked day off applies to the local calendar date."""
+    return _closed_therapist_ids(db, day)[1]
+
+
 def _busy_ranges(db: Session, therapist_ids: list[int], day: date):
     """Each therapist's busy time that touches the day, as (start, blocked_until): the
     segments of bookings that occupy their slot (one per therapist part of a booking)."""

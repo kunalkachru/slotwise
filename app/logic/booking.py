@@ -23,6 +23,7 @@ from app.errors import (
     NAME_CHARACTERS,
     NOT_AN_OFFERED_TIME,
     NOTE_TOO_LONG,
+    THERAPIST_DAY_OFF,
     TIME_TAKEN,
     AppError,
     outside_booking_window,
@@ -34,6 +35,7 @@ from app.logic.availability import (
     booking_limits,
     get_studio,
     local_to_utc,
+    therapist_day_off_ids,
 )
 from app.logic.selection import Selection, therapist_candidates
 from app.models import Booking, BookingSegment, Customer, Therapist
@@ -184,6 +186,15 @@ def create_booking(
             studio.min_notice_hours, studio.booking_window_days), field="start_time")
 
     candidates = therapist_candidates(db, selection, therapist_id, therapist_choices)
+    if therapist_id is not None:
+        selected_therapists = {therapist_id}
+    else:
+        selected_therapists = {
+            selected_id for service in selection.services
+            if (selected_id := (therapist_choices or {}).get(service.id)) is not None
+        }
+    if selected_therapists & therapist_day_off_ids(db, day):
+        raise AppError(422, THERAPIST_DAY_OFF, field="date")
     if not all(candidates.values()):
         raise AppError(400, TIME_TAKEN)
 
