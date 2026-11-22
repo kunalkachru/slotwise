@@ -5,6 +5,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
 
 from app.clock import BERLIN
+from app.logic.booking import snapshotted_total_minutes
 
 # Money leaves the API as a string with exactly two decimals ("70.00"), never a float.
 MoneyStr = Annotated[
@@ -232,7 +233,7 @@ def booking_fields(booking) -> dict:
         end_at=booking.end_at,
         date=local_start.date(),
         time=local_start.strftime("%H:%M"),
-        total_minutes=sum(i.minutes_snapshot * i.quantity for i in booking.items),
+        total_minutes=snapshotted_total_minutes(booking),
         total_price=booking.total_price,
         therapist_name=booking.therapist_names,
         # Several therapists (option B): who does what, when. One line for a simple booking.

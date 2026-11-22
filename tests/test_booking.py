@@ -22,7 +22,9 @@ def test_booking_snapshots_items_and_totals(empty_calendar, db):
     body = response.json()
     assert body["total_price"] == "82.00"
     assert body["total_minutes"] == 75
-    assert body["total_minutes"] == sum(item["minutes"] * item["quantity"] for item in body["items"])
+    assert body["total_minutes"] == sum(
+        item["minutes"] * item["quantity"] for item in body["items"]
+    )
     assert (body["date"], body["time"], body["therapist_name"]) == (TUESDAY, "17:00", "Lena")
     assert [(i["name"], i["unit_price"]) for i in body["items"]] == [
         ("Deep tissue massage", "70.00"), ("Hot stones", "12.00")]

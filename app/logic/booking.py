@@ -91,6 +91,14 @@ def mailbox_key(email: str) -> str:
 _booking_lock = threading.Lock()
 
 
+def snapshotted_total_minutes(booking: Booking) -> int:
+    """Return the booked duration from the immutable booking-item snapshots.
+
+    Scheduling buffers are deliberately not part of the customer-facing slot length.
+    """
+    return sum(item.minutes_snapshot * item.quantity for item in booking.items)
+
+
 @dataclass
 class CustomerDetails:
     first_name: str
