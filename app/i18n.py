@@ -132,6 +132,8 @@ MESSAGES_DE = {
         "Keine Therapeutin bietet diese Kombination an. Bitte entfernen Sie eine Behandlung.",
     "Please choose at least one service.": "Bitte wählen Sie mindestens eine Behandlung.",
     "End time must be after start time.": "Die Endzeit muss nach der Startzeit liegen.",
+    "This therapist has a day off on that date.":
+        "Diese Therapeutin hat an diesem Datum frei.",
     "One of the chosen treatments is no longer available. Please refresh.":
         "Eine der gewählten Behandlungen ist nicht mehr verfügbar. Bitte laden Sie die Seite neu.",
     "Please pick one of the offered times.": "Bitte wählen Sie eine der angebotenen Zeiten.",

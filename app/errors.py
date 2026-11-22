@@ -18,6 +18,7 @@ NOT_LOGGED_IN = "Please log in."
 
 # Booking (slice 2)
 TIME_TAKEN = "That time was just taken. Please pick another."
+THERAPIST_DAY_OFF = "This therapist has a day off on that date."
 
 
 def outside_booking_window(min_notice_hours: int, window_days: int) -> str:
