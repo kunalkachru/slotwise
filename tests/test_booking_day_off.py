@@ -1,9 +1,10 @@
 """Regression test for booking a therapist's marked day off."""
 
+from app.models import Booking
 from tests.conftest import CUSTOMER, login, menu_ids, therapist_id
 
 
-def test_booking_form_rejects_a_therapist_day_off(empty_calendar):
+def test_booking_form_rejects_a_therapist_day_off(empty_calendar, db):
     client = empty_calendar
     assert login(client).status_code == 200
     lena = therapist_id(client, "Lena")
@@ -27,3 +28,4 @@ def test_booking_form_rejects_a_therapist_day_off(empty_calendar):
 
     assert response.status_code == 422
     assert "day off" in response.json()["detail"].lower()
+    assert db.query(Booking).count() == 0
